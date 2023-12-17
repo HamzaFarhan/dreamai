@@ -21,6 +21,7 @@ from ast import literal_eval
 from inspect import cleandoc
 from matplotlib import colors
 from yaml import load, Loader
+from dotenv import load_dotenv
 import matplotlib.pyplot as plt
 from itertools import chain, groupby
 from functools import reduce, partial
