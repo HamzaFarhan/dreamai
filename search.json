@@ -1,0 +1,44 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "dreamai",
+    "section": "",
+    "text": "pip install dreamai"
+  },
+  {
+    "objectID": "index.html#install",
+    "href": "index.html#install",
+    "title": "dreamai",
+    "section": "",
+    "text": "pip install dreamai"
+  },
+  {
+    "objectID": "core.html",
+    "href": "core.html",
+    "title": "Core",
+    "section": "",
+    "text": "source"
+  },
+  {
+    "objectID": "core.html#some-usage-examples",
+    "href": "core.html#some-usage-examples",
+    "title": "Core",
+    "section": "Some usage examples:",
+    "text": "Some usage examples:\nGet all the files in a directory.\n\npath = \"../\"\nfiles = get_files(path)\nfiles[-11:-8]\n\n[Path('../dreamai/__pycache__/core.cpython-310.pyc'),\n Path('../dreamai/__pycache__/imports.cpython-311.pyc'),\n Path('../dreamai/__pycache__/checkers.cpython-310.pyc')]\n\n\nOnly get the files from the nbs folder.\n\nnb_files = get_files(path, folders=[\"nbs\"])\nnb_files\n\n[Path('../nbs/index.ipynb'),\n Path('../nbs/nbdev.yml'),\n Path('../nbs/sidebar.yml'),\n Path('../nbs/01_vision.ipynb'),\n Path('../nbs/_quarto.yml'),\n Path('../nbs/styles.css'),\n Path('../nbs/00_core.ipynb')]\n\n\nChecking a file path. All tests should pass.\n\nfile = str(nb_files[-1])\ntest_eq(is_str(file), True)\ntest_eq(is_path(file), False)\ntest_eq(path_or_str(file), True)\nfile\n\n'../nbs/00_core.ipynb'\n\n\n\nfile = nb_files[-1]\ntest_eq(is_str(file), False)\ntest_eq(is_path(file), True)\ntest_eq(path_or_str(file), True)\nfile\n\nPath('../nbs/00_core.ipynb')\n\n\nChecking a numpy array.\n\nx = np.array([1, 2, 3])\ntest_eq(is_array(x), True)\ntest_eq(is_list(x), False)\ntest_eq(is_iter(x), True)\n\nAdd an extension to a file path if it doesn’t already have one.\n\nl = [\"f1\", \"f2.jpeg\", \"f3\"]\next = \".png\"\nl2 = [str(Path(f).with_suffix(ext)) for f in l]\nprint(l)\nprint(l2)\n\n['f1', 'f2.jpeg', 'f3']\n['f1.png', 'f2.png', 'f3.png']\n\n\nSome dictionary examples.\n\nd = {\"apple\": 1, \"apple_pie\": 2, \"cake\": 3}\n\n\n# Sort dict.\n\nprint(sort_dict(d))  # by key\nprint(sort_dict(d, by_value=True))  # by value\n\n{'apple': 1, 'apple_pie': 2, 'cake': 3}\n{'apple': 1, 'apple_pie': 2, 'cake': 3}\n\n\n\n# Replace 'apple' with 'pumpkin'\nprint(replace_dict_key(d, x=\"apple\", y=\"pumpkin\", strict=True))\n\n# Replace all instances of 'apple' with 'pumpkin'\nprint(replace_dict_key(d, x=\"apple\", y=\"pumpkin\", strict=False))\n\n{'pumpkin': 1, 'apple_pie': 2, 'cake': 3}\n{'pumpkin': 1, 'pumpkin_pie': 2, 'cake': 3}\n\n\n\n# Remove keys that don't have 'apple' in them.\nd2 = filter_dict(d, fn=lambda x: \"apple\" in x)\nd2\n\n{'apple': 1, 'apple_pie': 2}\n\n\nFlatten a list.\n\nl = [[1, 2, 3], [4, [5, 6]], [7], [8, 9], 10]\nl2 = flatten(l)\nl2\n\n&lt;generator object flatten&gt;\n\n\n\ntest_eq(l2, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])\n\nGet the local variables/parameters in a function.\n\ndef fn2(z=30, **kwargs):\n    # lp will have the value of `z` and the values in `kwargs`.\n    lp = locals_to_params(locals())\n    print(f\"fn2 local params: {lp}\")\n    return lp[\"z\"]\n\n\ndef fn(x=10, y=20, **kwargs):\n    # lp will have the value of `x`, `y` and the values in `kwargs`.\n    lp = locals_to_params(locals())\n    print(f\"fn local params: {lp}\")\n    return x + y + fn2(**lp)\n\n\nres = fn()  # fn2 will receive `x=10`, `y=30` and `z=30` by default.\nprint(f\"Result: {res}\")\n\nfn local params: {'x': 10, 'y': 20}\nfn2 local params: {'z': 30, 'x': 10, 'y': 20}\nResult: 60\n\n\n\nparams = {\"x\": 50, \"z\": 300}  # fn2 will receive `x=50`, `y=20`, `z=300`.\nres = fn(**params)\nprint(f\"Result: {res}\")\n\nfn local params: {'x': 50, 'y': 20, 'z': 300}\nfn2 local params: {'z': 300, 'x': 50, 'y': 20}\nResult: 370"
+  },
+  {
+    "objectID": "vision.html",
+    "href": "vision.html",
+    "title": "Vision",
+    "section": "",
+    "text": "source"
+  },
+  {
+    "objectID": "vision.html#some-usage-examples",
+    "href": "vision.html#some-usage-examples",
+    "title": "Vision",
+    "section": "Some usage examples:",
+    "text": "Some usage examples:\nGet a list of all the images in a folder.\n\npath = \"../\"\nimgs = get_image_files(path)\nimgs\n\n[Path('../_proc/_docs/01_vision_files/figure-html/cell-30-output-2.png'),\n Path('../_proc/_docs/01_vision_files/figure-html/cell-30-output-1.png'),\n Path('../_proc/_docs/01_vision_files/figure-html/cell-30-output-3.png'),\n Path('../_proc/_docs/01_vision_files/figure-html/cell-34-output-1.png'),\n Path('../_proc/_docs/01_vision_files/figure-html/cell-34-output-4.png'),\n Path('../_proc/_docs/01_vision_files/figure-html/cell-32-output-1.png'),\n Path('../_proc/_docs/01_vision_files/figure-html/cell-34-output-3.png'),\n Path('../_proc/_docs/01_vision_files/figure-html/cell-34-output-5.png'),\n Path('../_proc/_docs/01_vision_files/figure-html/cell-34-output-2.png'),\n Path('../_proc/_docs/01_vision copy_files/figure-html/cell-20-output-1.png'),\n Path('../_proc/_docs/01_vision copy_files/figure-html/cell-20-output-3.png'),\n Path('../_proc/_docs/01_vision copy_files/figure-html/cell-22-output-1.png'),\n Path('../_proc/_docs/01_vision copy_files/figure-html/cell-20-output-2.png'),\n Path('../imgs/img_3.jpg'),\n Path('../imgs/img_1.jpg'),\n Path('../imgs/img_2.jpg'),\n Path('../imgs/img_4.jpg')]\n\n\nOnly images from the imgs folder.\n\nimgs = get_image_files(path, folders=[\"imgs\"])\nimgs\n\n[Path('../imgs/img_3.jpg'),\n Path('../imgs/img_1.jpg'),\n Path('../imgs/img_2.jpg'),\n Path('../imgs/img_4.jpg')]\n\n\nSort the images by their file number.\n\nimgs = get_image_files(path, folders=[\"imgs\"], sort_key=lambda x: x.stem.split(\"_\")[1])\nimgs\n\n[Path('../imgs/img_1.jpg'),\n Path('../imgs/img_2.jpg'),\n Path('../imgs/img_3.jpg'),\n Path('../imgs/img_4.jpg')]\n\n\nimg_path can be an str or a Path object.\n\nimg_path = imgs[0]\n\n# cv2 needs an str and it reads in BGR by default.\nx = cv2.imread(str(img_path))\n\n# So we prefer to use rgb_read.\nx2 = rgb_read(img_path)\n\n# If we want a grayscale image, we can use c1_read.\nx3 = c1_read(img_path)\n\n\nshow_img([x, x2])\nplt_show(x3, cmap=\"gray\")\n\n\n\n\n\n\n\n\n\n\n\n# Get the height and width of an image.\n\nget_hw(x)\n\n(1024, 1024)\n\n\n\nplt_show(bgr2rgb(x))\n\n\n\n\nTest if x is the same as x2 after converting from bgr to rgb.\n\ntest_eq(bgr2rgb(x), x2)\n\nPaste an image on a another image.\n\nbg = rgb_read(imgs[1])\n\n# Resize x2 to 500 pixels wide. The height will be adjusted automatically.\nx3 = resize_img(x2, width=500)\n\n# Paste x3 on bg at the top left corner.\nimg0 = paste_img(x3, bg, pos=(0, 0))\n\n# Paste x3 on bg at at the center.\nimg1 = paste_img(x3, bg, pos=(\"center\", \"center\"))  # Can also be (0.5,0.5)\n\n# Paste x3 on bg at at the bottom right corner.\nimg2 = paste_img(\n    x3, bg, pos=(1.0, 1.0)\n)  # 1. means 100% of the width and height because we are using relative coordinates.\n\n# Creating our own background.\nbg2 = solid_color_img((1000, 1000, 3), color=\"blue\")\n\n# Paste x3 on bg2 with a 20% gap from the right and 100 pixels down. Position can be both relative and absolute.\nimg3 = paste_img(x3, bg2, pos=(0.8, 100))\n\n# Paste another image on img3.\nx4 = resize_img(rgb_read(imgs[2]), height=400)\nimg4 = paste_img(x4, img3, pos=(0, 0.5))\n\nplt_show(img0, title=\"Top Left\")\nplt_show(img1, title=\"Center\")\nplt_show(img2, title=\"Bottom Right\")\nplt_show(img3, title=\"Top Right\")\nplt_show(img4, title=\"Multiple\")"
+  }
+]

@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.450">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Some basic functions and classes.">
+
+<title>dreamai - Core</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="styles.css">
+<meta property="og:title" content="dreamai - Core">
+<meta property="og:description" content="Some basic functions and classes.">
+<meta property="og:site-name" content="dreamai">
+<meta name="twitter:title" content="dreamai - Core">
+<meta name="twitter:description" content="Some basic functions and classes.">
+<meta name="twitter:card" content="summary">
+</head>
+
+<body class="nav-sidebar floating nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">dreamai</span>
+    </a>
+  </div>
+        <div class="quarto-navbar-tools ms-auto">
+</div>
+          <div id="quarto-search" class="" title="Search"></div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+      <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./core.html">Core</a></li></ol></nav>
+      <a class="flex-grow-1" role="button" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+      </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">dreamai</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./core.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Core</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./vision.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Vision</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#get_files" id="toc-get_files" class="nav-link active" data-scroll-target="#get_files">get_files</a></li>
+  <li><a href="#setify" id="toc-setify" class="nav-link" data-scroll-target="#setify">setify</a></li>
+  <li><a href="#filter_dict" id="toc-filter_dict" class="nav-link" data-scroll-target="#filter_dict">filter_dict</a></li>
+  <li><a href="#proc_fn" id="toc-proc_fn" class="nav-link" data-scroll-target="#proc_fn">proc_fn</a></li>
+  <li><a href="#replace_dict_key" id="toc-replace_dict_key" class="nav-link" data-scroll-target="#replace_dict_key">replace_dict_key</a></li>
+  <li><a href="#model_children" id="toc-model_children" class="nav-link" data-scroll-target="#model_children">model_children</a></li>
+  <li><a href="#next_batch" id="toc-next_batch" class="nav-link" data-scroll-target="#next_batch">next_batch</a></li>
+  <li><a href="#list_map" id="toc-list_map" class="nav-link" data-scroll-target="#list_map">list_map</a></li>
+  <li><a href="#locals_to_params" id="toc-locals_to_params" class="nav-link" data-scroll-target="#locals_to_params">locals_to_params</a></li>
+  <li><a href="#sort_dict" id="toc-sort_dict" class="nav-link" data-scroll-target="#sort_dict">sort_dict</a></li>
+  <li><a href="#dict_keys" id="toc-dict_keys" class="nav-link" data-scroll-target="#dict_keys">dict_keys</a></li>
+  <li><a href="#dict_values" id="toc-dict_values" class="nav-link" data-scroll-target="#dict_values">dict_values</a></li>
+  <li><a href="#update_settings" id="toc-update_settings" class="nav-link" data-scroll-target="#update_settings">update_settings</a></li>
+  <li><a href="#uniq_lines" id="toc-uniq_lines" class="nav-link" data-scroll-target="#uniq_lines">uniq_lines</a></li>
+  <li><a href="#set_pip_req" id="toc-set_pip_req" class="nav-link" data-scroll-target="#set_pip_req">set_pip_req</a></li>
+  <li><a href="#reqs_to_pip" id="toc-reqs_to_pip" class="nav-link" data-scroll-target="#reqs_to_pip">reqs_to_pip</a></li>
+  <li><a href="#yml_to_pip" id="toc-yml_to_pip" class="nav-link" data-scroll-target="#yml_to_pip">yml_to_pip</a></li>
+  <li><a href="#find_alternate_path" id="toc-find_alternate_path" class="nav-link" data-scroll-target="#find_alternate_path">find_alternate_path</a></li>
+  <li><a href="#resolve_data_path" id="toc-resolve_data_path" class="nav-link" data-scroll-target="#resolve_data_path">resolve_data_path</a></li>
+  <li><a href="#load_obj" id="toc-load_obj" class="nav-link" data-scroll-target="#load_obj">load_obj</a></li>
+  <li><a href="#save_obj" id="toc-save_obj" class="nav-link" data-scroll-target="#save_obj">save_obj</a></li>
+  <li><a href="#load_yaml" id="toc-load_yaml" class="nav-link" data-scroll-target="#load_yaml">load_yaml</a></li>
+  <li><a href="#last_modified" id="toc-last_modified" class="nav-link" data-scroll-target="#last_modified">last_modified</a></li>
+  <li><a href="#end_of_path" id="toc-end_of_path" class="nav-link" data-scroll-target="#end_of_path">end_of_path</a></li>
+  <li><a href="#extend_path_name" id="toc-extend_path_name" class="nav-link" data-scroll-target="#extend_path_name">extend_path_name</a></li>
+  <li><a href="#path_suffix" id="toc-path_suffix" class="nav-link" data-scroll-target="#path_suffix">path_suffix</a></li>
+  <li><a href="#path_stem" id="toc-path_stem" class="nav-link" data-scroll-target="#path_stem">path_stem</a></li>
+  <li><a href="#path_name" id="toc-path_name" class="nav-link" data-scroll-target="#path_name">path_name</a></li>
+  <li><a href="#is_clip" id="toc-is_clip" class="nav-link" data-scroll-target="#is_clip">is_clip</a></li>
+  <li><a href="#is_subscriptable" id="toc-is_subscriptable" class="nav-link" data-scroll-target="#is_subscriptable">is_subscriptable</a></li>
+  <li><a href="#path_or_str" id="toc-path_or_str" class="nav-link" data-scroll-target="#path_or_str">path_or_str</a></li>
+  <li><a href="#is_path" id="toc-is_path" class="nav-link" data-scroll-target="#is_path">is_path</a></li>
+  <li><a href="#is_set" id="toc-is_set" class="nav-link" data-scroll-target="#is_set">is_set</a></li>
+  <li><a href="#is_img" id="toc-is_img" class="nav-link" data-scroll-target="#is_img">is_img</a></li>
+  <li><a href="#is_pilimage" id="toc-is_pilimage" class="nav-link" data-scroll-target="#is_pilimage">is_pilimage</a></li>
+  <li><a href="#is_array" id="toc-is_array" class="nav-link" data-scroll-target="#is_array">is_array</a></li>
+  <li><a href="#is_float" id="toc-is_float" class="nav-link" data-scroll-target="#is_float">is_float</a></li>
+  <li><a href="#is_int" id="toc-is_int" class="nav-link" data-scroll-target="#is_int">is_int</a></li>
+  <li><a href="#is_str" id="toc-is_str" class="nav-link" data-scroll-target="#is_str">is_str</a></li>
+  <li><a href="#is_df" id="toc-is_df" class="nav-link" data-scroll-target="#is_df">is_df</a></li>
+  <li><a href="#is_dict" id="toc-is_dict" class="nav-link" data-scroll-target="#is_dict">is_dict</a></li>
+  <li><a href="#is_iter" id="toc-is_iter" class="nav-link" data-scroll-target="#is_iter">is_iter</a></li>
+  <li><a href="#list_or_tuple" id="toc-list_or_tuple" class="nav-link" data-scroll-target="#list_or_tuple">list_or_tuple</a></li>
+  <li><a href="#is_tuple" id="toc-is_tuple" class="nav-link" data-scroll-target="#is_tuple">is_tuple</a></li>
+  <li><a href="#is_list" id="toc-is_list" class="nav-link" data-scroll-target="#is_list">is_list</a></li>
+  <li><a href="#noop" id="toc-noop" class="nav-link" data-scroll-target="#noop">noop</a></li>
+  <li><a href="#flatten_list" id="toc-flatten_list" class="nav-link" data-scroll-target="#flatten_list">flatten_list</a></li>
+  <li><a href="#some-usage-examples" id="toc-some-usage-examples" class="nav-link" data-scroll-target="#some-usage-examples">Some usage examples:</a></li>
+  </ul>
+<div class="toc-actions"><div><i class="bi bi-github"></i></div><div class="action-links"><p><a href="https://github.com/HamzaFarhan/dreamai/issues/new" class="toc-action">Report an issue</a></p></div></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Core</h1>
+</div>
+
+<div>
+  <div class="description">
+    Some basic functions and classes.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<!-- WARNING: THIS FILE WAS AUTOGENERATED! DO NOT EDIT! -->
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L347" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="get_files" class="level3">
+<h3 class="anchored" data-anchor-id="get_files">get_files</h3>
+<blockquote class="blockquote">
+<pre><code> get_files (path, extensions=None, recurse=True, folders=None,
+            followlinks=True, make_str=False)</code></pre>
+</blockquote>
+<p>Get all the files in <code>path</code> with optional <code>extensions</code>, optionally with <code>recurse</code>, only in <code>folders</code>, if specified.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L332" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="setify" class="level3">
+<h3 class="anchored" data-anchor-id="setify">setify</h3>
+<blockquote class="blockquote">
+<pre><code> setify (o)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L319" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="filter_dict" class="level3">
+<h3 class="anchored" data-anchor-id="filter_dict">filter_dict</h3>
+<blockquote class="blockquote">
+<pre><code> filter_dict (d, fn)</code></pre>
+</blockquote>
+<p>Filter dict <code>d</code> based on function <code>fn</code>.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L311" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="proc_fn" class="level3">
+<h3 class="anchored" data-anchor-id="proc_fn">proc_fn</h3>
+<blockquote class="blockquote">
+<pre><code> proc_fn (fn)</code></pre>
+</blockquote>
+<p>Process function <code>fn</code>. It can be a string to match or a function that takes a key and returns True/False.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L298" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="replace_dict_key" class="level3">
+<h3 class="anchored" data-anchor-id="replace_dict_key">replace_dict_key</h3>
+<blockquote class="blockquote">
+<pre><code> replace_dict_key (d:dict, x='', y='', strict=False)</code></pre>
+</blockquote>
+<p>Replace key <code>x</code> with <code>y</code> in dictionary <code>d</code>.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L293" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="model_children" class="level3">
+<h3 class="anchored" data-anchor-id="model_children">model_children</h3>
+<blockquote class="blockquote">
+<pre><code> model_children (model)</code></pre>
+</blockquote>
+<p>Get the children of a model.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L288" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="next_batch" class="level3">
+<h3 class="anchored" data-anchor-id="next_batch">next_batch</h3>
+<blockquote class="blockquote">
+<pre><code> next_batch (dl)</code></pre>
+</blockquote>
+<p>Get the next batch from a dataloader <code>dl</code>.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L283" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="list_map" class="level3">
+<h3 class="anchored" data-anchor-id="list_map">list_map</h3>
+<blockquote class="blockquote">
+<pre><code> list_map (l, m)</code></pre>
+</blockquote>
+<p>Apply <code>m</code> to each element of <code>l</code>.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L264" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="locals_to_params" class="level3">
+<h3 class="anchored" data-anchor-id="locals_to_params">locals_to_params</h3>
+<blockquote class="blockquote">
+<pre><code> locals_to_params (l, omit=[], expand=['kwargs'])</code></pre>
+</blockquote>
+<p>Convert all the local variables to a dictionary of parameters.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L258" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="sort_dict" class="level3">
+<h3 class="anchored" data-anchor-id="sort_dict">sort_dict</h3>
+<blockquote class="blockquote">
+<pre><code> sort_dict (d, by_value=False)</code></pre>
+</blockquote>
+<p>Sort a dictionary by key by default or by value if <code>by_value</code> is True.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L253" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="dict_keys" class="level3">
+<h3 class="anchored" data-anchor-id="dict_keys">dict_keys</h3>
+<blockquote class="blockquote">
+<pre><code> dict_keys (d)</code></pre>
+</blockquote>
+<p>Get the sorted keys of a dictionary.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L248" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="dict_values" class="level3">
+<h3 class="anchored" data-anchor-id="dict_values">dict_values</h3>
+<blockquote class="blockquote">
+<pre><code> dict_values (d)</code></pre>
+</blockquote>
+<p>Get the values of a dictionary sorted by key.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L242" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="update_settings" class="level3">
+<h3 class="anchored" data-anchor-id="update_settings">update_settings</h3>
+<blockquote class="blockquote">
+<pre><code> update_settings (path='dreamai_pdf')</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L237" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="uniq_lines" class="level3">
+<h3 class="anchored" data-anchor-id="uniq_lines">uniq_lines</h3>
+<blockquote class="blockquote">
+<pre><code> uniq_lines (file)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L225" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="set_pip_req" class="level3">
+<h3 class="anchored" data-anchor-id="set_pip_req">set_pip_req</h3>
+<blockquote class="blockquote">
+<pre><code> set_pip_req (req_file, settings, less_eq=True, remove_eq=False,
+              ignore=['nvidia'])</code></pre>
+</blockquote>
+<p>Update the pip_requirements in settings.ini from a conda environment <code>yml</code> file.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L211" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="reqs_to_pip" class="level3">
+<h3 class="anchored" data-anchor-id="reqs_to_pip">reqs_to_pip</h3>
+<blockquote class="blockquote">
+<pre><code> reqs_to_pip (reqs, less_eq=True, remove_eq=False, ignore=['nvidia'])</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L194" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="yml_to_pip" class="level3">
+<h3 class="anchored" data-anchor-id="yml_to_pip">yml_to_pip</h3>
+<blockquote class="blockquote">
+<pre><code> yml_to_pip (yml, less_eq=True, remove_eq=False, ignore=['nvidia'])</code></pre>
+</blockquote>
+<p>Get pip packages from a conda environment <code>yml</code> file.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L178" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="find_alternate_path" class="level3">
+<h3 class="anchored" data-anchor-id="find_alternate_path">find_alternate_path</h3>
+<blockquote class="blockquote">
+<pre><code> find_alternate_path (path, first_idx=0, verbose=True)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L161" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="resolve_data_path" class="level3">
+<h3 class="anchored" data-anchor-id="resolve_data_path">resolve_data_path</h3>
+<blockquote class="blockquote">
+<pre><code> resolve_data_path (data_path)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L156" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="load_obj" class="level3">
+<h3 class="anchored" data-anchor-id="load_obj">load_obj</h3>
+<blockquote class="blockquote">
+<pre><code> load_obj (path)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L151" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="save_obj" class="level3">
+<h3 class="anchored" data-anchor-id="save_obj">save_obj</h3>
+<blockquote class="blockquote">
+<pre><code> save_obj (path, obj)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L145" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="load_yaml" class="level3">
+<h3 class="anchored" data-anchor-id="load_yaml">load_yaml</h3>
+<blockquote class="blockquote">
+<pre><code> load_yaml (file)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L140" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="last_modified" class="level3">
+<h3 class="anchored" data-anchor-id="last_modified">last_modified</h3>
+<blockquote class="blockquote">
+<pre><code> last_modified (x)</code></pre>
+</blockquote>
+<p>Get the last modified time of a file.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L130" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="end_of_path" class="level3">
+<h3 class="anchored" data-anchor-id="end_of_path">end_of_path</h3>
+<blockquote class="blockquote">
+<pre><code> end_of_path (p, n=2)</code></pre>
+</blockquote>
+<p>Get the last <code>n</code> parts of a path <code>p</code>.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L124" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="extend_path_name" class="level3">
+<h3 class="anchored" data-anchor-id="extend_path_name">extend_path_name</h3>
+<blockquote class="blockquote">
+<pre><code> extend_path_name (p, s='_2')</code></pre>
+</blockquote>
+<p>Add <code>s</code> to the name of a path <code>p</code>. Before the extension.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L120" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="path_suffix" class="level3">
+<h3 class="anchored" data-anchor-id="path_suffix">path_suffix</h3>
+<blockquote class="blockquote">
+<pre><code> path_suffix (path)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L116" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="path_stem" class="level3">
+<h3 class="anchored" data-anchor-id="path_stem">path_stem</h3>
+<blockquote class="blockquote">
+<pre><code> path_stem (x)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L112" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="path_name" class="level3">
+<h3 class="anchored" data-anchor-id="path_name">path_name</h3>
+<blockquote class="blockquote">
+<pre><code> path_name (x)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L108" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="is_clip" class="level3">
+<h3 class="anchored" data-anchor-id="is_clip">is_clip</h3>
+<blockquote class="blockquote">
+<pre><code> is_clip (x)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L104" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="is_subscriptable" class="level3">
+<h3 class="anchored" data-anchor-id="is_subscriptable">is_subscriptable</h3>
+<blockquote class="blockquote">
+<pre><code> is_subscriptable (x)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L100" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="path_or_str" class="level3">
+<h3 class="anchored" data-anchor-id="path_or_str">path_or_str</h3>
+<blockquote class="blockquote">
+<pre><code> path_or_str (x)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L96" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="is_path" class="level3">
+<h3 class="anchored" data-anchor-id="is_path">is_path</h3>
+<blockquote class="blockquote">
+<pre><code> is_path (x)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L92" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="is_set" class="level3">
+<h3 class="anchored" data-anchor-id="is_set">is_set</h3>
+<blockquote class="blockquote">
+<pre><code> is_set (x)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L88" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="is_img" class="level3">
+<h3 class="anchored" data-anchor-id="is_img">is_img</h3>
+<blockquote class="blockquote">
+<pre><code> is_img (x)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L84" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="is_pilimage" class="level3">
+<h3 class="anchored" data-anchor-id="is_pilimage">is_pilimage</h3>
+<blockquote class="blockquote">
+<pre><code> is_pilimage (x)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L79" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="is_array" class="level3">
+<h3 class="anchored" data-anchor-id="is_array">is_array</h3>
+<blockquote class="blockquote">
+<pre><code> is_array (x)</code></pre>
+</blockquote>
+<p><code>True</code> if <code>x</code> supports <code>__array__</code> or <code>iloc</code></p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L71" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="is_float" class="level3">
+<h3 class="anchored" data-anchor-id="is_float">is_float</h3>
+<blockquote class="blockquote">
+<pre><code> is_float (x)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L67" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="is_int" class="level3">
+<h3 class="anchored" data-anchor-id="is_int">is_int</h3>
+<blockquote class="blockquote">
+<pre><code> is_int (x)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L63" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="is_str" class="level3">
+<h3 class="anchored" data-anchor-id="is_str">is_str</h3>
+<blockquote class="blockquote">
+<pre><code> is_str (x)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L59" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="is_df" class="level3">
+<h3 class="anchored" data-anchor-id="is_df">is_df</h3>
+<blockquote class="blockquote">
+<pre><code> is_df (x)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L55" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="is_dict" class="level3">
+<h3 class="anchored" data-anchor-id="is_dict">is_dict</h3>
+<blockquote class="blockquote">
+<pre><code> is_dict (x)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L50" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="is_iter" class="level3">
+<h3 class="anchored" data-anchor-id="is_iter">is_iter</h3>
+<blockquote class="blockquote">
+<pre><code> is_iter (o)</code></pre>
+</blockquote>
+<p>Test whether <code>o</code> can be used in a <code>for</code> loop.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L46" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="list_or_tuple" class="level3">
+<h3 class="anchored" data-anchor-id="list_or_tuple">list_or_tuple</h3>
+<blockquote class="blockquote">
+<pre><code> list_or_tuple (x)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L42" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="is_tuple" class="level3">
+<h3 class="anchored" data-anchor-id="is_tuple">is_tuple</h3>
+<blockquote class="blockquote">
+<pre><code> is_tuple (x)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L38" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="is_list" class="level3">
+<h3 class="anchored" data-anchor-id="is_list">is_list</h3>
+<blockquote class="blockquote">
+<pre><code> is_list (x)</code></pre>
+</blockquote>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L33" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="noop" class="level3">
+<h3 class="anchored" data-anchor-id="noop">noop</h3>
+<blockquote class="blockquote">
+<pre><code> noop (x=None, **kwargs)</code></pre>
+</blockquote>
+<p>Do nothing.</p>
+<hr>
+<p><a href="https://github.com/HamzaFarhan/dreamai/blob/main/dreamai/core.py#L22" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="flatten_list" class="level3">
+<h3 class="anchored" data-anchor-id="flatten_list">flatten_list</h3>
+<blockquote class="blockquote">
+<pre><code> flatten_list (l)</code></pre>
+</blockquote>
+<p>Flatten a list of lists.</p>
+</section>
+<section id="some-usage-examples" class="level2">
+<h2 class="anchored" data-anchor-id="some-usage-examples">Some usage examples:</h2>
+<p>Get all the files in a directory.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb48"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a>path <span class="op">=</span> <span class="st">"../"</span></span>
+<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a>files <span class="op">=</span> get_files(path)</span>
+<span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a>files[<span class="op">-</span><span class="dv">11</span>:<span class="op">-</span><span class="dv">8</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<pre><code>[Path('../dreamai/__pycache__/core.cpython-310.pyc'),
+ Path('../dreamai/__pycache__/imports.cpython-311.pyc'),
+ Path('../dreamai/__pycache__/checkers.cpython-310.pyc')]</code></pre>
+</div>
+</div>
+<p>Only get the files from the <code>nbs</code> folder.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb50"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a>nb_files <span class="op">=</span> get_files(path, folders<span class="op">=</span>[<span class="st">"nbs"</span>])</span>
+<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a>nb_files</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<pre><code>[Path('../nbs/index.ipynb'),
+ Path('../nbs/nbdev.yml'),
+ Path('../nbs/sidebar.yml'),
+ Path('../nbs/01_vision.ipynb'),
+ Path('../nbs/_quarto.yml'),
+ Path('../nbs/styles.css'),
+ Path('../nbs/00_core.ipynb')]</code></pre>
+</div>
+</div>
+<p>Checking a file path. All tests should pass.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb52"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a><span class="bu">file</span> <span class="op">=</span> <span class="bu">str</span>(nb_files[<span class="op">-</span><span class="dv">1</span>])</span>
+<span id="cb52-2"><a href="#cb52-2" aria-hidden="true" tabindex="-1"></a>test_eq(is_str(<span class="bu">file</span>), <span class="va">True</span>)</span>
+<span id="cb52-3"><a href="#cb52-3" aria-hidden="true" tabindex="-1"></a>test_eq(is_path(<span class="bu">file</span>), <span class="va">False</span>)</span>
+<span id="cb52-4"><a href="#cb52-4" aria-hidden="true" tabindex="-1"></a>test_eq(path_or_str(<span class="bu">file</span>), <span class="va">True</span>)</span>
+<span id="cb52-5"><a href="#cb52-5" aria-hidden="true" tabindex="-1"></a><span class="bu">file</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<pre><code>'../nbs/00_core.ipynb'</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb54"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a><span class="bu">file</span> <span class="op">=</span> nb_files[<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb54-2"><a href="#cb54-2" aria-hidden="true" tabindex="-1"></a>test_eq(is_str(<span class="bu">file</span>), <span class="va">False</span>)</span>
+<span id="cb54-3"><a href="#cb54-3" aria-hidden="true" tabindex="-1"></a>test_eq(is_path(<span class="bu">file</span>), <span class="va">True</span>)</span>
+<span id="cb54-4"><a href="#cb54-4" aria-hidden="true" tabindex="-1"></a>test_eq(path_or_str(<span class="bu">file</span>), <span class="va">True</span>)</span>
+<span id="cb54-5"><a href="#cb54-5" aria-hidden="true" tabindex="-1"></a><span class="bu">file</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<pre><code>Path('../nbs/00_core.ipynb')</code></pre>
+</div>
+</div>
+<p>Checking a numpy array.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb56"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a>x <span class="op">=</span> np.array([<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>])</span>
+<span id="cb56-2"><a href="#cb56-2" aria-hidden="true" tabindex="-1"></a>test_eq(is_array(x), <span class="va">True</span>)</span>
+<span id="cb56-3"><a href="#cb56-3" aria-hidden="true" tabindex="-1"></a>test_eq(is_list(x), <span class="va">False</span>)</span>
+<span id="cb56-4"><a href="#cb56-4" aria-hidden="true" tabindex="-1"></a>test_eq(is_iter(x), <span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Add an extension to a file path if it doesn’t already have one.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb57"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a>l <span class="op">=</span> [<span class="st">"f1"</span>, <span class="st">"f2.jpeg"</span>, <span class="st">"f3"</span>]</span>
+<span id="cb57-2"><a href="#cb57-2" aria-hidden="true" tabindex="-1"></a>ext <span class="op">=</span> <span class="st">".png"</span></span>
+<span id="cb57-3"><a href="#cb57-3" aria-hidden="true" tabindex="-1"></a>l2 <span class="op">=</span> [<span class="bu">str</span>(Path(f).with_suffix(ext)) <span class="cf">for</span> f <span class="kw">in</span> l]</span>
+<span id="cb57-4"><a href="#cb57-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(l)</span>
+<span id="cb57-5"><a href="#cb57-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(l2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>['f1', 'f2.jpeg', 'f3']
+['f1.png', 'f2.png', 'f3.png']</code></pre>
+</div>
+</div>
+<p>Some dictionary examples.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb59"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> {<span class="st">"apple"</span>: <span class="dv">1</span>, <span class="st">"apple_pie"</span>: <span class="dv">2</span>, <span class="st">"cake"</span>: <span class="dv">3</span>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb60"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Sort dict.</span></span>
+<span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-3"><a href="#cb60-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(sort_dict(d))  <span class="co"># by key</span></span>
+<span id="cb60-4"><a href="#cb60-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(sort_dict(d, by_value<span class="op">=</span><span class="va">True</span>))  <span class="co"># by value</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>{'apple': 1, 'apple_pie': 2, 'cake': 3}
+{'apple': 1, 'apple_pie': 2, 'cake': 3}</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb62"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Replace 'apple' with 'pumpkin'</span></span>
+<span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(replace_dict_key(d, x<span class="op">=</span><span class="st">"apple"</span>, y<span class="op">=</span><span class="st">"pumpkin"</span>, strict<span class="op">=</span><span class="va">True</span>))</span>
+<span id="cb62-3"><a href="#cb62-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb62-4"><a href="#cb62-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Replace all instances of 'apple' with 'pumpkin'</span></span>
+<span id="cb62-5"><a href="#cb62-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(replace_dict_key(d, x<span class="op">=</span><span class="st">"apple"</span>, y<span class="op">=</span><span class="st">"pumpkin"</span>, strict<span class="op">=</span><span class="va">False</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>{'pumpkin': 1, 'apple_pie': 2, 'cake': 3}
+{'pumpkin': 1, 'pumpkin_pie': 2, 'cake': 3}</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb64"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Remove keys that don't have 'apple' in them.</span></span>
+<span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a>d2 <span class="op">=</span> filter_dict(d, fn<span class="op">=</span><span class="kw">lambda</span> x: <span class="st">"apple"</span> <span class="kw">in</span> x)</span>
+<span id="cb64-3"><a href="#cb64-3" aria-hidden="true" tabindex="-1"></a>d2</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'apple': 1, 'apple_pie': 2}</code></pre>
+</div>
+</div>
+<p>Flatten a list.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb66"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb66-1"><a href="#cb66-1" aria-hidden="true" tabindex="-1"></a>l <span class="op">=</span> [[<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>], [<span class="dv">4</span>, [<span class="dv">5</span>, <span class="dv">6</span>]], [<span class="dv">7</span>], [<span class="dv">8</span>, <span class="dv">9</span>], <span class="dv">10</span>]</span>
+<span id="cb66-2"><a href="#cb66-2" aria-hidden="true" tabindex="-1"></a>l2 <span class="op">=</span> flatten(l)</span>
+<span id="cb66-3"><a href="#cb66-3" aria-hidden="true" tabindex="-1"></a>l2</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<pre><code>&lt;generator object flatten&gt;</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb68"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a>test_eq(l2, [<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>, <span class="dv">6</span>, <span class="dv">7</span>, <span class="dv">8</span>, <span class="dv">9</span>, <span class="dv">10</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Get the local variables/parameters in a function.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb69"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> fn2(z<span class="op">=</span><span class="dv">30</span>, <span class="op">**</span>kwargs):</span>
+<span id="cb69-2"><a href="#cb69-2" aria-hidden="true" tabindex="-1"></a>    <span class="co"># lp will have the value of `z` and the values in `kwargs`.</span></span>
+<span id="cb69-3"><a href="#cb69-3" aria-hidden="true" tabindex="-1"></a>    lp <span class="op">=</span> locals_to_params(<span class="bu">locals</span>())</span>
+<span id="cb69-4"><a href="#cb69-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"fn2 local params: </span><span class="sc">{</span>lp<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb69-5"><a href="#cb69-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> lp[<span class="st">"z"</span>]</span>
+<span id="cb69-6"><a href="#cb69-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb69-7"><a href="#cb69-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb69-8"><a href="#cb69-8" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> fn(x<span class="op">=</span><span class="dv">10</span>, y<span class="op">=</span><span class="dv">20</span>, <span class="op">**</span>kwargs):</span>
+<span id="cb69-9"><a href="#cb69-9" aria-hidden="true" tabindex="-1"></a>    <span class="co"># lp will have the value of `x`, `y` and the values in `kwargs`.</span></span>
+<span id="cb69-10"><a href="#cb69-10" aria-hidden="true" tabindex="-1"></a>    lp <span class="op">=</span> locals_to_params(<span class="bu">locals</span>())</span>
+<span id="cb69-11"><a href="#cb69-11" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"fn local params: </span><span class="sc">{</span>lp<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb69-12"><a href="#cb69-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> x <span class="op">+</span> y <span class="op">+</span> fn2(<span class="op">**</span>lp)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb70"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a>res <span class="op">=</span> fn()  <span class="co"># fn2 will receive `x=10`, `y=30` and `z=30` by default.</span></span>
+<span id="cb70-2"><a href="#cb70-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Result: </span><span class="sc">{</span>res<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>fn local params: {'x': 10, 'y': 20}
+fn2 local params: {'z': 30, 'x': 10, 'y': 20}
+Result: 60</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb72"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> {<span class="st">"x"</span>: <span class="dv">50</span>, <span class="st">"z"</span>: <span class="dv">300</span>}  <span class="co"># fn2 will receive `x=50`, `y=20`, `z=300`.</span></span>
+<span id="cb72-2"><a href="#cb72-2" aria-hidden="true" tabindex="-1"></a>res <span class="op">=</span> fn(<span class="op">**</span>params)</span>
+<span id="cb72-3"><a href="#cb72-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Result: </span><span class="sc">{</span>res<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>fn local params: {'x': 50, 'y': 20, 'z': 300}
+fn2 local params: {'z': 300, 'x': 50, 'y': 20}
+Result: 370</code></pre>
+</div>
+</div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
