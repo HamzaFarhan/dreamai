@@ -1,0 +1,6 @@
+burr_docs
+.vscode
+lance
+*.pyc
+__pycache__
+.env
