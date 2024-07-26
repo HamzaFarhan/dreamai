@@ -96,7 +96,9 @@ def noop(x=None, *args, **kwargs):
     return x
 
 
-def resolve_data_path(data_path: list | str | Path) -> chain:
+def resolve_data_path(
+    data_path: list | str | Path, file_extension: str | None = None
+) -> chain:
     if not isinstance(data_path, list):
         data_path = [data_path]
     paths = []
@@ -106,9 +108,13 @@ def resolve_data_path(data_path: list | str | Path) -> chain:
             if not dp.exists():
                 raise Exception(f"Path {dp} does not exist.")
             if dp.is_dir():
-                paths.append(dp.iterdir())
+                if file_extension:
+                    paths.append(dp.glob(f"*.{file_extension}"))
+                else:
+                    paths.append(dp.iterdir())
             else:
-                paths.append([dp])
+                if file_extension is None or dp.suffix == f".{file_extension}":
+                    paths.append([dp])
     return chain(*paths)
 
 

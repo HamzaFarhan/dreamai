@@ -1,6 +1,6 @@
 import inspect
 from enum import Enum
-from typing import Any, Callable, Optional, Type, Literal
+from typing import Any, Callable, Literal, Optional, Type
 
 import instructor
 import tiktoken
@@ -10,9 +10,8 @@ from tenacity import Retrying, stop_after_attempt, wait_random
 
 
 class ModelName(str, Enum):
-    GPT_3 = "gpt-3.5-turbo"
-    GPT_4O = "gpt-4o"
-    GPT_4 = "gpt-4-turbo"
+    GPT = "gpt-4o"
+    GPT_MINI = "gpt-4o-mini"
     HAIKU = "claude-3-haiku-20240307"
     SONNET = "claude-3-5-sonnet-20240620"
     OPUS = "claude-3-opus-20240229"
@@ -22,7 +21,7 @@ class ModelName(str, Enum):
     MIXTRAL = "anyscale/mistralai/Mixtral-8x7B-Instruct-v0.1"
 
 
-MODEL = ModelName.GPT_3
+MODEL = ModelName.GPT_MINI
 ATTEMPTS = 2
 MAX_TOKENS = 2048
 TEMPERATURE = 0.3
