@@ -2,11 +2,17 @@ import inspect
 from enum import Enum
 from typing import Any, Callable, Literal, Optional, Type
 
+import google.generativeai as genai
 import instructor
 import tiktoken
+from anthropic import Anthropic
+from dotenv import load_dotenv
 from langchain_core.messages import AnyMessage
+from openai import OpenAI
 from pydantic import BaseModel, create_model
 from tenacity import Retrying, stop_after_attempt, wait_random
+
+load_dotenv()
 
 
 class ModelName(str, Enum):
@@ -17,11 +23,9 @@ class ModelName(str, Enum):
     OPUS = "claude-3-opus-20240229"
     GEMINI_PRO = "gemini-1.5-pro-latest"
     GEMINI_FLASH = "gemini-1.5-flash-latest"
-    MISTRAL = "anyscale/mistralai/Mistral-7B-Instruct-v0.1"
-    MIXTRAL = "anyscale/mistralai/Mixtral-8x7B-Instruct-v0.1"
 
 
-MODEL = ModelName.GPT_MINI
+MODEL = ModelName.GEMINI_FLASH
 ATTEMPTS = 2
 MAX_TOKENS = 2048
 TEMPERATURE = 0.3
@@ -134,9 +138,7 @@ def ai_retry_attempts(attempts: int = 3):
     )
 
 
-def ask_cld_or_oai(
-    ask_cld: instructor.Instructor,
-    ask_oai: instructor.Instructor,
+def create(
     messages: list[dict[str, str]],
     system: str = "",
     model: ModelName = MODEL,
@@ -145,36 +147,36 @@ def ask_cld_or_oai(
     max_tokens: int = MAX_TOKENS,
     temperature: float = TEMPERATURE,
     validation_context: dict = {},
-    ask_kwargs: dict = {},
+    create_kwargs: dict = {},
 ):
-    ask_kwargs["model"] = model
-    ask_kwargs["max_retries"] = attempts
-    ask_kwargs["max_tokens"] = max_tokens
-    ask_kwargs["temperature"] = temperature
-    ask_kwargs["response_model"] = response_model
-    ask_kwargs["validation_context"] = validation_context
-    # print(f"ASK_KWARGS:\n{ask_kwargs}")
-    try:
-        if "gpt" in ask_kwargs["model"].lower():
+    create_kwargs["max_retries"] = attempts
+    create_kwargs["max_tokens"] = max_tokens
+    create_kwargs["temperature"] = temperature
+    create_kwargs["response_model"] = response_model or str
+    create_kwargs["validation_context"] = validation_context
+    match model:
+        case ModelName.GPT, ModelName.GPT_MINI:
+            create_kwargs["model"] = model
+            creator = instructor.from_openai(OpenAI())
             if system:
                 messages.insert(0, system_message(system))
-            res = ask_oai.create(
-                messages=messages,  # type: ignore
-                **ask_kwargs,
-            )
-            if response_model is None:
-                return oai_response(res)
-            return res
-        else:
-            res = ask_cld.create(
-                system=system,
-                messages=merge_same_role_messages(messages),  # type: ignore
-                **ask_kwargs,
-            )
-            if response_model is None:
-                return claude_response(res)
-            return res
+        case ModelName.HAIKU, ModelName.SONNET, ModelName.OPUS:
+            create_kwargs["model"] = model
+            creator = instructor.from_anthropic(Anthropic())
+            if system:
+                create_kwargs["system"] = system
+            messages = merge_same_role_messages(messages=messages)
+        case ModelName.GEMINI_PRO, ModelName.GEMINI_FLASH:
+            creator = instructor.from_gemini(genai.GenerativeModel(model_name=model))
+            if system:
+                messages.insert(0, system_message(system))
+            messages = merge_same_role_messages(messages=messages)
+    try:
+        res = creator.create(
+            messages=messages,  # type: ignore
+            **create_kwargs,
+        )
     except Exception as e:
-        print(f"Error in ask_cld_or_oai. Messages: {messages}")
-        print(e)
-        return None
+        print(f"Error creating with model: {model}, {e}")
+        res = None
+    return res
