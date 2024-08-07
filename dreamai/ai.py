@@ -1,6 +1,6 @@
 import inspect
-from enum import Enum
-from typing import Any, Callable, Literal, Optional, Type
+from enum import StrEnum
+from typing import Any, Callable, Literal, Type
 
 import google.generativeai as genai
 import instructor
@@ -9,19 +9,20 @@ from anthropic import Anthropic
 from dotenv import load_dotenv
 from langchain_core.messages import AnyMessage
 from openai import OpenAI
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, create_model, validate_call
 from tenacity import Retrying, stop_after_attempt, wait_random
 
 load_dotenv()
 
 
-class ModelName(str, Enum):
-    GPT = "gpt-4o"
+class ModelName(StrEnum):
+    GPT = "gpt-4o-2024-08-06"
     GPT_MINI = "gpt-4o-mini"
     HAIKU = "claude-3-haiku-20240307"
     SONNET = "claude-3-5-sonnet-20240620"
     OPUS = "claude-3-opus-20240229"
     GEMINI_PRO = "gemini-1.5-pro-latest"
+    GEMINI_PRO_EXP = "gemini-1.5-pro-exp-0801"
     GEMINI_FLASH = "gemini-1.5-flash-latest"
 
 
@@ -77,7 +78,7 @@ def run_tool(tool_model: Tool, tool_func: Callable, **kwargs) -> Any:
         return ToolError(tool_name=tool_model.tool_name, error=str(e))
 
 
-def count_gpt_tokens(text: str, model: ModelName = MODEL) -> int:
+def count_gpt_tokens(text: str, model: ModelName = ModelName.GPT_MINI) -> int:
     encoding = tiktoken.encoding_for_model(model)
     return len(encoding.encode(text))
 
@@ -98,7 +99,7 @@ def assistant_message(content: str) -> dict[str, str]:
     return chat_message(role="assistant", content=content)
 
 
-def merge_same_role_messages(messages: list[dict]) -> list[dict]:
+def merge_same_role_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
     if not messages:
         return []
     new_messages = []
@@ -138,45 +139,41 @@ def ai_retry_attempts(attempts: int = 3):
     )
 
 
+@validate_call
 def create(
     messages: list[dict[str, str]],
     system: str = "",
     model: ModelName = MODEL,
-    response_model: Optional[type] = None,
+    response_model: Any = str,
     attempts: int = ATTEMPTS,
     max_tokens: int = MAX_TOKENS,
     temperature: float = TEMPERATURE,
     validation_context: dict = {},
-    create_kwargs: dict = {},
+    create_kwargs: dict[str, Any] = {},
 ):
     create_kwargs["max_retries"] = attempts
     create_kwargs["max_tokens"] = max_tokens
     create_kwargs["temperature"] = temperature
-    create_kwargs["response_model"] = response_model or str
+    create_kwargs["response_model"] = response_model
     create_kwargs["validation_context"] = validation_context
     match model:
-        case ModelName.GPT, ModelName.GPT_MINI:
+        case ModelName.GPT | ModelName.GPT_MINI:
             create_kwargs["model"] = model
             creator = instructor.from_openai(OpenAI())
             if system:
                 messages.insert(0, system_message(system))
-        case ModelName.HAIKU, ModelName.SONNET, ModelName.OPUS:
+        case ModelName.HAIKU | ModelName.SONNET | ModelName.OPUS:
             create_kwargs["model"] = model
             creator = instructor.from_anthropic(Anthropic())
             if system:
                 create_kwargs["system"] = system
             messages = merge_same_role_messages(messages=messages)
-        case ModelName.GEMINI_PRO, ModelName.GEMINI_FLASH:
+        case ModelName.GEMINI_PRO | ModelName.GEMINI_FLASH | ModelName.GEMINI_PRO_EXP:
             creator = instructor.from_gemini(genai.GenerativeModel(model_name=model))
             if system:
                 messages.insert(0, system_message(system))
             messages = merge_same_role_messages(messages=messages)
-    try:
-        res = creator.create(
-            messages=messages,  # type: ignore
-            **create_kwargs,
-        )
-    except Exception as e:
-        print(f"Error creating with model: {model}, {e}")
-        res = None
-    return res
+    return creator.create(
+        messages=messages,  # type: ignore
+        **create_kwargs,
+    )

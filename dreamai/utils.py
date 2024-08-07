@@ -73,7 +73,6 @@ def function_schema(f: Callable) -> dict:
 
 
 def flatten(o: Iterable):
-    "Concatenate all collections and items as a generator"
     for item in o:
         if isinstance(item, str):
             yield item
@@ -138,16 +137,7 @@ def remove_digits(text: str) -> str:
 
 
 def format_encoding_str(encoding: str) -> str:
-    """Format input encoding string (e.g., `utf-8`, `iso-8859-1`, etc).
-    Parameters
-    ----------
-    encoding
-        The encoding string to be formatted (e.g., `UTF-8`, `utf_8`, `ISO-8859-1`, `iso_8859_1`,
-        etc).
-    """
     formatted_encoding = encoding.lower().replace("_", "-")
-
-    # Special case for Arabic and Hebrew charsets with directional annotations
     annotated_encodings = [
         "iso-8859-6-i",
         "iso-8859-6-e",
@@ -155,52 +145,25 @@ def format_encoding_str(encoding: str) -> str:
         "iso-8859-8-e",
     ]
     if formatted_encoding in annotated_encodings:
-        formatted_encoding = formatted_encoding[:-2]  # remove the annotation
+        formatted_encoding = formatted_encoding[:-2]
 
     return formatted_encoding
 
 
 def bytes_string_to_string(text: str, encoding: str = "utf-8"):
-    """Converts a string representation of a byte string to a regular string using the
-    specified encoding."""
     text_bytes = bytes([ord(char) for char in text])
     formatted_encoding = format_encoding_str(encoding)
     return text_bytes.decode(formatted_encoding)
 
 
 def clean_non_ascii_chars(text) -> str:
-    """Cleans non-ascii characters from unicode string.
-
-    Example
-    -------
-    \x88This text contains non-ascii characters!\x88
-        -> This text contains non-ascii characters!
-    """
     en = text.encode("ascii", "ignore")
     return en.decode()
 
 
 def group_bullet_paragraph(paragraph: str) -> list:
-    """Groups paragraphs with bullets that have line breaks for visual/formatting purposes.
-    For example:
-
-    '''○ The big red fox
-    is walking down the lane.
-
-    ○ At the end of the lane
-    the fox met a friendly bear.'''
-
-    Gets converted to
-
-    '''○ The big red fox is walking down the lane.
-    ○ At the end of the land the fox met a bear.'''
-    """
     clean_paragraphs = []
-    # pytesseract converts some bullet points to standalone "e" characters.
-    # Substitute "e" with bullets since they are later used in partition_text
-    # to determine list element type.
     paragraph = (re.sub(E_BULLET_PATTERN, "·", paragraph)).strip()
-
     bullet_paras = re.split(UNICODE_BULLETS_RE_0W, paragraph)
     for bullet in bullet_paras:
         if bullet:
@@ -213,33 +176,13 @@ def group_broken_paragraphs(
     line_split: re.Pattern[str] = PARAGRAPH_PATTERN_RE,
     paragraph_split: re.Pattern[str] = DOUBLE_PARAGRAPH_PATTERN_RE,
 ) -> str:
-    """Groups paragraphs that have line breaks for visual/formatting purposes.
-    For example:
-
-    '''The big red fox
-    is walking down the lane.
-
-    At the end of the lane
-    the fox met a bear.'''
-
-    Gets converted to
-
-    '''The big red fox is walking down the lane.
-    At the end of the land the fox met a bear.'''
-    """
     paragraphs = paragraph_split.split(text)
     clean_paragraphs = []
     for paragraph in paragraphs:
         if not paragraph.strip():
             continue
-        # NOTE(robinson) - This block is to account for lines like the following that shouldn't be
-        # grouped together, but aren't separated by a double line break.
-        #     Apache License
-        #     Version 2.0, January 2004
-        #     http://www.apache.org/licenses/
         para_split = line_split.split(paragraph)
         all_lines_short = all(len(line.strip().split(" ")) < 5 for line in para_split)
-        # pytesseract converts some bullet points to standalone "e" characters
         if UNICODE_BULLETS_RE.match(paragraph.strip()) or E_BULLET_PATTERN.match(
             paragraph.strip()
         ):
@@ -253,12 +196,6 @@ def group_broken_paragraphs(
 
 
 def replace_mime_encodings(text: str, encoding: str = "utf-8") -> str:
-    """Replaces MIME encodings with their equivalent characters in the specified encoding.
-
-    Example
-    -------
-    5 w=E2=80-99s -> 5 w’s
-    """
     formatted_encoding = format_encoding_str(encoding)
     return quopri.decodestring(text.encode(formatted_encoding)).decode(
         formatted_encoding
@@ -266,14 +203,6 @@ def replace_mime_encodings(text: str, encoding: str = "utf-8") -> str:
 
 
 def replace_unicode_quotes(text: str) -> str:
-    """Replaces unicode bullets in text with the expected character
-
-    Example
-    -------
-    \x93What a lovely quote!\x94 -> “What a lovely quote!”
-    """
-    # NOTE(robinson) - We should probably make this something more sane like a regex
-    # instead of a whole big series of replaces
     text = text.replace("\x91", "‘")
     text = text.replace("\x92", "’")
     text = text.replace("\x93", "“")
@@ -307,36 +236,29 @@ def clean_text(
     text = re.sub(r"[\t+]", " ", text)
     text = re.sub(r"[. .]", " ", text)
     text = re.sub(r"([ ]{2,})", " ", text)
-    # print(text)
     try:
         text = bytes_string_to_string(text)
-        # print(text)
     except Exception:
         pass
     try:
         text = clean_non_ascii_chars(text)
-        # print(text)
     except Exception:
         pass
     try:
         text = replace_unicode_quotes(text)
-        # print(text)
     except Exception:
         pass
     try:
         text = replace_mime_encodings(text)
-        # print(text)
     except Exception:
         pass
     if group:
         try:
             text = "\n".join(group_bullet_paragraph(text))
-            # print(text)
         except Exception:
             pass
         try:
             text = group_broken_paragraphs(text)
-            # print(text)
         except Exception:
             pass
     if no_digits:
@@ -406,7 +328,6 @@ def to_markdown(text: str) -> Markdown:
 
 
 def current_time(format: str = "%m-%d-%Y_%H:%M:%S") -> str:
-    # print(f"\n\nCURRENT TIME: {datetime.now().strftime(format)}\n\n")
     return datetime.now().strftime(format)
 
 

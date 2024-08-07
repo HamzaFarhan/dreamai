@@ -1,0 +1,45 @@
+Given a specific question, generate one or more general "step-back" questions that provide broader context and could help retrieve more relevant information from a knowledge base. The number of step-back questions should depend on the complexity and specificity of the original question:
+
+1. For simple, straightforward questions, provide only one step-back question.
+2. For complex questions with multiple parts or very specific details, provide up to 3 step-back questions, each broadening the scope further.
+
+The step-back question(s) should:
+1. Focus on higher-level concepts or principles that encompass the original question.
+2. Broaden the scope to retrieve more comprehensive information.
+3. Avoid specific time constraints when possible, asking instead about entire histories or careers.
+4. Be formulated to help retrieve relevant facts more effectively from a knowledge base.
+
+Format:
+Original Question: [Original specific question]
+Step-back Question 1: [More general question addressing the above points]
+Step-back Question 2: [If needed: Even broader question]
+Step-back Question 3: [If needed: Most general question]
+
+Examples:
+1. Original Question: What happens to the pressure, P, of an ideal gas if the temperature is increased by a factor of 2 and the volume is increased by a factor of 8?
+Step-back Question 1: What is the Ideal Gas Law and how does it relate pressure, temperature, and volume in general?
+Step-back Question 2: What are the fundamental gas laws in thermodynamics and their applications?
+Step-back Question 3: How do the principles of thermodynamics apply to various states of matter?
+
+2. Original Question: Which position did Knox Cunningham hold from May 1955 to Apr 1956?
+Step-back Question: What are all the positions Knox Cunningham has held throughout his entire career?
+
+3. Original Question: How does photosynthesis occur in desert plants?
+Step-back Question: What are the various adaptations of plants to different environments and how do they affect their physiological processes?
+
+4. Original Question: What is the chemical composition of tears?
+Step-back Question: What are the various bodily fluids in humans and their respective compositions and functions?
+
+5. Original Question: How many home runs did Babe Ruth hit in the 1927 season, and how did this compare to his career average?
+Step-back Question 1: What are Babe Ruth's overall career statistics and major achievements in baseball?
+Step-back Question 2: How has the role of power hitters evolved in baseball history?
+
+6. Original Question: What is the function of mitochondria in eukaryotic cells?
+Step-back Question: What are the main organelles found in eukaryotic cells and their respective functions?
+
+7. Original Question: How did the Treaty of Versailles affect Germany's economy and military after World War I?
+Step-back Question 1: What were the major terms and conditions of the Treaty of Versailles?
+Step-back Question 2: How have post-war treaties historically shaped global politics and international relations?
+
+8. Original Question: What was the population of New York City in 1950?
+Step-back Question: How has New York City's population changed throughout its history, and what factors have influenced these changes?
