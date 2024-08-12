@@ -2,14 +2,10 @@ import inspect
 from enum import StrEnum
 from typing import Any, Callable, Literal, Type
 
-import google.generativeai as genai
-import instructor
 import tiktoken
-from anthropic import Anthropic
 from dotenv import load_dotenv
 from langchain_core.messages import AnyMessage
-from openai import OpenAI
-from pydantic import BaseModel, create_model, validate_call
+from pydantic import BaseModel, create_model
 from tenacity import Retrying, stop_after_attempt, wait_random
 
 load_dotenv()
@@ -141,44 +137,4 @@ def ai_retry_attempts(attempts: int = 3):
         Retrying(wait=wait_random(min=1, max=40), stop=stop_after_attempt(attempts))
         if attempts > 1
         else 1
-    )
-
-
-@validate_call
-def create(
-    messages: list[MessageType],
-    system: str = "",
-    model: ModelName = MODEL,
-    response_model: Any = str,
-    attempts: int = ATTEMPTS,
-    max_tokens: int = MAX_TOKENS,
-    temperature: float = TEMPERATURE,
-    validation_context: dict = {},
-    create_kwargs: dict[str, Any] = {},
-):
-    create_kwargs["max_retries"] = attempts
-    create_kwargs["max_tokens"] = max_tokens
-    create_kwargs["temperature"] = temperature
-    create_kwargs["response_model"] = response_model
-    create_kwargs["validation_context"] = validation_context
-    match model:
-        case ModelName.GPT | ModelName.GPT_MINI:
-            create_kwargs["model"] = model
-            creator = instructor.from_openai(OpenAI())
-            if system:
-                messages.insert(0, system_message(system))
-        case ModelName.HAIKU | ModelName.SONNET | ModelName.OPUS:
-            create_kwargs["model"] = model
-            creator = instructor.from_anthropic(Anthropic())
-            if system:
-                create_kwargs["system"] = system
-            messages = merge_same_role_messages(messages=messages)
-        case ModelName.GEMINI_PRO | ModelName.GEMINI_FLASH | ModelName.GEMINI_PRO_EXP:
-            creator = instructor.from_gemini(genai.GenerativeModel(model_name=model))
-            if system:
-                messages.insert(0, system_message(system))
-            messages = merge_same_role_messages(messages=messages)
-    return creator.create(
-        messages=messages,  # type: ignore
-        **create_kwargs,
     )

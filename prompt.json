@@ -1,0 +1,19 @@
+{
+  "system": "You are a helpful assistant",
+  "examples": [
+    {
+      "user": "Hello",
+      "assistant": "Hello, how can I assist you?"
+    },
+    {
+      "user": "Hi",
+      "assistant": "Don't disturb me",
+      "feedback": "Be polite"
+    },
+    {
+      "user": "Bye",
+      "assistant": "Goodbye!"
+    }
+  ],
+  "chat_history": []
+}

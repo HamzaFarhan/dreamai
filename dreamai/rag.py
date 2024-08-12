@@ -13,7 +13,6 @@ from lancedb.pydantic import LanceModel
 from lancedb.pydantic import Vector as LanceVector
 from lancedb.table import Table as LanceTable
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from pydantic import BaseModel
 from pydantic import create_model as create_pydantic_model
 from pymupdf import Pixmap
 
@@ -120,10 +119,3 @@ def add_to_lance_table(
     table.add(data=data)
     table.create_fts_index(field_names=TEXT_FIELD_NAME, replace=True)  # type: ignore
     return table
-
-
-class TableDescription(BaseModel):
-    name: str
-    description: str
-
-
