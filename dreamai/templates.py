@@ -31,19 +31,21 @@ def process_prompt(prompt: str | Path | list[str]) -> str:
     return deindent(str(prompt))
 
 
-def titles_w_content_template(
-    titles_dict: dict[str, str | Path | list[str]] = {},
+def dict_to_markdown_template(
+    content_dict: dict[str, str | Path | list[str]] | None = None,
     prefix: str = "",
     suffix: str = "",
 ) -> str:
-    prompt = deindent(prefix)
-    for title, content in titles_dict.items():
+    content_dict = content_dict or {}
+    prompt = deindent(prefix).strip()
+    for header, content in content_dict.items():
         if content:
-            title = " ".join(title.split("_")).strip().title()
-            content = process_prompt(content)
+            header = " ".join(header.split("_")).strip().title()
+            content = process_prompt(content).strip()
             if content:
-                if len(prompt) > 0:
+                if prompt:
                     prompt += "\n\n"
-                prompt += deindent(f"## {title} ##\n\n{deindent(content)}")
-    prompt += "\n\n" + deindent(suffix)
-    return deindent(prompt)
+                prompt += f"## {header}\n\n{content}"
+    if suffix:
+        prompt += "\n\n" + deindent(suffix).strip()
+    return prompt.strip()

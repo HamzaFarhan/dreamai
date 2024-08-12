@@ -1,0 +1,46 @@
+[
+  {
+    "role": "system",
+    "content": "You are a world-class expert in LLM pipeline development and quality assurance. Your unparalleled skill in crafting precise assertion concepts ensures the highest standards of output for language models. Based on the evolution of prompt templates, you excel at writing assertions for LLM pipelines to run on all pipeline responses. Here are some categories of assertion concepts you want to check for:\n\n- Presentation Format: Is there a specific format for the response, like a comma-separated list or a JSON object?\n- Example Demonstration: Does the prompt template include any examples of good responses that demonstrate any specific headers, keys, or structures?\n- Workflow Description: Does the prompt template include any descriptions of the workflow that the LLM should follow, indicating possible assertion concepts?\n- Count: Are there any instructions regarding the number of items of a certain type in the response, such as \"at least\", \"at most\", or an exact number?\n- Inclusion: Are there keywords that every LLM response should include?\n- Exclusion: Are there keywords that every LLM response should never mention?\n- Qualitative Assessment: Are there qualitative criteria for assessing good responses, including specific requirements for length, tone, or style?\n- Other: Based on the prompt template, are there any other concepts to check in assertions that are not covered by the above categories?\n\nGive me a list of JSON objects to check for in LLM responses. This list should contain as many assertion concepts as you can think of, as long are specific and reasonable.\nEach object in the list should contain a string description of a \"concept\" to check for, its corresponding \"category\", and the \"source\", or Phrase in the prompt template that triggered the concept."
+  },
+  {
+    "role": "user",
+    "content": "Template: \"I am a still-life artist. Give me a bulleted list of colors that I can use to paint <object>.\""
+  },
+  {
+    "role": "assistant",
+    "content": "[{\"concept\": \"The response should include a bulleted list of colors.\",\"category\": \"Presentation Format\",\"source\": \"Give me a bulleted list of colors\"}]"
+  },
+  {
+    "role": "user",
+    "content": "Template: \"Provide a JSON object with the following keys: 'name', 'age', and 'occupation'. The 'name' should be a string, 'age' an integer, and 'occupation' a string. Include at least 3 hobbies as an array under the key 'hobbies'.\""
+  },
+  {
+    "role": "assistant",
+    "content": "[{\"concept\": \"The response should be in JSON format.\",\"category\": \"Presentation Format\",\"source\": \"Provide a JSON object\"},{\"concept\": \"The JSON object should contain the keys 'name', 'age', and 'occupation'.\",\"category\": \"Inclusion\",\"source\": \"with the following keys: 'name', 'age', and 'occupation'\"},{\"concept\": \"The 'name' value should be a string.\",\"category\": \"Qualitative Assessment\",\"source\": \"The 'name' should be a string\"},{\"concept\": \"The 'age' value should be an integer.\",\"category\": \"Qualitative Assessment\",\"source\": \"'age' an integer\"},{\"concept\": \"The 'occupation' value should be a string.\",\"category\": \"Qualitative Assessment\",\"source\": \"'occupation' a string\"},{\"concept\": \"The JSON object should include a 'hobbies' key with an array of at least 3 hobbies.\",\"category\": \"Count\",\"source\": \"Include at least 3 hobbies as an array under the key 'hobbies'\"}]"
+  },
+  {
+    "role": "user",
+    "content": "Template: \"Write a short story about a haunted house. The story should be between 200-300 words long and must include the words 'creaky', 'shadow', and 'whisper' at least once each. Do not use the words 'ghost' or 'spirit'.\""
+  },
+  {
+    "role": "assistant",
+    "content": "[{\"concept\": \"The response should be a short story about a haunted house.\",\"category\": \"Qualitative Assessment\",\"source\": \"Write a short story about a haunted house\"},{\"concept\": \"The story should be between 200-300 words long.\",\"category\": \"Count\",\"source\": \"The story should be between 200-300 words long\"},{\"concept\": \"The story must include the word 'creaky' at least once.\",\"category\": \"Inclusion\",\"source\": \"must include the words 'creaky', 'shadow', and 'whisper' at least once each\"},{\"concept\": \"The story must include the word 'shadow' at least once.\",\"category\": \"Inclusion\",\"source\": \"must include the words 'creaky', 'shadow', and 'whisper' at least once each\"},{\"concept\": \"The story must include the word 'whisper' at least once.\",\"category\": \"Inclusion\",\"source\": \"must include the words 'creaky', 'shadow', and 'whisper' at least once each\"},{\"concept\": \"The story should not contain the word 'ghost'.\",\"category\": \"Exclusion\",\"source\": \"Do not use the words 'ghost' or 'spirit'\"},{\"concept\": \"The story should not contain the word 'spirit'.\",\"category\": \"Exclusion\",\"source\": \"Do not use the words 'ghost' or 'spirit'\"}]"
+  },
+  {
+    "role": "user",
+    "content": "Template: \"Create a step-by-step guide for making a perfect omelette. Include at least 5 steps but no more than 8. Each step should start with an action verb. List all ingredients at the beginning.\""
+  },
+  {
+    "role": "assistant",
+    "content": "[{\"concept\": \"The response should be a step-by-step guide for making an omelette.\",\"category\": \"Presentation Format\",\"source\": \"Create a step-by-step guide for making a perfect omelette\"},{\"concept\": \"The guide should include at least 5 steps.\",\"category\": \"Count\",\"source\": \"Include at least 5 steps but no more than 8\"},{\"concept\": \"The guide should include no more than 8 steps.\",\"category\": \"Count\",\"source\": \"Include at least 5 steps but no more than 8\"},{\"concept\": \"Each step should start with an action verb.\",\"category\": \"Qualitative Assessment\",\"source\": \"Each step should start with an action verb\"},{\"concept\": \"The guide should list all ingredients at the beginning.\",\"category\": \"Presentation Format\",\"source\": \"List all ingredients at the beginning\"}]"
+  },
+  {
+    "role": "user",
+    "content": "Template: \"Analyze the given poem and provide the following: 1) Main theme (1-2 sentences), 2) Rhyme scheme (if any), 3) Three examples of literary devices used (metaphor, simile, alliteration, etc.), 4) Mood of the poem (1 word), 5) Your personal interpretation (2-3 sentences).\""
+  },
+  {
+    "role": "assistant",
+    "content": "[{\"concept\": \"The response should provide an analysis of a given poem.\",\"category\": \"Qualitative Assessment\",\"source\": \"Analyze the given poem and provide the following:\"},{\"concept\": \"The analysis should include the main theme in 1-2 sentences.\",\"category\": \"Count\",\"source\": \"1) Main theme (1-2 sentences)\"},{\"concept\": \"The analysis should identify the rhyme scheme, if any.\",\"category\": \"Inclusion\",\"source\": \"2) Rhyme scheme (if any)\"},{\"concept\": \"The analysis should provide three examples of literary devices used.\",\"category\": \"Count\",\"source\": \"3) Three examples of literary devices used (metaphor, simile, alliteration, etc.)\"},{\"concept\": \"The analysis should describe the mood of the poem in one word.\",\"category\": \"Count\",\"source\": \"4) Mood of the poem (1 word)\"},{\"concept\": \"The analysis should include a personal interpretation in 2-3 sentences.\",\"category\": \"Count\",\"source\": \"5) Your personal interpretation (2-3 sentences)\"}]"
+  }
+]

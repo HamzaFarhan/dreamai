@@ -15,6 +15,9 @@ from tenacity import Retrying, stop_after_attempt, wait_random
 load_dotenv()
 
 
+MessageType = dict[str, Any]
+
+
 class ModelName(StrEnum):
     GPT = "gpt-4o-2024-08-06"
     GPT_MINI = "gpt-4o-mini"
@@ -83,23 +86,23 @@ def count_gpt_tokens(text: str, model: ModelName = ModelName.GPT_MINI) -> int:
     return len(encoding.encode(text))
 
 
-def chat_message(role: str, content: str) -> dict[str, str]:
+def chat_message(role: str, content: Any) -> MessageType:
     return {"role": role, "content": content}
 
 
-def system_message(content: str) -> dict[str, str]:
+def system_message(content: Any) -> MessageType:
     return chat_message(role="system", content=content)
 
 
-def user_message(content: str) -> dict[str, str]:
+def user_message(content: Any) -> MessageType:
     return chat_message(role="user", content=content)
 
 
-def assistant_message(content: str) -> dict[str, str]:
+def assistant_message(content: Any) -> MessageType:
     return chat_message(role="assistant", content=content)
 
 
-def merge_same_role_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+def merge_same_role_messages(messages: list[MessageType]) -> list[MessageType]:
     if not messages:
         return []
     new_messages = []
@@ -108,7 +111,9 @@ def merge_same_role_messages(messages: list[dict[str, str]]) -> list[dict[str, s
         if last_message is None:
             last_message = message
         elif last_message["role"] == message["role"]:
-            last_message["content"] += "\n\n" + message["content"]
+            last_message["content"] += (
+                "\n\n--- Next Message ---\n\n" + message["content"]
+            )
         else:
             new_messages.append(last_message)
             last_message = message
@@ -141,7 +146,7 @@ def ai_retry_attempts(attempts: int = 3):
 
 @validate_call
 def create(
-    messages: list[dict[str, str]],
+    messages: list[MessageType],
     system: str = "",
     model: ModelName = MODEL,
     response_model: Any = str,
