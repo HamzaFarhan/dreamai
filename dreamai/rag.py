@@ -1,5 +1,6 @@
 import os
 import re
+from duckduckgo_search import DDGS
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,6 +8,7 @@ from typing import Type
 
 import pymupdf
 import pymupdf4llm
+from firecrawl import FirecrawlApp
 from lancedb.db import DBConnection as LanceDBConnection
 from lancedb.embeddings import SentenceTransformerEmbeddings, get_registry
 from lancedb.pydantic import LanceModel
@@ -41,10 +43,87 @@ def replace_image_tags(md_text: str, image_folder: str) -> str:
     return re.sub(r"!\[\]\((.*?)\)", replace_tag, md_text)
 
 
+def remove_links_from_markdown(markdown_text: str) -> str:
+    markdown_text = re.sub(r"!?\[([^\]]+)\]\([^\)]+\)", r"\1", markdown_text)
+    markdown_text = re.sub(r"!?\[([^\]]+)\]\[[^\]]+\]", r"\1", markdown_text)
+    markdown_text = re.sub(
+        r"^\[[^\]]+\]:\s*http[s]?://\S+\s*$", "", markdown_text, flags=re.MULTILINE
+    )
+    markdown_text = re.sub(r"!?\[]\([^\)]+\)", "", markdown_text)
+    return markdown_text
+
+
+def remove_sponsor_related_words(text: str) -> str:
+    sponsor_patterns = [r"\bsponsor(s|ed|ing)?\b", r"\bsponsorship(s)?\b"]
+    for pattern in sponsor_patterns:
+        text = re.sub(pattern, "", text, flags=re.IGNORECASE)
+    return text
+
+
+def clean_web_content(content: str, min_length: int = 3) -> str:
+    cleaned_content = remove_links_from_markdown(markdown_text=content)
+    cleaned_content = remove_sponsor_related_words(text=cleaned_content)
+    return "\n".join(
+        [line for line in cleaned_content.split("\n") if len(line.strip()) > min_length]
+    )
+
+
+def web_search(query: str, max_results: int = 5) -> list[dict]:
+    return DDGS().text(query, max_results=max_results)
+
+
+def scrape_urls(
+    urls: list[str], clean_content: bool = True, wait_time: int = 123
+) -> list[dict]:
+    fc = FirecrawlApp()
+    scraped = []
+    for url in urls:
+        scraped_url = fc.scrape_url(
+            url=url,
+            params={
+                "pageOptions": {"onlyMainContent": True, "waitFor": wait_time},
+                "extractorOptions": {"mode": "markdown"},
+            },
+        )
+        if clean_content:
+            scraped_url["markdown"] = clean_web_content(scraped_url["markdown"])
+        scraped.append(scraped_url)
+    return scraped
+
+
+def search_and_scrape(
+    query: str, max_results: int = 5, clean_content: bool = True, wait_time: int = 123
+) -> list[dict]:
+    return scrape_urls(
+        urls=[
+            result["href"]
+            for result in web_search(query=query, max_results=max_results)
+        ],
+        clean_content=clean_content,
+        wait_time=wait_time,
+    )
+
+
 @dataclass
 class MarkdownResult:
     markdown: str
     chunks: list[dict]
+
+
+def chunk_markdown(
+    markdown: str,
+    chunk_size: int = CHUNK_SIZE,
+    chunk_overlap: int = CHUNK_OVERLAP,
+    separators: list[str] = SEPARATORS,
+) -> list[dict]:
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        separators=separators,
+        keep_separator=True,
+        is_separator_regex=True,
+    )
+    return [{TEXT_FIELD_NAME: chunk} for chunk in splitter.split_text(markdown)]
 
 
 def pdf_to_md_docs(
@@ -53,13 +132,6 @@ def pdf_to_md_docs(
     chunk_overlap: int = CHUNK_OVERLAP,
     separators: list[str] = SEPARATORS,
 ) -> MarkdownResult:
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        separators=separators,
-        keep_separator=True,
-        is_separator_regex=True,
-    )
     with tempfile.TemporaryDirectory() as image_folder:
         md_text = replace_image_tags(
             md_text=pymupdf4llm.to_markdown(
@@ -70,9 +142,16 @@ def pdf_to_md_docs(
             ),
             image_folder=image_folder,
         )
+    if Path(file_path).suffix == ".txt":
+        md_text = md_text.replace("```", "")
     return MarkdownResult(
         markdown=md_text,
-        chunks=[{TEXT_FIELD_NAME: chunk} for chunk in splitter.split_text(md_text)],
+        chunks=chunk_markdown(
+            markdown=md_text,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            separators=separators,
+        ),
     )
 
 

@@ -36,7 +36,7 @@ uvicorn = "^0.30.1"
 fastapi = "^0.111.0"
 aiofiles = "^23.2.1"
 pre-commit = "^3.7.1"
-firecrawl-py = "^0.0.16"
+firecrawl-py = "^0.0.20"
 tantivy = "^0.22.0"
 exa-py = "^1.0.12"
 langchain = "^0.2.11"
@@ -47,6 +47,9 @@ sentencepiece = "^0.2.0"
 instructorembedding = "^1.0.1"
 pymupdf4llm = "^0.0.10"
 openparse = "^0.5.7"
+duckduckgo-search = "^6.2.6"
+tavily-python = "^0.3.8"
+pymongo = "^4.8.0"
 
 [build-system]
 requires = ["poetry-core"]

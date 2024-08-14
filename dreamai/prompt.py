@@ -9,6 +9,7 @@ from pydantic import AfterValidator, BaseModel, Field, model_validator, validate
 
 from dreamai.ai import (
     MessageType,
+    ModelName,
     assistant_message,
     merge_same_role_messages,
     system_message,
@@ -154,6 +155,11 @@ class Prompt(BaseModel):
             examples = [examples]
         self.examples.extend(examples)
 
+    def add_messages(self, messages: list[MessageType] | MessageType) -> None:
+        if not isinstance(messages, list):
+            messages = [messages]
+        self.chat_history.extend(messages)
+
     def add_user_message(self, content: Any) -> None:
         self.chat_history.append(user_message(content=content))
 
@@ -179,12 +185,17 @@ class Prompt(BaseModel):
         return merge_same_role_messages(messages=self.messages)
 
     @property
-    def gpt_kwargs(self) -> dict[str, list[MessageType]]:
-        return {"messages": self.messages}
+    def gpt_kwargs(
+        self, model: str = ModelName.GPT_MINI
+    ) -> dict[str, str | list[MessageType]]:
+        return {"model": model, "messages": self.messages}
 
     @property
-    def claude_kwargs(self) -> dict[str, str | list[MessageType]]:
+    def claude_kwargs(
+        self, model: str = ModelName.SONNET
+    ) -> dict[str, str | list[MessageType]]:
         return {
+            "model": model,
             "system": self.system,
             "messages": self.merged_messages[1:]
             if self.system
