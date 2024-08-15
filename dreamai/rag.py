@@ -1,6 +1,5 @@
 import os
 import re
-from duckduckgo_search import DDGS
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,6 +7,7 @@ from typing import Type
 
 import pymupdf
 import pymupdf4llm
+from duckduckgo_search import DDGS
 from firecrawl import FirecrawlApp
 from lancedb.db import DBConnection as LanceDBConnection
 from lancedb.embeddings import SentenceTransformerEmbeddings, get_registry
@@ -22,6 +22,7 @@ CHUNK_SIZE = 800
 CHUNK_OVERLAP = 300
 SEPARATORS = [r"#{1,6} ", r"```\n", r"\*{2,}", r"---+\n", r"__+\n", r"\n\n", r"\n"]
 EMS_MODEL = "hkunlp/instructor-base"
+REREANKER = "answerdotai/answerai-colbert-small-v1"
 DEVICE = "cuda"
 TEXT_FIELD_NAME = "text"
 
@@ -182,7 +183,7 @@ def add_to_lance_table(
     db: LanceDBConnection,
     table_name: str,
     data: list[dict],
-    ems_model: SentenceTransformerEmbeddings | str,
+    ems_model: SentenceTransformerEmbeddings | str = EMS_MODEL,
     schema: Type[LanceModel] | None = None,
     ems_model_device: str = DEVICE,
 ) -> LanceTable:
