@@ -38,3 +38,8 @@ class AssertionConcept(BaseModel):
     concept: str
     category: ASSERTION_CATEGORIES
     source: str
+
+
+class TableDescription(BaseModel):
+    name: str
+    description: str

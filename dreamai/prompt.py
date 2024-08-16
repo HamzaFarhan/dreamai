@@ -15,6 +15,7 @@ from dreamai.ai import (
     user_message,
 )
 
+DEFAULT_TEMPLATE = "{}"
 DEFAULT_VERSION = 1.0
 DIFF_CONTEXT_LINES = 1
 
@@ -68,27 +69,29 @@ class ChangeRecord(BaseModel):
     description: str = ""
 
 
-def load_system(system: str | Path) -> str:
-    system = Path(str(system).strip())
+def load_prompt(prompt: str | Path) -> str:
+    prompt = Path(str(prompt).strip())
     assert (
-        system.suffix == ".txt" or system.suffix == ""
-    ), "System must be a .txt file or a plain string"
-    if not system.suffix == ".txt":
-        return str(system)
-    return system.read_text()
+        prompt.suffix == ".txt" or prompt.suffix == ""
+    ), "Prompt must be a .txt file or a plain string"
+    if not prompt.suffix == ".txt":
+        return str(prompt)
+    return prompt.read_text()
 
 
-SystemType = Annotated[str, AfterValidator(load_system)]
+PromptStr = Annotated[str, AfterValidator(load_prompt)]
 
 
 class Prompt(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
-    system: SystemType = ""
+    system: PromptStr = ""
+    template: PromptStr = DEFAULT_TEMPLATE
     examples: list[Example | BadExample] = Field(default_factory=list)
     chat_history: list[MessageType] = Field(default_factory=list)
     version: float = DEFAULT_VERSION
     description: str = ""
-    original_system: SystemType = ""
+    original_system: PromptStr = ""
+    original_template: PromptStr = DEFAULT_TEMPLATE
     change_history: list[ChangeRecord] = Field(default_factory=list)
     save_folder: str = str(Path.cwd())
 
@@ -100,15 +103,16 @@ class Prompt(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_original_system(self) -> Self:
+    def validate_originals(self) -> Self:
         self.original_system = self.original_system or self.system
+        self.original_template = self.original_template or self.template
         return self
 
     @property
     def name(self) -> str:
         return f"{self.id}_{self.version}"
 
-    def format(self, **kwargs):
+    def format_system(self, **kwargs):
         self.system = self.system.format(**kwargs)
 
     @classmethod
@@ -159,12 +163,6 @@ class Prompt(BaseModel):
             messages = [messages]
         self.chat_history.extend(messages)
 
-    def add_user_message(self, content: Any) -> None:
-        self.chat_history.append(user_message(content=content))
-
-    def add_assistant_message(self, content: Any) -> None:
-        self.chat_history.append(assistant_message(content=content))
-
     @property
     def messages(self) -> list[MessageType]:
         messages = []
@@ -183,22 +181,39 @@ class Prompt(BaseModel):
     def merged_messages(self) -> list[MessageType]:
         return merge_same_role_messages(messages=self.messages)
 
-    @property
-    def gpt_kwargs(self) -> dict[str, list[MessageType]]:
-        return {"messages": self.messages}
+    def _add_user_query(
+        self, messages: list[MessageType], user: str = "", **kwargs
+    ) -> list[MessageType]:
+        if user:
+            messages.append(user_message(content=user))
+        elif kwargs:
+            messages.append(user_message(content=self.template.format(**kwargs)))
+        return messages
 
-    @property
-    def claude_kwargs(self) -> dict[str, str | list[MessageType]]:
+    def gpt_kwargs(self, user: str = "", **kwargs) -> dict[str, list[MessageType]]:
         return {
-            "system": self.system,
-            "messages": self.merged_messages[1:]
-            if self.system
-            else self.merged_messages,
+            "messages": self._add_user_query(
+                messages=self.messages, user=user, **kwargs
+            )
         }
 
-    @property
-    def gemini_kwargs(self) -> dict[str, list[MessageType]]:
-        return {"messages": self.merged_messages}
+    def claude_kwargs(
+        self, user: str = "", **kwargs
+    ) -> dict[str, str | list[MessageType]]:
+        messages = self._add_user_query(
+            messages=self.merged_messages, user=user, **kwargs
+        )
+        return {
+            "system": self.system,
+            "messages": messages[1:] if self.system else messages,
+        }
+
+    def gemini_kwargs(self, user: str = "", **kwargs) -> dict[str, list[MessageType]]:
+        return {
+            "messages": self._add_user_query(
+                messages=self.merged_messages, user=user, **kwargs
+            )
+        }
 
     def bump_version(self, new_version: float | None = None):
         if new_version is None:
@@ -210,49 +225,54 @@ class Prompt(BaseModel):
         self.save()
 
     @validate_call
-    def update_system(
+    def update(
         self,
-        new_system: SystemType,
+        new_system: PromptStr = "",
+        new_template: PromptStr = DEFAULT_TEMPLATE,
         new_version: float | None = None,
         description: str = "",
     ):
-        if new_system == self.system:
+        if not new_system and not new_template:
             return
+
         current_version = self.version
         self.bump_version(new_version=new_version)
-        diff = list(
-            unified_diff(
-                self.system.splitlines(keepends=True),
-                new_system.splitlines(keepends=True),
-                fromfile=f"v{current_version}",
-                tofile=f"v{self.version}",
-                n=DIFF_CONTEXT_LINES,
-            )
-        )
-        self.change_history.append(
-            ChangeRecord(
-                from_version=current_version,
-                to_version=self.version,
-                description=description,
-                diff="".join(diff),
-            )
-        )
-        self.system = new_system
-        self.description = description
-        self.save()
 
-    def reset_to_original(self):
-        desc = "Reset to original system prompt"
-        self.system = self.original_system
-        new_version = DEFAULT_VERSION
-        self.change_history.append(
-            ChangeRecord(
-                from_version=self.version,
-                to_version=new_version,
-                description=desc,
-                diff="",
+        changes = []
+        if new_system and new_system != self.system:
+            system_diff = list(
+                unified_diff(
+                    self.system.splitlines(keepends=True),
+                    new_system.splitlines(keepends=True),
+                    fromfile=f"system_v{current_version}",
+                    tofile=f"system_v{self.version}",
+                    n=DIFF_CONTEXT_LINES,
+                )
             )
-        )
-        self.version = new_version
-        self.description = desc
-        self.save()
+            changes.append("".join(system_diff))
+            self.system = new_system
+
+        if new_template and new_template != self.template:
+            template_diff = list(
+                unified_diff(
+                    self.template.splitlines(keepends=True),
+                    new_template.splitlines(keepends=True),
+                    fromfile=f"template_v{current_version}",
+                    tofile=f"template_v{self.version}",
+                    n=DIFF_CONTEXT_LINES,
+                )
+            )
+            changes.append("".join(template_diff))
+            self.template = new_template
+
+        if changes:
+            self.change_history.append(
+                ChangeRecord(
+                    from_version=current_version,
+                    to_version=self.version,
+                    description=description,
+                    diff="\n".join(changes),
+                )
+            )
+            self.description = description
+            self.save()
