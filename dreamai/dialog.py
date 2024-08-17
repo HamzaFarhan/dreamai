@@ -9,6 +9,7 @@ from pydantic import AfterValidator, BaseModel, Field, model_validator, validate
 
 from dreamai.ai import (
     MessageType,
+    ModelName,
     assistant_message,
     merge_same_role_messages,
     system_message,
@@ -69,42 +70,44 @@ class ChangeRecord(BaseModel):
     description: str = ""
 
 
-def load_prompt(prompt: str | Path) -> str:
-    prompt = Path(str(prompt).strip())
-    assert (
-        prompt.suffix == ".txt" or prompt.suffix == ""
-    ), "Prompt must be a .txt file or a plain string"
-    if not prompt.suffix == ".txt":
-        return str(prompt)
-    return prompt.read_text()
+def load_str(string: str | Path) -> str:
+    string_path = Path(str(string).strip())
+    suffix = string_path.suffix.strip()
+    if suffix == ".txt":
+        return string_path.read_text()
+    if suffix in [".json", ".py", ".yaml", ".yml"]:
+        raise ValueError(
+            f"String must be a .txt file or a plain string. Suffix received: {suffix}"
+        )
+    return str(string).strip()
 
 
-PromptStr = Annotated[str, AfterValidator(load_prompt)]
+Str = Annotated[str, AfterValidator(load_str)]
 
 
-class Prompt(BaseModel):
+class Dialog(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
-    system: PromptStr = ""
-    template: PromptStr = DEFAULT_TEMPLATE
+    task: Str = ""
+    template: Str = DEFAULT_TEMPLATE
     examples: list[Example | BadExample] = Field(default_factory=list)
     chat_history: list[MessageType] = Field(default_factory=list)
     version: float = DEFAULT_VERSION
     description: str = ""
-    original_system: PromptStr = ""
-    original_template: PromptStr = DEFAULT_TEMPLATE
+    original_task: Str = ""
+    original_template: Str = DEFAULT_TEMPLATE
     change_history: list[ChangeRecord] = Field(default_factory=list)
     save_folder: str = str(Path.cwd())
 
     @model_validator(mode="after")
     def validate_not_empty(self) -> Self:
         assert (
-            self.system or self.examples or self.chat_history
-        ), "Prompt must have a system, examples, or chat history"
+            self.task or self.examples or self.chat_history
+        ), "Dialog must have a task, examples, or chat history"
         return self
 
     @model_validator(mode="after")
     def validate_originals(self) -> Self:
-        self.original_system = self.original_system or self.system
+        self.original_task = self.original_task or self.task
         self.original_template = self.original_template or self.template
         return self
 
@@ -112,8 +115,8 @@ class Prompt(BaseModel):
     def name(self) -> str:
         return f"{self.id}_{self.version}"
 
-    def format_system(self, **kwargs):
-        self.system = self.system.format(**kwargs)
+    def format_task(self, **kwargs):
+        self.task = self.task.format(**kwargs)
 
     @classmethod
     def from_dump(cls, dump: dict[str, Any], include_chat_history: bool = True) -> Self:
@@ -131,7 +134,7 @@ class Prompt(BaseModel):
             assert Path(messages).suffix == ".json", "Path must be a .json file"
             messages = cast(list[MessageType], json.loads(Path(messages).read_text()))
         if messages[0]["role"] == "system":
-            return cls(system=messages[0]["content"], chat_history=messages[1:])
+            return cls(task=messages[0]["content"], chat_history=messages[1:])
         return cls(chat_history=messages)
 
     def save(self) -> str:
@@ -166,8 +169,8 @@ class Prompt(BaseModel):
     @property
     def messages(self) -> list[MessageType]:
         messages = []
-        if self.system:
-            messages.append(system_message(content=self.system))
+        if self.task:
+            messages.append(system_message(content=self.task))
         for example in self.examples:
             messages.extend(example.messages)
         if self.chat_history:
@@ -182,36 +185,51 @@ class Prompt(BaseModel):
         return merge_same_role_messages(messages=self.messages)
 
     def _add_user_query(
-        self, messages: list[MessageType], user: str = "", **kwargs
+        self,
+        messages: list[MessageType],
+        user: str = "",
+        template_data: dict | None = None,
     ) -> list[MessageType]:
         if user:
             messages.append(user_message(content=user))
-        elif kwargs:
-            messages.append(user_message(content=self.template.format(**kwargs)))
+        elif template_data:
+            messages.append(user_message(content=self.template.format(**template_data)))
         return messages
 
-    def gpt_kwargs(self, user: str = "", **kwargs) -> dict[str, list[MessageType]]:
+    def gpt_kwargs(
+        self,
+        model: ModelName = ModelName.GPT_MINI,
+        user: str = "",
+        template_data: dict | None = None,
+    ) -> dict[str, str | list[MessageType]]:
         return {
+            "model": model,
             "messages": self._add_user_query(
-                messages=self.messages, user=user, **kwargs
-            )
+                messages=self.messages, user=user, template_data=template_data
+            ),
         }
 
     def claude_kwargs(
-        self, user: str = "", **kwargs
+        self,
+        model: ModelName = ModelName.SONNET,
+        user: str = "",
+        template_data: dict | None = None,
     ) -> dict[str, str | list[MessageType]]:
         messages = self._add_user_query(
-            messages=self.merged_messages, user=user, **kwargs
+            messages=self.merged_messages, user=user, template_data=template_data
         )
         return {
-            "system": self.system,
-            "messages": messages[1:] if self.system else messages,
+            "model": model,
+            "system": self.task,
+            "messages": messages[1:] if self.task else messages,
         }
 
-    def gemini_kwargs(self, user: str = "", **kwargs) -> dict[str, list[MessageType]]:
+    def gemini_kwargs(
+        self, user: str = "", template_data: dict | None = None
+    ) -> dict[str, list[MessageType]]:
         return {
             "messages": self._add_user_query(
-                messages=self.merged_messages, user=user, **kwargs
+                messages=self.merged_messages, user=user, template_data=template_data
             )
         }
 
@@ -227,30 +245,30 @@ class Prompt(BaseModel):
     @validate_call
     def update(
         self,
-        new_system: PromptStr = "",
-        new_template: PromptStr = DEFAULT_TEMPLATE,
+        new_task: Str = "",
+        new_template: Str = DEFAULT_TEMPLATE,
         new_version: float | None = None,
         description: str = "",
     ):
-        if not new_system and not new_template:
+        if not new_task and not new_template:
             return
 
         current_version = self.version
         self.bump_version(new_version=new_version)
 
         changes = []
-        if new_system and new_system != self.system:
-            system_diff = list(
+        if new_task and new_task != self.task:
+            task_diff = list(
                 unified_diff(
-                    self.system.splitlines(keepends=True),
-                    new_system.splitlines(keepends=True),
-                    fromfile=f"system_v{current_version}",
-                    tofile=f"system_v{self.version}",
+                    self.task.splitlines(keepends=True),
+                    new_task.splitlines(keepends=True),
+                    fromfile=f"task_v{current_version}",
+                    tofile=f"task_v{self.version}",
                     n=DIFF_CONTEXT_LINES,
                 )
             )
-            changes.append("".join(system_diff))
-            self.system = new_system
+            changes.append("".join(task_diff))
+            self.task = new_task
 
         if new_template and new_template != self.template:
             template_diff = list(

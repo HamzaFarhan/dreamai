@@ -1,5 +1,6 @@
 import inspect
 import json
+import os
 import quopri
 import re
 import textwrap
@@ -12,7 +13,6 @@ from pathlib import Path
 from typing import Callable, Final, Iterable
 
 import demoji
-from IPython.display import Markdown
 from pydantic import create_model
 
 UNICODE_BULLETS: Final[list[str]] = [
@@ -61,15 +61,6 @@ def run_code(code, *args, **kwargs):
         return func(*args, **kwargs)
     except Exception:
         return traceback.format_exc()
-
-
-def function_schema(f: Callable) -> dict:
-    kw = {
-        n: (o.annotation, ... if o.default == inspect.Parameter.empty else o.default)
-        for n, o in inspect.signature(f).parameters.items()
-    }
-    s = create_model(f"Input for `{f.__name__}`", **kw).schema()  # type: ignore
-    return dict(name=f.__name__, description=f.__doc__, parameters=s)
 
 
 def flatten(o: Iterable):
@@ -134,6 +125,53 @@ def deindent(text: str) -> str:
 
 def remove_digits(text: str) -> str:
     return re.sub(r"\d+", "", text)
+
+
+def dict_to_xml(d: dict) -> str:
+    xml_str = ""
+    for key, value in d.items():
+        xml_str += f"<{key}>\n{value}\n</{key}>\n"
+    return xml_str.strip()
+
+
+def _txt_to_content(content_file: str | Path) -> str:
+    if not os.path.exists(content_file := str(content_file)):
+        return ""
+    with open(content_file, "r") as f:
+        content = f.read()
+    return deindent(content)
+
+
+def _process_content(content: str | Path | list[str]) -> str:
+    if not content:
+        return ""
+    if isinstance(content, list):
+        content = "\n\n---\n\n".join(list(content))
+    elif isinstance(content, (Path, str)):
+        content = str(content)
+        if content.endswith(".txt"):
+            content = _txt_to_content(content)
+    return deindent(str(content))
+
+
+def dict_to_markdown(
+    content_dict: dict[str, str | Path | list[str]] | None = None,
+    prefix: str = "",
+    suffix: str = "",
+) -> str:
+    content_dict = content_dict or {}
+    prompt = deindent(prefix).strip()
+    for header, content in content_dict.items():
+        if content:
+            header = " ".join(header.split("_")).strip().title()
+            content = _process_content(content).strip()
+            if content:
+                if prompt:
+                    prompt += "\n\n"
+                prompt += f"## {header}\n\n{content}"
+    if suffix:
+        prompt += "\n\n" + deindent(suffix).strip()
+    return prompt.strip()
 
 
 def format_encoding_str(encoding: str) -> str:
@@ -290,6 +328,15 @@ def get_required_param_names(func: Callable) -> list[str]:
     ]
 
 
+def function_schema(f: Callable) -> dict:
+    kw = {
+        n: (o.annotation, ... if o.default == inspect.Parameter.empty else o.default)
+        for n, o in inspect.signature(f).parameters.items()
+    }
+    s = create_model(f"Input for `{f.__name__}`", **kw).schema()  # type: ignore
+    return dict(name=f.__name__, description=f.__doc__, parameters=s)
+
+
 def get_function_return_type(func: Callable) -> type:
     func = func.func if type(func) == partial else func
     sig = typing.get_type_hints(func)
@@ -321,26 +368,12 @@ def get_function_info(func: Callable) -> str:
     return inspect.cleandoc(desc + "---\n\n")
 
 
-def to_markdown(text: str) -> Markdown:
-    return Markdown(
-        textwrap.indent(text.replace("•", "  *"), "> ", predicate=lambda _: True)
-    )
-
-
 def current_time(format: str = "%m-%d-%Y_%H:%M:%S") -> str:
     return datetime.now().strftime(format)
 
 
 def sort_times(times, format="%m-%d-%Y_%H:%M:%S"):
     return sorted(times, key=lambda time: datetime.strptime(time, format))
-
-
-def count_words(text: str) -> int:
-    return len(text.split())
-
-
-def count_lines(text: str) -> int:
-    return len(text.split("\n"))
 
 
 def token_count_to_word_count(token_count) -> int:
