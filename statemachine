@@ -1,0 +1,19 @@
+digraph {
+	graph [compound=false concentrate=false rankdir=TB ranksep=0.4]
+	router [label=router shape=box style=rounded]
+	input__query [label="input: query" shape=oval style=dashed]
+	input__query -> router
+	create_step_back_questions [label=create_step_back_questions shape=box style=rounded]
+	search_lancedb [label=search_lancedb shape=box style=rounded]
+	create_rag_response [label=create_rag_response shape=box style=rounded]
+	ask_assistant [label=ask_assistant shape=box style=rounded]
+	terminate [label=terminate shape=box style=rounded]
+	router -> terminate [label="route=Terminate" style=dashed]
+	router -> ask_assistant [label="route=Assistant" style=dashed]
+	router -> create_step_back_questions [style=solid]
+	create_step_back_questions -> search_lancedb [style=solid]
+	search_lancedb -> ask_assistant [label="len(lancedb_results) == 0" style=dashed]
+	search_lancedb -> create_rag_response [style=solid]
+	create_rag_response -> router [style=solid]
+	ask_assistant -> router [style=solid]
+}

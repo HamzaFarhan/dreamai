@@ -1,6 +1,7 @@
 from typing import Annotated, Literal
-
-from pydantic import AfterValidator, BaseModel, Field
+from uuid import uuid4
+from dreamai.utils import to_camel
+from pydantic import AfterValidator, BaseModel, Field, ValidationInfo, field_validator
 
 MAX_SENTENCE_COMPONENTS = 5
 MAX_STEP_BACK_QUESTIONS = 3
@@ -14,6 +15,7 @@ ASSERTION_CATEGORIES = Literal[
     "Qualitative Assessment",
     "Other",
 ]
+MAX_RAG_SENTENCES = 5
 
 
 def validate_sentence_components(
@@ -43,3 +45,51 @@ class AssertionConcept(BaseModel):
 class TableDescription(BaseModel):
     name: str
     description: str
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str, info: ValidationInfo) -> str:
+        v = to_camel(to_camel(v), sep=" ")
+        context = info.context
+        if context is None:
+            return v
+        if v in context.get("names", []):
+            return str(uuid4())
+        return v
+
+
+class SourcedRAGSentence(BaseModel):
+    sentence: str
+    sources: list[int] = Field(
+        default_factory=lambda: [-1], description="The source document indices."
+    )
+
+    @field_validator("sources")
+    @classmethod
+    def validate_sources(cls, v: list[int], info: ValidationInfo) -> list[int]:
+        context = info.context
+        if context is None:
+            return v
+        num_documents = context.get("num_documents", 0)
+        valid_sources = []
+        for source in v:
+            if source < -1 or source >= num_documents:
+                valid_sources.append(-1)
+            else:
+                valid_sources.append(source)
+        return valid_sources
+
+    def __str__(self) -> str:
+        return f"{self.sentence} {self.sources}"
+
+
+class SourcedRAGResponse(BaseModel):
+    sentences: list[SourcedRAGSentence] = Field(
+        min_length=1, max_length=MAX_RAG_SENTENCES
+    )
+
+    def __str__(self) -> str:
+        if len(self.sentences) == 1:
+            return self.sentences[0].sentence
+        else:
+            return "\n".join(f"- {sentence}" for sentence in self.sentences)

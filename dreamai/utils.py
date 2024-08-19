@@ -74,6 +74,10 @@ def flatten(o: Iterable):
             yield item
 
 
+def to_camel(s: str, sep: str = "_") -> str:
+    return "".join(s.title().split(sep))
+
+
 def extract_json(s):
     s = s[next(idx for idx, c in enumerate(s) if c in "{[") :]
     try:
@@ -87,7 +91,7 @@ def noop(x=None, *args, **kwargs):
 
 
 def resolve_data_path(
-    data_path: list | str | Path, file_extension: str | None = None
+    data_path: list[str | Path] | str | Path, file_extension: str | None = None
 ) -> chain:
     if not isinstance(data_path, list):
         data_path = [data_path]

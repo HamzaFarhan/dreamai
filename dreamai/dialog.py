@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Annotated, Any, Self, cast
 from uuid import uuid4
 
-from pydantic import AfterValidator, BaseModel, Field, model_validator, validate_call
+from pydantic import AfterValidator, BaseModel, Field, model_validator
 
 from dreamai.ai import (
     MessageType,
@@ -21,9 +21,29 @@ DEFAULT_VERSION = 1.0
 DIFF_CONTEXT_LINES = 1
 
 
+def load_str(content: Any) -> Any:
+    if isinstance(content, list):
+        return "\n".join([load_str(c) for c in content])
+    if not isinstance(content, (str, Path)):
+        return content
+    string_path = Path(str(content).strip())
+    suffix = string_path.suffix.strip()
+    if suffix == ".txt":
+        return string_path.read_text()
+    if suffix in [".json", ".py", ".yaml", ".yml"]:
+        raise ValueError(
+            f"String must be a .txt file or a plain string. Suffix received: {suffix}"
+        )
+    return str(string_path).strip()
+
+
+Str = Annotated[str, AfterValidator(load_str)]
+ExampleContent = Annotated[Any, AfterValidator(load_str)]
+
+
 class Example(BaseModel):
-    user: Any
-    assistant: Any
+    user: ExampleContent
+    assistant: ExampleContent
 
     @property
     def messages(self) -> list[MessageType]:
@@ -42,7 +62,7 @@ class Example(BaseModel):
 
 
 class BadExample(Example):
-    feedback: Any
+    feedback: ExampleContent
 
     @property
     def messages(self) -> list[MessageType]:
@@ -70,24 +90,9 @@ class ChangeRecord(BaseModel):
     description: str = ""
 
 
-def load_str(string: str | Path) -> str:
-    string_path = Path(str(string).strip())
-    suffix = string_path.suffix.strip()
-    if suffix == ".txt":
-        return string_path.read_text()
-    if suffix in [".json", ".py", ".yaml", ".yml"]:
-        raise ValueError(
-            f"String must be a .txt file or a plain string. Suffix received: {suffix}"
-        )
-    return str(string).strip()
-
-
-Str = Annotated[str, AfterValidator(load_str)]
-
-
 class Dialog(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
-    task: Str = ""
+    task: Str | list[Str] = ""
     template: Str = DEFAULT_TEMPLATE
     examples: list[Example | BadExample] = Field(default_factory=list)
     chat_history: list[MessageType] = Field(default_factory=list)
@@ -107,7 +112,7 @@ class Dialog(BaseModel):
 
     @model_validator(mode="after")
     def validate_originals(self) -> Self:
-        self.original_task = self.original_task or self.task
+        self.original_task = self.original_task or str(self.task)
         self.original_template = self.original_template or self.template
         return self
 
@@ -116,7 +121,7 @@ class Dialog(BaseModel):
         return f"{self.id}_{self.version}"
 
     def format_task(self, **kwargs):
-        self.task = self.task.format(**kwargs)
+        self.task = str(self.task).format(**kwargs)
 
     @classmethod
     def from_dump(cls, dump: dict[str, Any], include_chat_history: bool = True) -> Self:
@@ -137,11 +142,19 @@ class Dialog(BaseModel):
             return cls(task=messages[0]["content"], chat_history=messages[1:])
         return cls(chat_history=messages)
 
-    def save(self) -> str:
+    def save(self, name: str = "", include_chat_history: bool = True) -> str:
         os.makedirs(self.save_folder, exist_ok=True)
-        path = Path(self.save_folder) / f"{self.name}.json"
+        name = name or self.name
+        if not name.endswith(".json"):
+            name += ".json"
+        path = Path(self.save_folder) / name
+        exclude = set() if include_chat_history else {"chat_history"}
+        if self.original_task == self.task:
+            exclude.add("original_task")
+        if self.original_template == self.template:
+            exclude.add("original_template")
         with open(path, "w") as f:
-            json.dump(self.model_dump(), f, indent=2)
+            json.dump(self.model_dump(exclude=exclude), f, indent=2)
         return str(path)
 
     @classmethod
@@ -220,7 +233,7 @@ class Dialog(BaseModel):
         )
         return {
             "model": model,
-            "system": self.task,
+            "system": str(self.task),
             "messages": messages[1:] if self.task else messages,
         }
 
@@ -233,34 +246,37 @@ class Dialog(BaseModel):
             )
         }
 
-    def bump_version(self, new_version: float | None = None):
+    def bump_version(
+        self, new_version: float | None = None, name: str = "", save: bool = True
+    ):
         if new_version is None:
             num_decimal_places = str(self.version)[::-1].find(".")
             new_version = round(
                 self.version + 10**-num_decimal_places, num_decimal_places
             )
         self.version = cast(float, new_version)
-        self.save()
+        if save:
+            self.save(name=name)
 
-    @validate_call
     def update(
         self,
         new_task: Str = "",
         new_template: Str = DEFAULT_TEMPLATE,
         new_version: float | None = None,
         description: str = "",
+        name: str = "",
     ):
         if not new_task and not new_template:
             return
 
         current_version = self.version
-        self.bump_version(new_version=new_version)
+        self.bump_version(new_version=new_version, save=False)
 
         changes = []
         if new_task and new_task != self.task:
             task_diff = list(
                 unified_diff(
-                    self.task.splitlines(keepends=True),
+                    str(self.task).splitlines(keepends=True),
                     new_task.splitlines(keepends=True),
                     fromfile=f"task_v{current_version}",
                     tofile=f"task_v{self.version}",
@@ -270,7 +286,7 @@ class Dialog(BaseModel):
             changes.append("".join(task_diff))
             self.task = new_task
 
-        if new_template and new_template != self.template:
+        if new_template not in [DEFAULT_TEMPLATE, self.template]:
             template_diff = list(
                 unified_diff(
                     self.template.splitlines(keepends=True),
@@ -293,4 +309,4 @@ class Dialog(BaseModel):
                 )
             )
             self.description = description
-            self.save()
+            self.save(name=name)
