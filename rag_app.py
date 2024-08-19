@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 from typing import Literal, cast
 
@@ -18,7 +19,13 @@ from dreamai.dialog_models import (
     StepBackQuestions,
     TableDescription,
 )
-from dreamai.rag import CHUNK_OVERLAP, CHUNK_SIZE, add_to_lance_table, pdf_to_md_docs
+from dreamai.rag import (
+    CHUNK_OVERLAP,
+    CHUNK_SIZE,
+    add_to_lance_table,
+    pdf_to_md_docs,
+    search_and_scrape,
+)
 from dreamai.utils import resolve_data_path
 
 ATTEMPTS = 4
@@ -29,9 +36,10 @@ ask_kid = instructor.from_gemini(
     client=GenerativeModel(model_name=ModelName.GEMINI_FLASH)
 )
 
-
+assistant_dialog = Dialog(task="dreamai/dialogs/chatbot_task.txt")
 table_description_dialog = Dialog.load("dreamai/dialogs/table_description_dialog.json")
 table_selection_dialog = Dialog.load("dreamai/dialogs/table_selection_dialog.json")
+web_or_not_dialog = Dialog.load("dreamai/dialogs/web_or_not_dialog.json")
 step_back_dialog = Dialog.load("dreamai/dialogs/step_back_dialog.json")
 rag_dialog = Dialog.load("dreamai/dialogs/sourced_rag_dialog.json")
 
@@ -72,7 +80,7 @@ def add_data(
     return table_descriptions
 
 
-@action(reads=["db"], writes=["query", "route"])
+@action(reads=["db", "has_web"], writes=["query", "route"])
 def router(
     state: State,
     query: str,
@@ -82,6 +90,10 @@ def router(
     if query.lower() in TERMINATORS:
         route = "Terminate"
         return {"route": route}, state.update(query=query, route=route)
+    if "@web" in query.lower():
+        return {"route": "Web"}, state.update(
+            query=query.replace("@web", ""), route="Web"
+        )
     db: LancedbDBConnection = state["db"]
     table_names = db.table_names()
     routes = Literal[*table_names, "Assistant"]  # type: ignore
@@ -102,20 +114,53 @@ def router(
     except Exception as e:
         print(f"Error in router: {e}")
         route = "Assistant"
+    if route == "Assistant" and state["has_web"]:
+        route = "WebOrNot"
     return {"route": route}, state.update(query=query, route=route)
+
+
+@action(reads=["query"], writes=["route"])
+def web_or_not(state: State, attempts: int = ATTEMPTS) -> tuple[dict[str, str], State]:
+    try:
+        route: str = ask_kid.create(
+            response_model=Literal["Assistant", "Web"],
+            **web_or_not_dialog.gemini_kwargs(
+                template_data={
+                    "current_date": datetime.now().strftime("%Y-%m-%d"),
+                    "user_query": state["query"],
+                }
+            ),  # type: ignore
+            max_retries=attempts,
+        )
+    except Exception as e:
+        print(f"Error in web_or_not: {e}")
+        route = "Assistant"
+    return {"route": route}, state.update(route=route)
+
+
+@action(reads=["query"], writes=["search_results"])
+def search_web(
+    state: State, docs_limit: int = DOCS_LIMIT
+) -> tuple[dict[str, list[str]], State]:
+    try:
+        results = search_and_scrape(query=state["query"], max_results=docs_limit)
+        results = [result["markdown"] for result in results]
+    except Exception as e:
+        print(f"Error in search_web: {e}")
+        results = []
+    return {"search_results": results}, state.update(search_results=results)
 
 
 @action(reads=["query"], writes=["step_back_questions"])
 def create_step_back_questions(
     state: State, attempts: int = ATTEMPTS
 ) -> tuple[dict[str, list[str]], State]:
-    query: str = state["query"]
     try:
         step_back_questions = cast(
             StepBackQuestions,
             ask_kid.create(
                 response_model=StepBackQuestions,
-                **step_back_dialog.gemini_kwargs(user=query),  # type: ignore
+                **step_back_dialog.gemini_kwargs(user=state["query"]),  # type: ignore
                 max_retries=attempts,
             ),
         ).questions
@@ -129,7 +174,7 @@ def create_step_back_questions(
 
 @action(
     reads=["query", "route", "step_back_questions", "db"],
-    writes=["lancedb_results"],
+    writes=["search_results"],
 )
 def search_lancedb(
     state: State, reranker: Reranker, docs_limit: int = DOCS_LIMIT
@@ -137,7 +182,7 @@ def search_lancedb(
     db: LancedbDBConnection = state["db"]
     table = db.open_table(name=state["route"])
     try:
-        res = (
+        results = (
             pd.concat(
                 [
                     table.search(
@@ -157,18 +202,17 @@ def search_lancedb(
         )["text"].tolist()
     except Exception as e:
         print(f"Error in search_and_rerank: {e}")
-        res = []
-
-    return {"lancedb_results": res}, state.update(lancedb_results=res)
+        results = []
+    return {"search_results": results}, state.update(search_results=results)
 
 
 @action(
-    reads=["query", "lancedb_results", "chat_history"],
-    writes=["chat_history", "lancedb_results"],
+    reads=["query", "search_results", "chat_history"],
+    writes=["chat_history", "search_results"],
 )
-def create_rag_response(state: State, attempts: int = 3) -> tuple[dict, State]:
+def create_search_response(state: State, attempts: int = 3) -> tuple[dict, State]:
     query = state["query"]
-    documents = state["lancedb_results"]
+    documents = state["search_results"]
     rag_dialog.chat_history += state.get("chat_history", [])
     try:
         response = ask_kid.create(
@@ -180,7 +224,7 @@ def create_rag_response(state: State, attempts: int = 3) -> tuple[dict, State]:
             max_retries=attempts,
         )
     except Exception as e:
-        print(f"Error in create_rag_response: {e}")
+        print(f"Error in create_search_response: {e}")
         response = SourcedRAGResponse(
             sentences=[
                 SourcedRAGSentence(
@@ -191,18 +235,19 @@ def create_rag_response(state: State, attempts: int = 3) -> tuple[dict, State]:
     return {"assistant_response": str(response)}, state.append(
         chat_history=user_message(content=query)
     ).append(chat_history=assistant_message(content=str(response))).update(
-        lancedb_results=[]
+        search_results=[]
     )
 
 
 @action(reads=["query", "chat_history"], writes=["chat_history"])
-def ask_assistant(state: State) -> tuple[dict, State]:
+def ask_assistant(state: State, attempts: int = ATTEMPTS) -> tuple[dict, State]:
     query = state["query"]
-    assistant_dialog = Dialog(chat_history=state.get("chat_history", []))
+    assistant_dialog.add_messages(state.get("chat_history", []))
     try:
         response = ask_kid.create(
             response_model=str,
             **assistant_dialog.gemini_kwargs(user=query),  # type: ignore
+            max_retries=attempts,
         )
     except Exception as e:
         print(f"Error in ask_assistant: {e}")
@@ -221,6 +266,7 @@ def application(
     db: LancedbDBConnection,
     reranker: Reranker,
     table_descriptions: list[TableDescription] = [],
+    has_web: bool = False,
     app_id: str | None = None,
     username: str | None = None,
     project: str = "DreamAIRAG",
@@ -230,20 +276,28 @@ def application(
         ApplicationBuilder()
         .with_actions(
             router.bind(table_descriptions=table_descriptions, attempts=ATTEMPTS),
+            web_or_not.bind(attempts=ATTEMPTS),
+            search_web.bind(docs_limit=DOCS_LIMIT),
             create_step_back_questions.bind(attempts=ATTEMPTS),
             search_lancedb.bind(reranker=reranker, docs_limit=DOCS_LIMIT),
-            create_rag_response.bind(attempts=ATTEMPTS),
+            create_search_response.bind(attempts=ATTEMPTS),
             ask_assistant.bind(attempts=ATTEMPTS),
             terminate,
         )
         .with_transitions(
             ("router", "terminate", when(route="Terminate")),  # type: ignore
             ("router", "ask_assistant", when(route="Assistant")),  # type: ignore
+            ("router", "web_or_not", when(route="WebOrNot")),  # type: ignore
+            ("router", "search_web", when(route="Web")),  # type: ignore
             ("router", "create_step_back_questions"),
+            ("web_or_not", "ask_assistant", when(route="Assistant")),  # type: ignore
+            ("web_or_not", "search_web"),
+            ("search_web", "ask_assistant", expr("len(search_results) == 0")),  # type: ignore
+            ("search_web", "create_search_response"),
             ("create_step_back_questions", "search_lancedb"),
-            ("search_lancedb", "ask_assistant", expr("len(lancedb_results) == 0")),  # type: ignore
-            ("search_lancedb", "create_rag_response"),
-            ("create_rag_response", "router"),
+            ("search_lancedb", "ask_assistant", expr("len(search_results) == 0")),  # type: ignore
+            ("search_lancedb", "create_search_response"),
+            ("create_search_response", "router"),
             ("ask_assistant", "router"),
         )
         .with_tracker("local", project=project)
@@ -252,7 +306,7 @@ def application(
             tracker,
             resume_at_next_action=True,
             default_entrypoint="router",
-            default_state=dict(db=db, chat_history=[]),
+            default_state=dict(db=db, chat_history=[], has_web=has_web),
         )
     )
     return builder.build()
