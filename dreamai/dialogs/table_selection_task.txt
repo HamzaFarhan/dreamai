@@ -12,10 +12,15 @@ Instructions:
 3. Identify the most relevant database based on the user's query.
 4. Evaluate how well the database name aligns with the query, while also considering nuances in the description.
 5. If multiple databases are relevant, prioritize the one that best matches the query's focus.
-6. If no database is sufficiently relevant to the query, or if the list of databases is empty, return "Assistant".
+6. Assess your confidence in the selection on a scale from 0.0 to 1.0, where:
+   - 0.0 indicates no confidence
+   - 1.0 indicates absolute certainty in the selection
+   - Values between 0.0 and 1.0 represent varying degrees of confidence based on the relevance and specificity of the match
 
-Output: Provide one of the following:
-- The name of the selected database if a relevant one is found.
-- "Assistant" if no database is sufficiently relevant to the query.
+Output: Provide a JSON object with the following structure:
+{
+  "response": "Selected database name",
+  "confidence": float between 0.0 and 1.0
+}
 
 Do not provide any additional explanation or context with your selection.

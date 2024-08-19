@@ -19,6 +19,7 @@ from dreamai.ai import (
 DEFAULT_TEMPLATE = "{}"
 DEFAULT_VERSION = 1.0
 DIFF_CONTEXT_LINES = 1
+CHAT_HISTORY_LIMIT = 10
 
 
 def load_str(content: Any) -> Any:
@@ -214,12 +215,13 @@ class Dialog(BaseModel):
         model: ModelName = ModelName.GPT_MINI,
         user: str = "",
         template_data: dict | None = None,
+        chat_history_limit: int = CHAT_HISTORY_LIMIT,
     ) -> dict[str, str | list[MessageType]]:
         return {
             "model": model,
             "messages": self._add_user_query(
                 messages=self.messages, user=user, template_data=template_data
-            ),
+            )[-chat_history_limit:],
         }
 
     def claude_kwargs(
@@ -227,10 +229,11 @@ class Dialog(BaseModel):
         model: ModelName = ModelName.SONNET,
         user: str = "",
         template_data: dict | None = None,
+        chat_history_limit: int = CHAT_HISTORY_LIMIT,
     ) -> dict[str, str | list[MessageType]]:
         messages = self._add_user_query(
             messages=self.merged_messages, user=user, template_data=template_data
-        )
+        )[-chat_history_limit:]
         return {
             "model": model,
             "system": str(self.task),
@@ -238,12 +241,15 @@ class Dialog(BaseModel):
         }
 
     def gemini_kwargs(
-        self, user: str = "", template_data: dict | None = None
+        self,
+        user: str = "",
+        template_data: dict | None = None,
+        chat_history_limit: int = CHAT_HISTORY_LIMIT,
     ) -> dict[str, list[MessageType]]:
         return {
             "messages": self._add_user_query(
                 messages=self.merged_messages, user=user, template_data=template_data
-            )
+            )[-chat_history_limit:],
         }
 
     def bump_version(

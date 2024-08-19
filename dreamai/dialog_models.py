@@ -1,7 +1,16 @@
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Any
 from uuid import uuid4
+
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    Field,
+    ValidationInfo,
+    create_model,
+    field_validator,
+)
+
 from dreamai.utils import to_camel
-from pydantic import AfterValidator, BaseModel, Field, ValidationInfo, field_validator
 
 MAX_SENTENCE_COMPONENTS = 5
 MAX_STEP_BACK_QUESTIONS = 3
@@ -93,3 +102,16 @@ class SourcedRAGResponse(BaseModel):
             return self.sentences[0].sentence
         else:
             return "\n".join(f"- {sentence}" for sentence in self.sentences)
+
+
+def create_response_with_confidence_model(
+    response_type: list | type, response_value: Any | None = None
+) -> type[BaseModel]:
+    if isinstance(response_type, list):
+        response_type = Literal[*response_type]  # type: ignore
+    return create_model(
+        "ResponseWithConfidence",
+        response=(response_type, response_value or ...),
+        confidence=(float, Field(ge=0.0, le=1.0)),
+        __base__=BaseModel,
+    )

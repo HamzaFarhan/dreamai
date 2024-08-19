@@ -18,6 +18,7 @@ from dreamai.dialog_models import (
     SourcedRAGSentence,
     StepBackQuestions,
     TableDescription,
+    create_response_with_confidence_model,
 )
 from dreamai.rag import (
     CHUNK_OVERLAP,
@@ -28,8 +29,14 @@ from dreamai.rag import (
 )
 from dreamai.utils import resolve_data_path
 
+ASSISTANT = "Assistant"
+WEB_OR_NOT = "WebOrNot"
+WEB = "Web"
+ROUTE_CONFIDENCE_THRESHOLD = 0.6
+ASSISTANT_CONFIDENCE_THRESHOLD = 0.4
 ATTEMPTS = 4
 DOCS_LIMIT = 3
+CHAT_HISTORY_LIMIT = 10
 TERMINATORS = ["exit", "quit", "q"]
 
 ask_kid = instructor.from_gemini(
@@ -80,26 +87,26 @@ def add_data(
     return table_descriptions
 
 
-@action(reads=["db", "has_web"], writes=["query", "route"])
+@action(reads=["db", "has_web"], writes=["query", "route", "confidence", "table_names"])
 def router(
     state: State,
     query: str,
     table_descriptions: list[TableDescription] = [],
     attempts: int = ATTEMPTS,
-) -> tuple[dict[str, str], State]:
+) -> tuple[dict[str, str | float | list[str]], State]:
     if query.lower() in TERMINATORS:
         route = "Terminate"
         return {"route": route}, state.update(query=query, route=route)
     if "@web" in query.lower():
-        return {"route": "Web"}, state.update(
-            query=query.replace("@web", ""), route="Web"
-        )
+        return {"route": WEB}, state.update(query=query.replace("@web", ""), route=WEB)
     db: LancedbDBConnection = state["db"]
-    table_names = db.table_names()
-    routes = Literal[*table_names, "Assistant"]  # type: ignore
+    table_names = list(db.table_names())
+    response_with_confidence_model = create_response_with_confidence_model(
+        response_type=table_names
+    )
     try:
-        route: str = ask_kid.create(
-            response_model=routes,
+        response = ask_kid.create(
+            response_model=response_with_confidence_model,
             **table_selection_dialog.gemini_kwargs(
                 template_data={
                     "query": query,
@@ -111,19 +118,67 @@ def router(
             ),  # type: ignore
             max_retries=attempts,
         )
+        route = response.response  # type: ignore
+        confidence = response.confidence  # type: ignore
     except Exception as e:
         print(f"Error in router: {e}")
-        route = "Assistant"
-    if route == "Assistant" and state["has_web"]:
-        route = "WebOrNot"
-    return {"route": route}, state.update(query=query, route=route)
+        route = ASSISTANT
+        confidence = 1.0
+    if confidence <= ASSISTANT_CONFIDENCE_THRESHOLD:
+        route = ASSISTANT
+        confidence = 1.0
+    if route == ASSISTANT and state["has_web"]:
+        route = WEB_OR_NOT
+        confidence = 1.0
+    return {
+        "route": route,
+        "confidence": confidence,
+        "table_names": table_names,
+    }, state.update(
+        query=query, route=route, confidence=confidence, table_names=table_names
+    )
+
+
+@action(reads=["route", "confidence", "has_web", "table_names"], writes=["route"])
+def low_confidence_route(state: State) -> tuple[dict[str, str], State]:
+    current_route = state["route"]
+    confidence = state["confidence"]
+    options = ["a", "b"]
+    routes_dict = {"a": current_route, "b": ASSISTANT}
+    table_names_menu_str = ""
+    table_number = 1
+    for table_name in state["table_names"]:
+        if table_name != current_route:
+            options.append(str(table_number))
+            table_names_menu_str += f"{table_number}. {table_name}\n"
+            routes_dict[str(table_number)] = table_name
+            table_number += 1
+    message = f"I've selected the table '{current_route}' for your query, but I'm not entirely confident about this choice (confidence: {confidence:.2f}).\n\n"
+    message += "What should I do?\n"
+    message += "a. Proceed with the current table selection.\n"
+    message += "b. Respond directly without using any table.\n"
+    next_option = "c"
+    if table_names_menu_str:
+        message += f"{next_option}. Use one of the following tables instead:\n    {table_names_menu_str}\n"
+        next_option = "d"
+    if state["has_web"]:
+        message += f"{next_option}. Perform a web search instead.\n"
+        options.append(next_option)
+        routes_dict[next_option] = WEB
+    print(message)
+    while True:
+        user_choice = input(f"Your choice ({', '.join(options)}) > ").strip().lower()
+        if user_choice in routes_dict:
+            route = routes_dict[user_choice]
+            return {"route": route}, state.update(route=route)
+        print("Invalid choice. Please try again.")
 
 
 @action(reads=["query"], writes=["route"])
 def web_or_not(state: State, attempts: int = ATTEMPTS) -> tuple[dict[str, str], State]:
     try:
         route: str = ask_kid.create(
-            response_model=Literal["Assistant", "Web"],
+            response_model=Literal[ASSISTANT, WEB],  # type: ignore
             **web_or_not_dialog.gemini_kwargs(
                 template_data={
                     "current_date": datetime.now().strftime("%Y-%m-%d"),
@@ -134,7 +189,7 @@ def web_or_not(state: State, attempts: int = ATTEMPTS) -> tuple[dict[str, str], 
         )
     except Exception as e:
         print(f"Error in web_or_not: {e}")
-        route = "Assistant"
+        route = ASSISTANT
     return {"route": route}, state.update(route=route)
 
 
@@ -208,17 +263,20 @@ def search_lancedb(
 
 @action(
     reads=["query", "search_results", "chat_history"],
-    writes=["chat_history", "search_results"],
+    writes=["chat_history"],
 )
-def create_search_response(state: State, attempts: int = 3) -> tuple[dict, State]:
+def create_search_response(
+    state: State, chat_history_limit: int = CHAT_HISTORY_LIMIT, attempts: int = 3
+) -> tuple[dict, State]:
     query = state["query"]
     documents = state["search_results"]
-    rag_dialog.chat_history += state.get("chat_history", [])
+    rag_dialog.chat_history = state.get("chat_history", [])
+    user = rag_dialog.template.format(documents=documents, user_query=query)
     try:
         response = ask_kid.create(
             response_model=SourcedRAGResponse,
             **rag_dialog.gemini_kwargs(
-                template_data={"documents": documents, "user_query": query}
+                user=user, chat_history_limit=chat_history_limit
             ),  # type: ignore
             validation_context={"num_documents": len(documents)},
             max_retries=attempts,
@@ -233,20 +291,22 @@ def create_search_response(state: State, attempts: int = 3) -> tuple[dict, State
             ]
         )
     return {"assistant_response": str(response)}, state.append(
-        chat_history=user_message(content=query)
-    ).append(chat_history=assistant_message(content=str(response))).update(
-        search_results=[]
-    )
+        chat_history=user_message(content=user)
+    ).append(chat_history=assistant_message(content=str(response)))
 
 
 @action(reads=["query", "chat_history"], writes=["chat_history"])
-def ask_assistant(state: State, attempts: int = ATTEMPTS) -> tuple[dict, State]:
+def ask_assistant(
+    state: State, chat_history_limit: int = CHAT_HISTORY_LIMIT, attempts: int = 3
+) -> tuple[dict, State]:
     query = state["query"]
-    assistant_dialog.add_messages(state.get("chat_history", []))
+    assistant_dialog.chat_history = state.get("chat_history", [])
     try:
         response = ask_kid.create(
             response_model=str,
-            **assistant_dialog.gemini_kwargs(user=query),  # type: ignore
+            **assistant_dialog.gemini_kwargs(
+                user=query, chat_history_limit=chat_history_limit
+            ),  # type: ignore
             max_retries=attempts,
         )
     except Exception as e:
@@ -276,21 +336,34 @@ def application(
         ApplicationBuilder()
         .with_actions(
             router.bind(table_descriptions=table_descriptions, attempts=ATTEMPTS),
+            low_confidence_route,
             web_or_not.bind(attempts=ATTEMPTS),
             search_web.bind(docs_limit=DOCS_LIMIT),
             create_step_back_questions.bind(attempts=ATTEMPTS),
             search_lancedb.bind(reranker=reranker, docs_limit=DOCS_LIMIT),
-            create_search_response.bind(attempts=ATTEMPTS),
-            ask_assistant.bind(attempts=ATTEMPTS),
+            create_search_response.bind(
+                chat_history_limit=CHAT_HISTORY_LIMIT, attempts=ATTEMPTS
+            ),
+            ask_assistant.bind(
+                chat_history_limit=CHAT_HISTORY_LIMIT, attempts=ATTEMPTS
+            ),
             terminate,
         )
         .with_transitions(
             ("router", "terminate", when(route="Terminate")),  # type: ignore
-            ("router", "ask_assistant", when(route="Assistant")),  # type: ignore
-            ("router", "web_or_not", when(route="WebOrNot")),  # type: ignore
-            ("router", "search_web", when(route="Web")),  # type: ignore
+            (
+                "router",
+                "low_confidence_route",
+                expr(f"confidence <= {ROUTE_CONFIDENCE_THRESHOLD}"),  # type: ignore
+            ),
+            ("router", "ask_assistant", when(route=ASSISTANT)),  # type: ignore
+            ("router", "web_or_not", when(route=WEB_OR_NOT)),  # type: ignore
+            ("router", "search_web", when(route=WEB)),  # type: ignore
             ("router", "create_step_back_questions"),
-            ("web_or_not", "ask_assistant", when(route="Assistant")),  # type: ignore
+            ("low_confidence_route", "ask_assistant", when(route=ASSISTANT)),  # type: ignore
+            ("low_confidence_route", "search_web", when(route=WEB)),  # type: ignore
+            ("low_confidence_route", "create_step_back_questions"),
+            ("web_or_not", "ask_assistant", when(route=ASSISTANT)),  # type: ignore
             ("web_or_not", "search_web"),
             ("search_web", "ask_assistant", expr("len(search_results) == 0")),  # type: ignore
             ("search_web", "create_search_response"),

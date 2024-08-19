@@ -4,19 +4,29 @@
   "examples": [
     {
       "user": "User query: 'How has the role of defensive midfielders evolved in modern football tactics?'\n\nDatabase list:\n  [\n    {\n      \"name\": \"football_tactics\",\n      \"description\": \"Focuses on advanced football tactics and strategic play, emphasizing modern innovations. Contains detailed analyses of specific tactical concepts, their historical development, and implementation by top teams and coaches.\"\n    },\n    {\n      \"name\": \"football_history\",\n      \"description\": \"Covers the historical development of football, including major events, rule changes, and cultural impacts. Contains academic articles and historical accounts spanning multiple decades, focusing on how the sport has changed over time.\"\n    }\n  ]",
-      "assistant": "football_tactics"
+      "assistant": "{ \"response\": \"football_tactics\", \"confidence\": 0.95 }"
     },
     {
       "user": "User query: 'What are the potential impacts of rising sea levels on coastal ecosystems?'\n\nDatabase list:\n  [\n    {\n      \"name\": \"climate_change_effects\",\n      \"description\": \"Contains research on the various impacts of climate change, including rising temperatures, extreme weather events, and sea-level rise. Includes scientific studies, projections, and case studies from around the world.\"\n    },\n    {\n      \"name\": \"marine_biology\",\n      \"description\": \"Focuses on the study of marine organisms, their behaviors, and their interactions with the environment. Covers topics such as marine ecosystems, biodiversity, and conservation efforts.\"\n    },\n    {\n      \"name\": \"environmental_policy\",\n      \"description\": \"Examines environmental regulations, international agreements, and policy proposals related to various environmental issues. Includes analysis of policy effectiveness and economic impacts.\"\n    }\n  ]",
-      "assistant": "climate_change_effects"
+      "assistant": "{ \"response\": \"climate_change_effects\", \"confidence\": 0.9 }"
     },
     {
       "user": "User query: 'What are the latest advancements in quantum computing and their potential applications?'\n\nDatabase list:\n  [\n    {\n      \"name\": \"quantum_physics\",\n      \"description\": \"Covers fundamental principles of quantum mechanics, including wave-particle duality, superposition, and entanglement. Contains theoretical papers and experimental results in the field of quantum physics.\"\n    },\n    {\n      \"name\": \"computer_science_innovations\",\n      \"description\": \"Focuses on cutting-edge developments in various areas of computer science, including artificial intelligence, blockchain, and quantum computing. Includes research papers, industry reports, and analysis of potential applications.\"\n    },\n    {\n      \"name\": \"technology_trends\",\n      \"description\": \"Provides an overview of emerging technologies across various sectors. Includes market analysis, consumer adoption trends, and predictions for future technological developments.\"\n    }\n  ]",
-      "assistant": "computer_science_innovations"
+      "assistant": "{ \"response\": \"computer_science_innovations\", \"confidence\": 0.85 }"
     },
     {
       "user": "User query: 'What is the best way to train a pet parrot?'\n\nDatabase list:\n  [\n    {\n      \"name\": \"world_economics\",\n      \"description\": \"Contains data on global economic trends, including GDP, inflation rates, and trade statistics for various countries.\"\n    },\n    {\n      \"name\": \"space_exploration\",\n      \"description\": \"Focuses on the history and current developments in space exploration, including missions, technologies, and scientific discoveries.\"\n    },\n    {\n      \"name\": \"classical_literature\",\n      \"description\": \"A comprehensive collection of classical literature works, including analyses and critiques of major authors and literary movements.\"\n    }\n  ]",
-      "assistant": "Assistant"
+      "assistant": "{ \"response\": \"world_economics\", \"confidence\": 0.05 }"
+    },
+    {
+      "user": "User query: 'What are the main causes of deforestation in the Amazon rainforest?'\n\nDatabase list:\n  [\n    {\n      \"name\": \"environmental_issues\",\n      \"description\": \"Covers various environmental problems, their causes, and potential solutions. Includes topics such as climate change, pollution, deforestation, and biodiversity loss.\"\n    },\n    {\n      \"name\": \"south_american_geography\",\n      \"description\": \"Focuses on the physical and human geography of South America, including information about countries, landscapes, and major geographical features.\"\n    }\n  ]",
+      "assistant": "{ \"response\": \"south_american_geography\", \"confidence\": 0.8 }",
+      "feedback": "Incorrect selection. The 'environmental_issues' database is more relevant to the query about deforestation causes in the Amazon rainforest."
+    },
+    {
+      "user": "User query: 'What are the basic rules of chess?'\n\nDatabase list:\n  [\n    {\n      \"name\": \"chess_fundamentals\",\n      \"description\": \"Covers all aspects of chess, including rules, strategies, famous games, and player profiles. Suitable for beginners and advanced players alike.\"\n    },\n    {\n      \"name\": \"board_games\",\n      \"description\": \"General information about various board games, their history, and cultural significance.\"\n    }\n  ]",
+      "assistant": "{ \"response\": \"chess_fundamentals\", \"confidence\": 0.6 }",
+      "feedback": "While the correct database was selected, the confidence score is inappropriately low. Given the perfect match between the query and the 'chess_fundamentals' database description, the confidence should be much higher (close to 1.0)."
     }
   ]
 }
