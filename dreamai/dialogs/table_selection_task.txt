@@ -16,6 +16,7 @@ Instructions:
    - 0.0 indicates no confidence
    - 1.0 indicates absolute certainty in the selection
    - Values between 0.0 and 1.0 represent varying degrees of confidence based on the relevance and specificity of the match
+7. If the query is time-sensitive (e.g., "Apple's stock price today" or "Did Ronaldo score last night"), and the database descriptions do not explicitly mention that the data is up-to-date, the query likely requires a web search. In this case, even if a database seems relevant overall, select it but assign a low confidence score.
 
 Output: Provide a JSON object with the following structure:
 {

@@ -29,9 +29,11 @@ from dreamai.rag import (
 )
 from dreamai.utils import resolve_data_path
 
+ROUTER = "Router"
 ASSISTANT = "Assistant"
 WEB_OR_NOT = "WebOrNot"
 WEB = "Web"
+TERMINATE = "Terminate"
 ROUTE_CONFIDENCE_THRESHOLD = 0.6
 ASSISTANT_CONFIDENCE_THRESHOLD = 0.4
 ATTEMPTS = 4
@@ -43,6 +45,7 @@ ask_kid = instructor.from_gemini(
     client=GenerativeModel(model_name=ModelName.GEMINI_FLASH)
 )
 
+is_followup_dialog = Dialog(task="dreamai/dialogs/is_followup_task.txt")
 assistant_dialog = Dialog(task="dreamai/dialogs/chatbot_task.txt")
 table_description_dialog = Dialog.load("dreamai/dialogs/table_description_dialog.json")
 table_selection_dialog = Dialog.load("dreamai/dialogs/table_selection_dialog.json")
@@ -87,23 +90,67 @@ def add_data(
     return table_descriptions
 
 
-@action(reads=["db", "has_web"], writes=["query", "route", "confidence", "table_names"])
+@action(reads=[], writes=["query", "route"])
+def get_query(state: State, query: str) -> tuple[dict[str, str], State]:
+    # query = get_user_query()
+    route = "IsFollowup"
+    if query.lower() in TERMINATORS:
+        route = TERMINATE
+    if "@web" in query.lower():
+        route = WEB
+        query = query.replace("@web", "")
+    return {"query": query, "route": route}, state.update(query=query, route=route)
+
+
+@action(reads=["query", "chat_history"], writes=["route", "confidence"])
+def check_is_followup(
+    state: State, chat_history_limit: int = CHAT_HISTORY_LIMIT
+) -> tuple[dict[str, str | float], State]:
+    query = state["query"]
+    chat_history = state.get("chat_history", [])
+    confidence = 1.0
+    if len(chat_history) == 0:
+        return {"route": ROUTER, "confidence": confidence}, state.update(
+            route=ROUTER, confidence=confidence
+        )
+
+    is_followup_dialog.chat_history = chat_history
+    try:
+        is_followup = ask_kid.create(
+            response_model=bool,  # type: ignore
+            **is_followup_dialog.gemini_kwargs(
+                user=query, chat_history_limit=chat_history_limit
+            ),  # type: ignore
+        )
+    except Exception as e:
+        print(f"Error in check_is_followup: {e}")
+        is_followup = False
+    if is_followup:
+        route = ASSISTANT
+    else:
+        route = ROUTER
+    return {"route": route, "confidence": confidence}, state.update(
+        route=route, confidence=confidence
+    )
+
+
+@action(
+    reads=["query", "db", "chat_history", "has_web"],
+    writes=["route", "confidence", "table_names"],
+)
 def router(
     state: State,
-    query: str,
     table_descriptions: list[TableDescription] = [],
+    chat_history_limit: int = CHAT_HISTORY_LIMIT,
     attempts: int = ATTEMPTS,
 ) -> tuple[dict[str, str | float | list[str]], State]:
-    if query.lower() in TERMINATORS:
-        route = "Terminate"
-        return {"route": route}, state.update(query=query, route=route)
-    if "@web" in query.lower():
-        return {"route": WEB}, state.update(query=query.replace("@web", ""), route=WEB)
+    query = state["query"]
     db: LancedbDBConnection = state["db"]
     table_names = list(db.table_names())
     response_with_confidence_model = create_response_with_confidence_model(
         response_type=table_names
     )
+    table_selection_dialog.chat_history = state.get("chat_history", [])
     try:
         response = ask_kid.create(
             response_model=response_with_confidence_model,
@@ -114,7 +161,8 @@ def router(
                         table_description.model_dump_json(indent=2)
                         for table_description in table_descriptions
                     ],
-                }
+                },
+                chat_history_limit=chat_history_limit,
             ),  # type: ignore
             max_retries=attempts,
         )
@@ -134,9 +182,7 @@ def router(
         "route": route,
         "confidence": confidence,
         "table_names": table_names,
-    }, state.update(
-        query=query, route=route, confidence=confidence, table_names=table_names
-    )
+    }, state.update(route=route, confidence=confidence, table_names=table_names)
 
 
 @action(reads=["route", "confidence", "has_web", "table_names"], writes=["route"])
@@ -166,6 +212,9 @@ def low_confidence_route(state: State) -> tuple[dict[str, str], State]:
         options.append(next_option)
         routes_dict[next_option] = WEB
     print(message)
+    options += TERMINATORS
+    for t in TERMINATORS:
+        routes_dict[t] = TERMINATE
     while True:
         user_choice = input(f"Your choice ({', '.join(options)}) > ").strip().lower()
         if user_choice in routes_dict:
@@ -174,8 +223,11 @@ def low_confidence_route(state: State) -> tuple[dict[str, str], State]:
         print("Invalid choice. Please try again.")
 
 
-@action(reads=["query"], writes=["route"])
-def web_or_not(state: State, attempts: int = ATTEMPTS) -> tuple[dict[str, str], State]:
+@action(reads=["query", "chat_history"], writes=["route"])
+def web_or_not(
+    state: State, chat_history_limit: int = CHAT_HISTORY_LIMIT, attempts: int = ATTEMPTS
+) -> tuple[dict[str, str], State]:
+    web_or_not_dialog.chat_history = state.get("chat_history", [])
     try:
         route: str = ask_kid.create(
             response_model=Literal[ASSISTANT, WEB],  # type: ignore
@@ -183,7 +235,8 @@ def web_or_not(state: State, attempts: int = ATTEMPTS) -> tuple[dict[str, str], 
                 template_data={
                     "current_date": datetime.now().strftime("%Y-%m-%d"),
                     "user_query": state["query"],
-                }
+                },
+                chat_history_limit=chat_history_limit,
             ),  # type: ignore
             max_retries=attempts,
         )
@@ -206,16 +259,19 @@ def search_web(
     return {"search_results": results}, state.update(search_results=results)
 
 
-@action(reads=["query"], writes=["step_back_questions"])
+@action(reads=["query", "chat_history"], writes=["step_back_questions"])
 def create_step_back_questions(
-    state: State, attempts: int = ATTEMPTS
+    state: State, chat_history_limit: int = CHAT_HISTORY_LIMIT, attempts: int = ATTEMPTS
 ) -> tuple[dict[str, list[str]], State]:
+    step_back_dialog.chat_history = state.get("chat_history", [])
     try:
         step_back_questions = cast(
             StepBackQuestions,
             ask_kid.create(
                 response_model=StepBackQuestions,
-                **step_back_dialog.gemini_kwargs(user=state["query"]),  # type: ignore
+                **step_back_dialog.gemini_kwargs(
+                    user=state["query"], chat_history_limit=chat_history_limit
+                ),  # type: ignore
                 max_retries=attempts,
             ),
         ).questions
@@ -262,7 +318,7 @@ def search_lancedb(
 
 
 @action(
-    reads=["query", "search_results", "chat_history"],
+    reads=["query", "chat_history", "search_results"],
     writes=["chat_history"],
 )
 def create_search_response(
@@ -335,11 +391,19 @@ def application(
     builder = (
         ApplicationBuilder()
         .with_actions(
-            router.bind(table_descriptions=table_descriptions, attempts=ATTEMPTS),
+            get_query,
+            check_is_followup.bind(chat_history_limit=CHAT_HISTORY_LIMIT),
+            router.bind(
+                table_descriptions=table_descriptions,
+                chat_history_limit=CHAT_HISTORY_LIMIT,
+                attempts=ATTEMPTS,
+            ),
             low_confidence_route,
-            web_or_not.bind(attempts=ATTEMPTS),
+            web_or_not.bind(chat_history_limit=CHAT_HISTORY_LIMIT, attempts=ATTEMPTS),
             search_web.bind(docs_limit=DOCS_LIMIT),
-            create_step_back_questions.bind(attempts=ATTEMPTS),
+            create_step_back_questions.bind(
+                chat_history_limit=CHAT_HISTORY_LIMIT, attempts=ATTEMPTS
+            ),
             search_lancedb.bind(reranker=reranker, docs_limit=DOCS_LIMIT),
             create_search_response.bind(
                 chat_history_limit=CHAT_HISTORY_LIMIT, attempts=ATTEMPTS
@@ -350,7 +414,11 @@ def application(
             terminate,
         )
         .with_transitions(
-            ("router", "terminate", when(route="Terminate")),  # type: ignore
+            ("get_query", "terminate", when(route=TERMINATE)),  # type: ignore
+            ("get_query", "search_web", when(route=WEB)),  # type: ignore
+            ("get_query", "check_is_followup"),
+            ("check_is_followup", "ask_assistant", when(route=ASSISTANT)),  # type: ignore
+            ("check_is_followup", "router"),
             (
                 "router",
                 "low_confidence_route",
@@ -358,8 +426,8 @@ def application(
             ),
             ("router", "ask_assistant", when(route=ASSISTANT)),  # type: ignore
             ("router", "web_or_not", when(route=WEB_OR_NOT)),  # type: ignore
-            ("router", "search_web", when(route=WEB)),  # type: ignore
             ("router", "create_step_back_questions"),
+            ("low_confidence_route", "terminate", when(route=TERMINATE)),  # type: ignore
             ("low_confidence_route", "ask_assistant", when(route=ASSISTANT)),  # type: ignore
             ("low_confidence_route", "search_web", when(route=WEB)),  # type: ignore
             ("low_confidence_route", "create_step_back_questions"),
@@ -370,15 +438,15 @@ def application(
             ("create_step_back_questions", "search_lancedb"),
             ("search_lancedb", "ask_assistant", expr("len(search_results) == 0")),  # type: ignore
             ("search_lancedb", "create_search_response"),
-            ("create_search_response", "router"),
-            ("ask_assistant", "router"),
+            ("create_search_response", "get_query"),
+            ("ask_assistant", "get_query"),
         )
         .with_tracker("local", project=project)
         .with_identifiers(app_id=app_id, partition_key=username)  # type: ignore
         .initialize_from(
             tracker,
             resume_at_next_action=True,
-            default_entrypoint="router",
+            default_entrypoint="get_query",
             default_state=dict(db=db, chat_history=[], has_web=has_web),
         )
     )
