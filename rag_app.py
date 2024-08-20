@@ -68,6 +68,7 @@ def add_data(
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
 ) -> list[TableDescription]:
+    table_descriptions_dict = {td.name: td for td in table_descriptions}
     for file in resolve_data_path(data_path=data_path):
         table_name = Path(file).stem
         md_data = pdf_to_md_docs(
@@ -79,20 +80,24 @@ def add_data(
                 template_data={
                     "database_name": table_name,
                     "sample_text": md_data.markdown,
+                    "current_databases": [
+                        td.model_dump_json(indent=2) for td in table_descriptions
+                    ],
                 }
             ),  # type: ignore
-            validation_context={"names": [t.name for t in table_descriptions]},
         )
-        table_descriptions.append(table_description)
-        _ = add_to_lance_table(
+        table_description = table_descriptions_dict.get(
+            table_description.name, table_description
+        )
+        table_descriptions_dict[table_description.name] = table_description
+        add_to_lance_table(
             db=lance_db, table_name=table_description.name, data=md_data.chunks
         )
-    return table_descriptions
+    return list(table_descriptions_dict.values())
 
 
 @action(reads=[], writes=["query", "route"])
 def get_query(state: State, query: str) -> tuple[dict[str, str], State]:
-    # query = get_user_query()
     route = "IsFollowup"
     if query.lower() in TERMINATORS:
         route = TERMINATE
@@ -113,7 +118,6 @@ def check_is_followup(
         return {"route": ROUTER, "confidence": confidence}, state.update(
             route=ROUTER, confidence=confidence
         )
-
     is_followup_dialog.chat_history = chat_history
     try:
         is_followup = ask_kid.create(
@@ -125,10 +129,7 @@ def check_is_followup(
     except Exception as e:
         print(f"Error in check_is_followup: {e}")
         is_followup = False
-    if is_followup:
-        route = ASSISTANT
-    else:
-        route = ROUTER
+    route = ASSISTANT if is_followup else ROUTER
     return {"route": route, "confidence": confidence}, state.update(
         route=route, confidence=confidence
     )
@@ -200,9 +201,7 @@ def low_confidence_route(state: State) -> tuple[dict[str, str], State]:
             routes_dict[str(table_number)] = table_name
             table_number += 1
     message = f"I've selected the table '{current_route}' for your query, but I'm not entirely confident about this choice (confidence: {confidence:.2f}).\n\n"
-    message += "What should I do?\n"
-    message += "a. Proceed with the current table selection.\n"
-    message += "b. Respond directly without using any table.\n"
+    message += "What should I do?\na. Proceed with the current table selection.\nb. Respond directly without using any table.\n"
     next_option = "c"
     if table_names_menu_str:
         message += f"{next_option}. Use one of the following tables instead:\n    {table_names_menu_str}\n"
@@ -212,11 +211,12 @@ def low_confidence_route(state: State) -> tuple[dict[str, str], State]:
         options.append(next_option)
         routes_dict[next_option] = WEB
     print(message)
-    options += TERMINATORS
     for t in TERMINATORS:
         routes_dict[t] = TERMINATE
     while True:
-        user_choice = input(f"Your choice ({', '.join(options)}) > ").strip().lower()
+        user_choice = (
+            input(f"Your choice ({', '.join(options+TERMINATORS)}) > ").strip().lower()
+        )
         if user_choice in routes_dict:
             route = routes_dict[user_choice]
             return {"route": route}, state.update(route=route)
@@ -296,10 +296,7 @@ def search_lancedb(
         results = (
             pd.concat(
                 [
-                    table.search(
-                        query=question,
-                        query_type="hybrid",
-                    )
+                    table.search(query=question, query_type="hybrid")
                     .rerank(reranker=reranker)  # type: ignore
                     .limit(docs_limit)
                     .to_pandas()
@@ -317,12 +314,9 @@ def search_lancedb(
     return {"search_results": results}, state.update(search_results=results)
 
 
-@action(
-    reads=["query", "chat_history", "search_results"],
-    writes=["chat_history"],
-)
+@action(reads=["query", "chat_history", "search_results"], writes=["chat_history"])
 def create_search_response(
-    state: State, chat_history_limit: int = CHAT_HISTORY_LIMIT, attempts: int = 3
+    state: State, chat_history_limit: int = CHAT_HISTORY_LIMIT, attempts: int = ATTEMPTS
 ) -> tuple[dict, State]:
     query = state["query"]
     documents = state["search_results"]
@@ -353,7 +347,7 @@ def create_search_response(
 
 @action(reads=["query", "chat_history"], writes=["chat_history"])
 def ask_assistant(
-    state: State, chat_history_limit: int = CHAT_HISTORY_LIMIT, attempts: int = 3
+    state: State, chat_history_limit: int = CHAT_HISTORY_LIMIT, attempts: int = ATTEMPTS
 ) -> tuple[dict, State]:
     query = state["query"]
     assistant_dialog.chat_history = state.get("chat_history", [])
@@ -392,54 +386,43 @@ def application(
         ApplicationBuilder()
         .with_actions(
             get_query,
-            check_is_followup.bind(chat_history_limit=CHAT_HISTORY_LIMIT),
-            router.bind(
-                table_descriptions=table_descriptions,
-                chat_history_limit=CHAT_HISTORY_LIMIT,
-                attempts=ATTEMPTS,
-            ),
+            check_is_followup,
+            router.bind(table_descriptions=table_descriptions),
             low_confidence_route,
-            web_or_not.bind(chat_history_limit=CHAT_HISTORY_LIMIT, attempts=ATTEMPTS),
-            search_web.bind(docs_limit=DOCS_LIMIT),
-            create_step_back_questions.bind(
-                chat_history_limit=CHAT_HISTORY_LIMIT, attempts=ATTEMPTS
-            ),
-            search_lancedb.bind(reranker=reranker, docs_limit=DOCS_LIMIT),
-            create_search_response.bind(
-                chat_history_limit=CHAT_HISTORY_LIMIT, attempts=ATTEMPTS
-            ),
-            ask_assistant.bind(
-                chat_history_limit=CHAT_HISTORY_LIMIT, attempts=ATTEMPTS
-            ),
+            web_or_not,
+            search_web,
+            create_step_back_questions,
+            search_lancedb.bind(reranker=reranker),
+            create_search_response,
+            ask_assistant,
             terminate,
         )
         .with_transitions(
-            ("get_query", "terminate", when(route=TERMINATE)),  # type: ignore
-            ("get_query", "search_web", when(route=WEB)),  # type: ignore
+            (["get_query", "low_confidence_route"], "terminate", when(route=TERMINATE)),  # type: ignore
+            (["get_query", "low_confidence_route"], "search_web", when(route=WEB)),  # type: ignore
             ("get_query", "check_is_followup"),
-            ("check_is_followup", "ask_assistant", when(route=ASSISTANT)),  # type: ignore
+            (
+                ["check_is_followup", "router", "low_confidence_route", "web_or_not"],
+                "ask_assistant",
+                when(route=ASSISTANT),  # type: ignore
+            ),
             ("check_is_followup", "router"),
             (
                 "router",
                 "low_confidence_route",
                 expr(f"confidence <= {ROUTE_CONFIDENCE_THRESHOLD}"),  # type: ignore
             ),
-            ("router", "ask_assistant", when(route=ASSISTANT)),  # type: ignore
             ("router", "web_or_not", when(route=WEB_OR_NOT)),  # type: ignore
-            ("router", "create_step_back_questions"),
-            ("low_confidence_route", "terminate", when(route=TERMINATE)),  # type: ignore
-            ("low_confidence_route", "ask_assistant", when(route=ASSISTANT)),  # type: ignore
-            ("low_confidence_route", "search_web", when(route=WEB)),  # type: ignore
-            ("low_confidence_route", "create_step_back_questions"),
-            ("web_or_not", "ask_assistant", when(route=ASSISTANT)),  # type: ignore
+            (["router", "low_confidence_route"], "create_step_back_questions"),
             ("web_or_not", "search_web"),
-            ("search_web", "ask_assistant", expr("len(search_results) == 0")),  # type: ignore
-            ("search_web", "create_search_response"),
+            (
+                ["search_web", "search_lancedb"],
+                "ask_assistant",
+                expr("len(search_results) == 0"),  # type: ignore
+            ),
             ("create_step_back_questions", "search_lancedb"),
-            ("search_lancedb", "ask_assistant", expr("len(search_results) == 0")),  # type: ignore
-            ("search_lancedb", "create_search_response"),
-            ("create_search_response", "get_query"),
-            ("ask_assistant", "get_query"),
+            (["search_web", "search_lancedb"], "create_search_response"),
+            (["create_search_response", "ask_assistant"], "get_query"),
         )
         .with_tracker("local", project=project)
         .with_identifiers(app_id=app_id, partition_key=username)  # type: ignore

@@ -58,7 +58,7 @@ class TableDescription(BaseModel):
     @field_validator("name")
     @classmethod
     def validate_name(cls, v: str, info: ValidationInfo) -> str:
-        v = to_camel(to_camel(v), sep=" ")
+        v = to_camel(to_camel(v.strip(), sep="_"), sep=" ")
         context = info.context
         if context is None:
             return v

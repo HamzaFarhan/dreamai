@@ -75,6 +75,8 @@ def flatten(o: Iterable):
 
 
 def to_camel(s: str, sep: str = "_") -> str:
+    if sep not in s:
+        return s
     return "".join(s.title().split(sep))
 
 
