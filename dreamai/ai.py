@@ -2,16 +2,15 @@ import inspect
 from enum import StrEnum
 from typing import Any, Callable, Literal, Type
 
-import tiktoken
+import instructor
+from anthropic import Anthropic
 from dotenv import load_dotenv
+from google.generativeai import GenerativeModel
 from langchain_core.messages import AnyMessage
-from pydantic import BaseModel, create_model
-from tenacity import Retrying, stop_after_attempt, wait_random
+from openai import OpenAI
+from pydantic import BaseModel, create_model, validate_call
 
 load_dotenv()
-
-
-MessageType = dict[str, Any]
 
 
 class ModelName(StrEnum):
@@ -23,12 +22,6 @@ class ModelName(StrEnum):
     GEMINI_PRO = "gemini-1.5-pro-latest"
     GEMINI_PRO_EXP = "gemini-1.5-pro-exp-0801"
     GEMINI_FLASH = "gemini-1.5-flash-latest"
-
-
-MODEL = ModelName.GEMINI_FLASH
-ATTEMPTS = 2
-MAX_TOKENS = 2048
-TEMPERATURE = 0.3
 
 
 class Tool(BaseModel):
@@ -77,64 +70,17 @@ def run_tool(tool_model: Tool, tool_func: Callable, **kwargs) -> Any:
         return ToolError(tool_name=tool_model.tool_name, error=str(e))
 
 
-def count_gpt_tokens(text: str, model: ModelName = ModelName.GPT_MINI) -> int:
-    encoding = tiktoken.encoding_for_model(model)
-    return len(encoding.encode(text))
-
-
-def chat_message(role: str, content: Any) -> MessageType:
-    return {"role": role, "content": content}
-
-
-def system_message(content: Any) -> MessageType:
-    return chat_message(role="system", content=content)
-
-
-def user_message(content: Any) -> MessageType:
-    return chat_message(role="user", content=content)
-
-
-def assistant_message(content: Any) -> MessageType:
-    return chat_message(role="assistant", content=content)
-
-
-def merge_same_role_messages(messages: list[MessageType]) -> list[MessageType]:
-    if not messages:
-        return []
-    new_messages = []
-    last_message = None
-    for message in messages:
-        if last_message is None:
-            last_message = message
-        elif last_message["role"] == message["role"]:
-            last_message["content"] += (
-                "\n\n--- Next Message ---\n\n" + message["content"]
-            )
-        else:
-            new_messages.append(last_message)
-            last_message = message
-    if last_message is not None:
-        new_messages.append(last_message)
-    return new_messages
-
-
-def oai_response(response) -> str:
-    try:
-        return response.choices[0].message.content
-    except Exception:
-        return response
-
-
-def claude_response(response) -> str:
-    try:
-        return response.content[0].text
-    except Exception:
-        return response
-
-
-def ai_retry_attempts(attempts: int = 3):
-    return (
-        Retrying(wait=wait_random(min=1, max=40), stop=stop_after_attempt(attempts))
-        if attempts > 1
-        else 1
-    )
+@validate_call
+def create_creator(model: ModelName) -> instructor.Instructor:
+    if model in [ModelName.GPT_MINI, ModelName.GPT]:
+        return instructor.from_openai(OpenAI())
+    elif model in [ModelName.HAIKU, ModelName.SONNET, ModelName.OPUS]:
+        return instructor.from_anthropic(Anthropic())
+    elif model in [
+        ModelName.GEMINI_FLASH,
+        ModelName.GEMINI_PRO,
+        ModelName.GEMINI_PRO_EXP,
+    ]:
+        return instructor.from_gemini(GenerativeModel(model_name=model))
+    else:
+        raise ValueError(f"Model {model} not supported")

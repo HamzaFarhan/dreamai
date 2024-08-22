@@ -16,7 +16,7 @@ Instructions:
 4. Determine if you can confidently and accurately answer the query using only your built-in knowledge.
 
 Output: Provide one of the following:
-- "Assistant" if you can confidently answer the query using your built-in knowledge.
-- "Web" if the query requires internet access for up-to-date, specific, or real-time information.
+- "ask_assistant" if you can confidently answer the query using your built-in knowledge.
+- "web" if the query requires internet access for up-to-date, specific, or real-time information.
 
 Do not provide any additional explanation or context with your selection.

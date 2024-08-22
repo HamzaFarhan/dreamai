@@ -1,0 +1,26 @@
+Now, I'd like you to critically evaluate the confidence level of your previous response. As a world-class AI with exceptional analytical skills, you have the ability to assess your own performance objectively and accurately.
+
+Please consider the following:
+
+1. The depth and breadth of knowledge you drew upon for your response.
+2. The relevance and specificity of the information you provided.
+3. Any assumptions or inferences you made.
+4. The potential for alternative interpretations or answers.
+5. The completeness of your response in addressing all aspects of the query.
+6. Any areas where you felt uncertain or where your knowledge might be limited.
+
+Based on these factors, provide a single float value between 0.0 and 1.0 representing your confidence in your previous response, where:
+
+- 0.0 indicates no confidence (pure guesswork)
+- 1.0 indicates absolute certainty (you'd stake your existence on it)
+
+Use this scale as a guide:
+- 0.9 - 1.0: Near certain, comprehensive answer with authoritative sources
+- 0.75 - 0.89: Very confident, minor uncertainties or omissions
+- 0.5 - 0.74: Moderately confident, significant uncertainties or incomplete information
+- 0.25 - 0.49: Low confidence, major gaps in knowledge or highly speculative
+- 0.0 - 0.24: Very low confidence, mostly guesswork or extremely limited information
+
+Be honest and critical in your self-assessment. It's better to acknowledge uncertainty than to overstate your confidence. Your goal is to provide a reliable and unbiased evaluation of your previous response.
+
+Please respond with only a single float value representing your confidence level.

@@ -1,38 +1,38 @@
 {
   "task": "/home/hamza/dev/dreamai/dreamai/dialogs/web_or_not_task.txt",
-  "template": "Current date: {current_date}\n\nUser query: '{user_query}'",
+  "template": "<current_date>{current_date}</current_date>\n<user_query>{user_query}</user_query>",
   "examples": [
     {
-      "user": "Current date: 2024-08-19\n\nUser query: 'What were the major outcomes of the 2024 Summer Olympics?'",
-      "assistant": "Web"
+      "user": "<current_date>2024-08-19</current_date>\n<user_query>What were the major outcomes of the 2024 Summer Olympics?</user_query>",
+      "assistant": "web"
     },
     {
-      "user": "Current date: 2024-08-19\n\nUser query: 'Can you explain the theory of relativity?'",
-      "assistant": "Assistant"
+      "user": "<current_date>2024-08-19</current_date>\n<user_query>Can you explain the theory of relativity?</user_query>",
+      "assistant": "ask_assistant"
     },
     {
-      "user": "Current date: 2024-08-19\n\nUser query: 'What is the current stock price of Apple Inc.?'",
-      "assistant": "Web"
+      "user": "<current_date>2024-08-19</current_date>\n<user_query>What is the current stock price of Apple Inc.?</user_query>",
+      "assistant": "web"
     },
     {
-      "user": "Current date: 2024-08-19\n\nUser query: 'Who was the first person to walk on the moon?'",
-      "assistant": "Assistant"
+      "user": "<current_date>2024-08-19</current_date>\n<user_query>Who was the first person to walk on the moon?</user_query>",
+      "assistant": "ask_assistant"
     },
     {
-      "user": "Current date: 2024-08-19\n\nUser query: 'What are the latest advancements in quantum computing?'",
-      "assistant": "Web"
+      "user": "<current_date>2024-08-19</current_date>\n<user_query>What are the latest advancements in quantum computing?</user_query>",
+      "assistant": "web"
     },
     {
-      "user": "Current date: 2024-08-19\n\nUser query: 'Can you provide a summary of Shakespeare's play Hamlet?'",
-      "assistant": "Assistant"
+      "user": "<current_date>2024-08-19</current_date>\n<user_query>Can you provide a summary of Shakespeare's play Hamlet?</user_query>",
+      "assistant": "ask_assistant"
     },
     {
-      "user": "Current date: 2024-08-19\n\nUser query: 'What is the weather forecast for New York City tomorrow?'",
-      "assistant": "Web"
+      "user": "<current_date>2024-08-19</current_date>\n<user_query>What is the weather forecast for New York City tomorrow?</user_query>",
+      "assistant": "web"
     },
     {
-      "user": "Current date: 2024-08-19\n\nUser query: 'How does photosynthesis work in plants?'",
-      "assistant": "Assistant"
+      "user": "<current_date>2024-08-19</current_date>\n<user_query>How does photosynthesis work in plants?</user_query>",
+      "assistant": "ask_assistant"
     }
   ]
 }

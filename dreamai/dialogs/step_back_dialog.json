@@ -1,38 +1,38 @@
 {
   "task": "You are a brilliant and insightful question generator, renowned for your ability to uncover deeper contexts and broader perspectives. Your expertise lies in transforming specific queries into thought-provoking, comprehensive questions that unlock vast realms of knowledge. Given a specific question, generate one or more general 'step-back' questions that provide broader context and could help retrieve more relevant information from a knowledge base. The number of step-back questions should depend on the complexity and specificity of the original question:\n\n1. For simple, straightforward questions, provide only one step-back question.\n2. For complex questions with multiple parts or very specific details, provide up to 3 step-back questions, each broadening the scope further.\n\nThe step-back question(s) should:\n1. Focus on higher-level concepts or principles that encompass the original question.\n2. Broaden the scope to retrieve more comprehensive information.\n3. Avoid specific time constraints when possible, asking instead about entire histories or careers.\n4. Be formulated to help retrieve relevant facts more effectively from a knowledge base.\n\nFormat:\nOriginal Question: [Original specific question]\nStep-back Question 1: [More general question addressing the above points]\nStep-back Question 2: [If needed: Even broader question]\nStep-back Question 3: [If needed: Most general question]",
-  "template": "Original Question: {question}",
+  "template": "<original_question>{question}</original_question>",
   "examples": [
     {
-      "user": "Original Question: What happens to the pressure, P, of an ideal gas if the temperature is increased by a factor of 2 and the volume is increased by a factor of 8?",
-      "assistant": "Step-back Question 1: What is the Ideal Gas Law and how does it relate pressure, temperature, and volume in general?\nStep-back Question 2: What are the fundamental gas laws in thermodynamics and their applications?\nStep-back Question 3: How do the principles of thermodynamics apply to various states of matter?"
+      "user": "<original_question>What happens to the pressure, P, of an ideal gas if the temperature is increased by a factor of 2 and the volume is increased by a factor of 8?</original_question>",
+      "assistant": "<step_back_question>Step-back Question 1: What is the Ideal Gas Law and how does it relate pressure, temperature, and volume in general?</step_back_question>\n<step_back_question>Step-back Question 2: What are the fundamental gas laws in thermodynamics and their applications?</step_back_question>\n<step_back_question>Step-back Question 3: How do the principles of thermodynamics apply to various states of matter?</step_back_question>"
     },
     {
-      "user": "Original Question: Which position did Knox Cunningham hold from May 1955 to Apr 1956?",
-      "assistant": "Step-back Question: What are all the positions Knox Cunningham has held throughout his entire career?"
+      "user": "<original_question>Which position did Knox Cunningham hold from May 1955 to Apr 1956?</original_question>",
+      "assistant": "<step_back_question>What are all the positions Knox Cunningham has held throughout his entire career?</step_back_question>"
     },
     {
-      "user": "Original Question: How does photosynthesis occur in desert plants?",
-      "assistant": "Step-back Question: What are the various adaptations of plants to different environments and how do they affect their physiological processes?"
+      "user": "<original_question>How does photosynthesis occur in desert plants?</original_question>",
+      "assistant": "<step_back_question>What are the various adaptations of plants to different environments and how do they affect their physiological processes?</step_back_question>"
     },
     {
-      "user": "Original Question: What is the chemical composition of tears?",
-      "assistant": "Step-back Question: What are the various bodily fluids in humans and their respective compositions and functions?"
+      "user": "<original_question>What is the chemical composition of tears?</original_question>",
+      "assistant": "<step_back_question>What are the various bodily fluids in humans and their respective compositions and functions?</step_back_question>"
     },
     {
-      "user": "Original Question: How many home runs did Babe Ruth hit in the 1927 season, and how did this compare to his career average?",
-      "assistant": "Step-back Question 1: What are Babe Ruth's overall career statistics and major achievements in baseball?\nStep-back Question 2: How has the role of power hitters evolved in baseball history?"
+      "user": "<original_question>How many home runs did Babe Ruth hit in the 1927 season, and how did this compare to his career average?</original_question>",
+      "assistant": "<step_back_question>Step-back Question 1: What are Babe Ruth's overall career statistics and major achievements in baseball?</step_back_question>\n<step_back_question>Step-back Question 2: How has the role of power hitters evolved in baseball history?</step_back_question>"
     },
     {
-      "user": "Original Question: What is the function of mitochondria in eukaryotic cells?",
-      "assistant": "Step-back Question: What are the main organelles found in eukaryotic cells and their respective functions?"
+      "user": "<original_question>What is the function of mitochondria in eukaryotic cells?</original_question>",
+      "assistant": "<step_back_question>What are the main organelles found in eukaryotic cells and their respective functions?</step_back_question>"
     },
     {
-      "user": "Original Question: How did the Treaty of Versailles affect Germany's economy and military after World War I?",
-      "assistant": "Step-back Question 1: What were the major terms and conditions of the Treaty of Versailles?\nStep-back Question 2: How have post-war treaties historically shaped global politics and international relations?"
+      "user": "<original_question>How did the Treaty of Versailles affect Germany's economy and military after World War I?</original_question>",
+      "assistant": "<step_back_question>Step-back Question 1: What were the major terms and conditions of the Treaty of Versailles?</step_back_question>\n<step_back_question>Step-back Question 2: How have post-war treaties historically shaped global politics and international relations?</step_back_question>"
     },
     {
-      "user": "Original Question: What was the population of New York City in 1950?",
-      "assistant": "Step-back Question: How has New York City's population changed throughout its history, and what factors have influenced these changes?"
+      "user": "<original_question>What was the population of New York City in 1950?</original_question>",
+      "assistant": "<step_back_question>How has New York City's population changed throughout its history, and what factors have influenced these changes?</step_back_question>"
     }
   ]
 }

@@ -15,16 +15,36 @@ from lancedb.pydantic import LanceModel
 from lancedb.pydantic import Vector as LanceVector
 from lancedb.table import Table as LanceTable
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from pydantic import BaseModel
 from pydantic import create_model as create_pydantic_model
 from pymupdf import Pixmap
 
-CHUNK_SIZE = 800
-CHUNK_OVERLAP = 300
-SEPARATORS = [r"#{1,6} ", r"```\n", r"\*{2,}", r"---+\n", r"__+\n", r"\n\n", r"\n"]
-EMS_MODEL = "hkunlp/instructor-base"
-REREANKER = "answerdotai/answerai-colbert-small-v1"
-DEVICE = "cuda"
-TEXT_FIELD_NAME = "text"
+from dreamai.settings import RAGAppSettings, RAGSettings
+
+rag_settings = RAGSettings()
+rag_app_settings = RAGAppSettings()
+
+CHUNK_SIZE = rag_settings.chunk_size
+CHUNK_OVERLAP = rag_settings.chunk_overlap
+SEPARATORS = rag_settings.separators
+EMS_MODEL = rag_settings.ems_model
+REREANKER = rag_settings.reranker
+DEVICE = rag_settings.device
+TEXT_FIELD_NAME = rag_settings.text_field_name
+MAX_SEARCH_RESULTS = rag_settings.max_search_results
+TERMINATORS = rag_app_settings.terminators
+
+
+class StepWithConfidence(BaseModel):
+    step: str
+    confidence: float
+
+
+def get_user_query() -> str:
+    query = ""
+    while not query:
+        query = input(f"({', '.join(TERMINATORS)} to exit) > ").strip()
+    return query
 
 
 def extract_text_from_image(image_path: str, min_len: int = 2) -> str:
@@ -69,7 +89,7 @@ def clean_web_content(content: str, min_length: int = 3) -> str:
     )
 
 
-def web_search(query: str, max_results: int = 5) -> list[dict]:
+def web_search(query: str, max_results: int = MAX_SEARCH_RESULTS) -> list[dict]:
     return DDGS().text(query, max_results=max_results)
 
 
@@ -93,7 +113,10 @@ def scrape_urls(
 
 
 def search_and_scrape(
-    query: str, max_results: int = 5, clean_content: bool = True, wait_time: int = 123
+    query: str,
+    max_results: int = MAX_SEARCH_RESULTS,
+    clean_content: bool = True,
+    wait_time: int = 123,
 ) -> list[dict]:
     return scrape_urls(
         urls=[

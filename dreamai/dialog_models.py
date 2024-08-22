@@ -1,4 +1,4 @@
-from typing import Annotated, Literal, Any
+from typing import Annotated, Any, Literal
 from uuid import uuid4
 
 from pydantic import (
@@ -10,10 +10,14 @@ from pydantic import (
     field_validator,
 )
 
+from dreamai.settings import DialogModelsSettings
 from dreamai.utils import to_camel
 
-MAX_SENTENCE_COMPONENTS = 5
-MAX_STEP_BACK_QUESTIONS = 3
+settings = DialogModelsSettings()
+
+MAX_SENTENCE_COMPONENTS = settings.max_sentence_components
+MAX_STEP_BACK_QUESTIONS = settings.max_step_back_questions
+MAX_RESPONSE_SENTENCES = settings.max_response_sentences
 ASSERTION_CATEGORIES = Literal[
     "Presentation Format",
     "Example Demonstration",
@@ -24,7 +28,6 @@ ASSERTION_CATEGORIES = Literal[
     "Qualitative Assessment",
     "Other",
 ]
-MAX_RAG_SENTENCES = 5
 
 
 def validate_sentence_components(
@@ -67,7 +70,7 @@ class TableDescription(BaseModel):
         return v
 
 
-class SourcedRAGSentence(BaseModel):
+class SourcedSentence(BaseModel):
     sentence: str
     sources: list[int] = Field(
         default_factory=lambda: [-1], description="The source document indices."
@@ -92,9 +95,9 @@ class SourcedRAGSentence(BaseModel):
         return f"{self.sentence} {self.sources}"
 
 
-class SourcedRAGResponse(BaseModel):
-    sentences: list[SourcedRAGSentence] = Field(
-        min_length=1, max_length=MAX_RAG_SENTENCES
+class SourcedResponse(BaseModel):
+    sentences: list[SourcedSentence] = Field(
+        min_length=1, max_length=MAX_RESPONSE_SENTENCES
     )
 
     def __str__(self) -> str:

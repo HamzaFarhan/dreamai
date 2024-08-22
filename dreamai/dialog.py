@@ -5,26 +5,32 @@ from pathlib import Path
 from typing import Annotated, Any, Self, cast
 from uuid import uuid4
 
+from anthropic import Anthropic
+from google.generativeai import GenerativeModel
+from instructor import Instructor
+from openai import OpenAI
 from pydantic import AfterValidator, BaseModel, Field, model_validator
 
-from dreamai.ai import (
-    MessageType,
-    ModelName,
-    assistant_message,
-    merge_same_role_messages,
-    system_message,
-    user_message,
-)
+from dreamai.ai import ModelName, create_creator
+from dreamai.settings import DialogSettings, CreatorSettings
 
-DEFAULT_TEMPLATE = "{}"
-DEFAULT_VERSION = 1.0
+dialog_settings = DialogSettings()
+creator_settings = CreatorSettings()
+
+DEFAULT_TEMPLATE = dialog_settings.default_template
+DEFAULT_DIALOG_VERSION = dialog_settings.default_dialog_version
+CHAT_HISTORY_LIMIT = dialog_settings.chat_history_limit
+TEMPERATURE = creator_settings.temperature
+MAX_TOKENS = creator_settings.max_tokens
+ATTEMPTS = creator_settings.attempts
 DIFF_CONTEXT_LINES = 1
-CHAT_HISTORY_LIMIT = 10
+
+MessageType = dict[str, Any]
 
 
-def load_str(content: Any) -> Any:
+def load_dialog_str(content: Any) -> Any:
     if isinstance(content, list):
-        return "\n".join([load_str(c) for c in content])
+        return "\n".join([load_dialog_str(c) for c in content])
     if not isinstance(content, (str, Path)):
         return content
     string_path = Path(str(content).strip())
@@ -38,8 +44,46 @@ def load_str(content: Any) -> Any:
     return str(string_path).strip()
 
 
-Str = Annotated[str, AfterValidator(load_str)]
-ExampleContent = Annotated[Any, AfterValidator(load_str)]
+def chat_message(role: str, content: Any) -> MessageType:
+    if isinstance(content, (str, Path)):
+        content = load_dialog_str(content=content)
+    return {"role": role, "content": content}
+
+
+def system_message(content: Any) -> MessageType:
+    return chat_message(role="system", content=content)
+
+
+def user_message(content: Any) -> MessageType:
+    return chat_message(role="user", content=content)
+
+
+def assistant_message(content: Any) -> MessageType:
+    return chat_message(role="assistant", content=content)
+
+
+def merge_same_role_messages(messages: list[MessageType]) -> list[MessageType]:
+    if not messages:
+        return []
+    new_messages = []
+    last_message = None
+    for message in messages:
+        if last_message is None:
+            last_message = message
+        elif last_message["role"] == message["role"]:
+            last_message["content"] += (
+                "\n\n--- Next Message ---\n\n" + message["content"]
+            )
+        else:
+            new_messages.append(last_message)
+            last_message = message
+    if last_message is not None:
+        new_messages.append(last_message)
+    return new_messages
+
+
+Str = Annotated[str, AfterValidator(load_dialog_str)]
+ExampleContent = Annotated[Any, AfterValidator(load_dialog_str)]
 
 
 class Example(BaseModel):
@@ -97,7 +141,7 @@ class Dialog(BaseModel):
     template: Str = DEFAULT_TEMPLATE
     examples: list[Example | BadExample] = Field(default_factory=list)
     chat_history: list[MessageType] = Field(default_factory=list)
-    version: float = DEFAULT_VERSION
+    version: float = DEFAULT_DIALOG_VERSION
     description: str = ""
     original_task: Str = ""
     original_template: Str = DEFAULT_TEMPLATE
@@ -204,6 +248,7 @@ class Dialog(BaseModel):
         user: str = "",
         template_data: dict | None = None,
     ) -> list[MessageType]:
+        user = "" if template_data is not None else user
         if user:
             messages.append(user_message(content=user))
         elif template_data:
@@ -212,11 +257,11 @@ class Dialog(BaseModel):
 
     def gpt_kwargs(
         self,
-        model: ModelName = ModelName.GPT_MINI,
+        model: ModelName,
         user: str = "",
         template_data: dict | None = None,
         chat_history_limit: int = CHAT_HISTORY_LIMIT,
-    ) -> dict[str, str | list[MessageType]]:
+    ) -> dict[str, Any]:
         return {
             "model": model,
             "messages": self._add_user_query(
@@ -226,11 +271,11 @@ class Dialog(BaseModel):
 
     def claude_kwargs(
         self,
-        model: ModelName = ModelName.SONNET,
+        model: ModelName,
         user: str = "",
         template_data: dict | None = None,
         chat_history_limit: int = CHAT_HISTORY_LIMIT,
-    ) -> dict[str, str | list[MessageType]]:
+    ) -> dict[str, Any]:
         messages = self._add_user_query(
             messages=self.merged_messages, user=user, template_data=template_data
         )[-chat_history_limit:]
@@ -245,12 +290,48 @@ class Dialog(BaseModel):
         user: str = "",
         template_data: dict | None = None,
         chat_history_limit: int = CHAT_HISTORY_LIMIT,
-    ) -> dict[str, list[MessageType]]:
+    ) -> dict[str, Any]:
         return {
             "messages": self._add_user_query(
                 messages=self.merged_messages, user=user, template_data=template_data
             )[-chat_history_limit:],
         }
+
+    def creator_with_kwargs(
+        self,
+        model: ModelName,
+        user: str = "",
+        template_data: dict | None = None,
+        chat_history_limit: int = CHAT_HISTORY_LIMIT,
+    ) -> tuple[Instructor, dict[str, Any]]:
+        creator = create_creator(model=model)
+        creator_kwargs = {}
+        if isinstance(creator.client, OpenAI):
+            creator_kwargs = self.gpt_kwargs(
+                model=model,
+                user=user,
+                template_data=template_data,
+                chat_history_limit=chat_history_limit,
+            )
+        elif isinstance(creator.client, Anthropic):
+            creator_kwargs = self.claude_kwargs(
+                model=model,
+                user=user,
+                template_data=template_data,
+                chat_history_limit=chat_history_limit,
+            )
+        elif isinstance(creator.client, GenerativeModel):
+            creator_kwargs = self.gemini_kwargs(
+                user=user,
+                template_data=template_data,
+                chat_history_limit=chat_history_limit,
+            )
+        else:
+            raise ValueError(f"Unsupported model: {model}")
+        creator_kwargs["temperature"] = TEMPERATURE
+        creator_kwargs["max_tokens"] = MAX_TOKENS
+        creator_kwargs["max_retries"] = ATTEMPTS
+        return creator, creator_kwargs
 
     def bump_version(
         self, new_version: float | None = None, name: str = "", save: bool = True

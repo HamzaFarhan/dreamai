@@ -1,0 +1,36 @@
+{
+  "task": "/home/hamza/dev/dreamai/dreamai/dialogs/router_task.txt",
+  "template": "<user_query>{user_query}</user_query>\n\n<available_routes>{routes}</available_routes>",
+  "examples": [
+    {
+      "user": "<user_query>What's the weather like today?</user_query>\n<available_routes>['weather', 'news', 'general_chat', 'task_planning']</available_routes>",
+      "assistant": "{\"route\": \"weather\", \"confidence\": 0.95}"
+    },
+    {
+      "user": "<user_query>Can you help me plan my vacation?</user_query>\n<chat_history>[User]: I'm thinking about taking a trip\n[AI]: That sounds exciting! Where are you considering going?\n[User]: I'm not sure yet</chat_history>\n<available_routes>['travel_planning', 'budget_advice', 'general_chat', 'local_recommendations']</available_routes>",
+      "assistant": "{\"route\": \"travel_planning\", \"confidence\": 0.88}"
+    },
+    {
+      "user": "<user_query>What's the latest news on renewable energy?</user_query>\n<chat_history>[User]: I'm interested in environmental topics\n[AI]: That's great! Environmental issues are very important. What specific area are you most interested in?</chat_history>\n<available_routes>['news', 'science_education', 'environmental_data', 'general_chat']</available_routes>",
+      "assistant": "{\"route\": \"news\", \"confidence\": 0.92}"
+    },
+    {
+      "user": "<user_query>Can you explain quantum computing?</user_query>\n<chat_history>[User]: I've been reading about new technologies\n[AI]: That's a fascinating area! What specific technology would you like to know more about?</chat_history>\n<available_routes>['tech_news', 'science_education', 'coding_help', 'general_chat']</available_routes>",
+      "assistant": "{\"route\": \"science_education\", \"confidence\": 0.72}"
+    },
+    {
+      "user": "<user_query>What's a good recipe for vegetarian lasagna?</user_query>\n<chat_history>[User]: I'm trying to eat less meat\n[AI]: That's a great goal! There are many delicious vegetarian options. What kind of dishes do you usually enjoy?</chat_history>\n<available_routes>['recipe_search', 'nutrition_advice', 'restaurant_recommendations', 'general_chat']</available_routes>",
+      "assistant": "{\"route\": \"recipe_search\", \"confidence\": 0.8}"
+    },
+    {
+      "user": "<user_query>What's the capital of France?</user_query>\n<chat_history>[User]: I'm planning a trip to Europe\n[AI]: How exciting! Which countries are you planning to visit?\n[User]: I'm thinking about France and Spain</chat_history>\n<available_routes>['travel_planning', 'geography_facts', 'language_learning', 'general_chat']</available_routes>",
+      "assistant": "{\"route\": \"travel_planning\", \"confidence\": 0.95}",
+      "feedback": "Your selection of the 'travel_planning' route with high confidence was incorrect. While the chat history mentions trip planning, the specific query is asking for a geography fact. You should have chosen the 'geography_facts' route. Remember to prioritize the immediate query over the general context of the conversation when making your routing decisions."
+    },
+    {
+      "user": "<user_query>How do I bake chocolate chip cookies?</user_query>\n<chat_history>[User]: I want to surprise my family with some homemade treats\n[AI]: That's a lovely idea! What kind of treats are you thinking of making?</chat_history>\n<available_routes>['recipe_search', 'cooking_tips', 'baking_techniques', 'general_chat']</available_routes>",
+      "assistant": "{\"route\": \"recipe_search\", \"confidence\": 0.6}",
+      "feedback": "While you correctly selected the 'recipe_search' route, your confidence score of 0.6 is inappropriately low. Given the clear match between the query about baking cookies and the 'recipe_search' route, your confidence should have been much higher (above 0.9). Make sure to align your confidence scores more accurately with the relevance of the selected route."
+    }
+  ]
+}

@@ -11,16 +11,16 @@ from google.generativeai import GenerativeModel
 from lancedb.db import DBConnection as LancedbDBConnection
 from lancedb.rerankers import Reranker
 
-from dreamai.ai import ModelName, assistant_message, user_message
-from dreamai.dialog import Dialog
+from dreamai.ai import ModelName
+from dreamai.dialog import Dialog, assistant_message, user_message
 from dreamai.dialog_models import (
-    SourcedRAGResponse,
-    SourcedRAGSentence,
+    SourcedResponse,
+    SourcedSentence,
     StepBackQuestions,
     TableDescription,
     create_response_with_confidence_model,
 )
-from dreamai.rag import (
+from dreamai.rag_utils import (
     CHUNK_OVERLAP,
     CHUNK_SIZE,
     add_to_lance_table,
@@ -324,7 +324,7 @@ def create_search_response(
     user = rag_dialog.template.format(documents=documents, user_query=query)
     try:
         response = ask_kid.create(
-            response_model=SourcedRAGResponse,
+            response_model=SourcedResponse,
             **rag_dialog.gemini_kwargs(
                 user=user, chat_history_limit=chat_history_limit
             ),  # type: ignore
@@ -333,9 +333,9 @@ def create_search_response(
         )
     except Exception as e:
         print(f"Error in create_search_response: {e}")
-        response = SourcedRAGResponse(
+        response = SourcedResponse(
             sentences=[
-                SourcedRAGSentence(
+                SourcedSentence(
                     sentence="Sorry, I couldn't find an answer to your question. Please try again."
                 )
             ]

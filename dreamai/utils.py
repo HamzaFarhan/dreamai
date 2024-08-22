@@ -6,7 +6,6 @@ import re
 import textwrap
 import traceback
 import typing
-from datetime import datetime
 from functools import partial
 from itertools import chain
 from pathlib import Path
@@ -78,6 +77,10 @@ def to_camel(s: str, sep: str = "_") -> str:
     if sep not in s:
         return s
     return "".join(s.title().split(sep))
+
+
+def to_snake(s: str) -> str:
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", s).lower()
 
 
 def extract_json(s):
@@ -372,27 +375,3 @@ def get_function_info(func: Callable) -> str:
     if docstring:
         desc += f"Docstring: {docstring}\n"
     return inspect.cleandoc(desc + "---\n\n")
-
-
-def current_time(format: str = "%m-%d-%Y_%H:%M:%S") -> str:
-    return datetime.now().strftime(format)
-
-
-def sort_times(times, format="%m-%d-%Y_%H:%M:%S"):
-    return sorted(times, key=lambda time: datetime.strptime(time, format))
-
-
-def token_count_to_word_count(token_count) -> int:
-    return max(int(token_count * 0.75), 1)
-
-
-def token_count_to_line_count(token_count) -> int:
-    return max(int(token_count * 0.066), 1)
-
-
-def word_count_to_token_count(word_count) -> int:
-    return max(int(word_count / 0.75), 1)
-
-
-def count_tokens(text: str) -> int:
-    return word_count_to_token_count(len(text.split()))

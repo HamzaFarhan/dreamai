@@ -50,6 +50,7 @@ openparse = "^0.5.7"
 duckduckgo-search = "^6.2.6"
 tavily-python = "^0.3.8"
 pymongo = "^4.8.0"
+pydantic-settings = "^2.4.0"
 
 [build-system]
 requires = ["poetry-core"]
