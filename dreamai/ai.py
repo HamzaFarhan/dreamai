@@ -28,9 +28,7 @@ class Tool(BaseModel):
     tool_name: str
 
 
-def convert_lc_messages(
-    messages: AnyMessage | list[AnyMessage],
-) -> list[dict[str, Any]]:
+def convert_lc_messages(messages: AnyMessage | list[AnyMessage]) -> list[dict[str, Any]]:
     type_to_role = {"human": "user", "ai": "assistant"}
 
     if not isinstance(messages, list):

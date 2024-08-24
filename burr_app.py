@@ -174,9 +174,7 @@ def get_user_query() -> str:
 
 
 @action(reads=["db", "chat_history"], writes=["query", "route"])
-def router(
-    state: State, query: str, attempts: int = ATTEMPTS
-) -> tuple[dict[str, str], State]:
+def router(state: State, query: str, attempts: int = ATTEMPTS) -> tuple[dict[str, str], State]:
     """
     Route the user `query` to the appropriate place for an answer.
     If the `query` is directly related to a table in the database, return the table name.
@@ -239,9 +237,7 @@ def rewrite_query_for_lancedb(
     return {"lancedb_query": query}, state.update(lancedb_query=query)
 
 
-@action(
-    reads=["db", "route", "lancedb_query", "docs_limit"], writes=["lancedb_results"]
-)
+@action(reads=["db", "route", "lancedb_query", "docs_limit"], writes=["lancedb_results"])
 def search_lancedb(state: State) -> tuple[dict[str, list[str]], State]:
     db: DBConnection = state["db"]
     try:
@@ -255,9 +251,7 @@ def search_lancedb(state: State) -> tuple[dict[str, list[str]], State]:
     except Exception as e:
         print(f"Error in search_lancedb: {e}")
         lancedb_results = []
-    return {"lancedb_results": lancedb_results}, state.update(
-        lancedb_results=lancedb_results
-    )
+    return {"lancedb_results": lancedb_results}, state.update(lancedb_results=lancedb_results)
 
 
 @action(reads=["query", "lancedb_results"], writes=["lancedb_results"])
@@ -277,9 +271,7 @@ def remove_irrelevant_lancedb_results(
             is_relevant = ask_gemini.create(
                 messages=[
                     user_message(
-                        evaluator_template(
-                            query=state["query"], document=lancedb_result
-                        )
+                        evaluator_template(query=state["query"], document=lancedb_result)
                     )  # type: ignore
                 ],
                 response_model=bool,  # type: ignore
@@ -343,9 +335,7 @@ def search_exa(state: State) -> tuple[dict[str, list[str]], State]:
     reads=["query", "lancedb_results", "exa_search_results", "chat_history"],
     writes=["chat_history", "lancedb_results", "exa_search_results"],
 )
-def ask_assistant(
-    state: State, attempts: int = ATTEMPTS
-) -> tuple[dict[str, str], State]:
+def ask_assistant(state: State, attempts: int = ATTEMPTS) -> tuple[dict[str, str], State]:
     """
     Combine the `chat_history`, `query`, `lancedb_results`, and `exa_search_results` to ask the assistant for an answer.
     `chat_history`, `lancedb_results`, and `exa_search_results` are used as context for the assistant and can be empty lists.
@@ -358,10 +348,7 @@ def ask_assistant(
     if context:
         context = "\n".join(context)
         query = (
-            query.strip()
-            + "\n<additional_context>\n"
-            + context
-            + "\n</additional_context>"
+            query.strip() + "\n<additional_context>\n" + context + "\n</additional_context>"
         )
     messages.append({"role": "user", "content": query.strip()})
     try:

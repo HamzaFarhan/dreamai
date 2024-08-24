@@ -15,7 +15,6 @@ from lancedb.pydantic import LanceModel
 from lancedb.pydantic import Vector as LanceVector
 from lancedb.table import Table as LanceTable
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from pydantic import BaseModel
 from pydantic import create_model as create_pydantic_model
 from pymupdf import Pixmap
 
@@ -33,11 +32,6 @@ DEVICE = rag_settings.device
 TEXT_FIELD_NAME = rag_settings.text_field_name
 MAX_SEARCH_RESULTS = rag_settings.max_search_results
 TERMINATORS = rag_app_settings.terminators
-
-
-class StepWithConfidence(BaseModel):
-    step: str
-    confidence: float
 
 
 def get_user_query() -> str:
@@ -119,10 +113,7 @@ def search_and_scrape(
     wait_time: int = 123,
 ) -> list[dict]:
     return scrape_urls(
-        urls=[
-            result["href"]
-            for result in web_search(query=query, max_results=max_results)
-        ],
+        urls=[result["href"] for result in web_search(query=query, max_results=max_results)],
         clean_content=clean_content,
         wait_time=wait_time,
     )
@@ -186,9 +177,7 @@ def get_lance_ems_model(
 
 
 def create_lance_schema(
-    name: str,
-    ems_model: SentenceTransformerEmbeddings,
-    data: dict,
+    name: str, ems_model: SentenceTransformerEmbeddings, data: dict
 ) -> Type[LanceModel]:
     fields = {
         TEXT_FIELD_NAME: (str, ems_model.SourceField()),
@@ -212,9 +201,7 @@ def add_to_lance_table(
 ) -> LanceTable:
     if isinstance(ems_model, str):
         ems_model = get_lance_ems_model(name=ems_model, device=ems_model_device)
-    schema = schema or create_lance_schema(
-        name="LanceDoc", ems_model=ems_model, data=data[0]
-    )
+    schema = schema or create_lance_schema(name="LanceDoc", ems_model=ems_model, data=data[0])
     if table_name in db.table_names():
         table = db.open_table(table_name)
     else:

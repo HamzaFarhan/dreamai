@@ -85,6 +85,8 @@ class SourcedSentence(BaseModel):
         num_documents = context.get("num_documents", 0)
         valid_sources = []
         for source in v:
+            if source in valid_sources:
+                continue
             if source < -1 or source >= num_documents:
                 valid_sources.append(-1)
             else:
@@ -96,9 +98,7 @@ class SourcedSentence(BaseModel):
 
 
 class SourcedResponse(BaseModel):
-    sentences: list[SourcedSentence] = Field(
-        min_length=1, max_length=MAX_RESPONSE_SENTENCES
-    )
+    sentences: list[SourcedSentence] = Field(min_length=1, max_length=MAX_RESPONSE_SENTENCES)
 
     def __str__(self) -> str:
         if len(self.sentences) == 1:

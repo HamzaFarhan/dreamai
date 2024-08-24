@@ -244,9 +244,7 @@ def group_broken_paragraphs(
 
 def replace_mime_encodings(text: str, encoding: str = "utf-8") -> str:
     formatted_encoding = format_encoding_str(encoding)
-    return quopri.decodestring(text.encode(formatted_encoding)).decode(
-        formatted_encoding
-    )
+    return quopri.decodestring(text.encode(formatted_encoding)).decode(formatted_encoding)
 
 
 def replace_unicode_quotes(text: str) -> str:
@@ -326,15 +324,10 @@ def get_required_param_names(func: Callable) -> list[str]:
         return [
             name
             for name, param in params.items()
-            if param.default == inspect.Parameter.empty
-            and name not in func.keywords.keys()
+            if param.default == inspect.Parameter.empty and name not in func.keywords.keys()
         ]
     params = inspect.signature(func).parameters
-    return [
-        name
-        for name, param in params.items()
-        if param.default == inspect.Parameter.empty
-    ]
+    return [name for name, param in params.items() if param.default == inspect.Parameter.empty]
 
 
 def function_schema(f: Callable) -> dict:

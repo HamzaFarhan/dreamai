@@ -80,9 +80,7 @@ def search_lancedb(
 # Example usage:
 if __name__ == "__main__":
     lance_model = (
-        get_registry()
-        .get("sentence-transformers")
-        .create(name=EMS_MODEL, device=DEVICE)
+        get_registry().get("sentence-transformers").create(name=EMS_MODEL, device=DEVICE)
     )
 
     class LanceDoc(LanceModel):

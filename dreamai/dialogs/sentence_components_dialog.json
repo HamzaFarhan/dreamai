@@ -3,23 +3,23 @@
   "examples": [
     {
       "user": "The playful cat chased the red ball.",
-      "assistant": "noun: ['cat', 'ball']\nsubject: ['cat']\nobject: ['ball']\nverb: ['chased']\nadjective: ['playful', 'red']"
+      "assistant": "<components>\n  <noun>cat, ball</noun>\n  <subject>cat</subject>\n  <object>ball</object>\n  <verb>chased</verb>\n  <adjective>playful, red</adjective>\n</components>"
     },
     {
       "user": "Birds sing melodiously.",
-      "assistant": "noun: ['birds']\nsubject: ['birds']\nobject: []\nverb: ['sing']\nadjective: []"
+      "assistant": "<components>\n  <noun>birds</noun>\n  <subject>birds</subject>\n  <object></object>\n  <verb>sing</verb>\n  <adjective></adjective>\n</components>"
     },
     {
       "user": "The old man and young boy walked through busy streets.",
-      "assistant": "noun: ['man', 'boy', 'streets']\nsubject: ['man', 'boy']\nobject: []\nverb: ['walked']\nadjective: ['old', 'young', 'busy']"
+      "assistant": "<components>\n  <noun>man, boy, streets</noun>\n  <subject>man, boy</subject>\n  <object></object>\n  <verb>walked</verb>\n  <adjective>old, young, busy</adjective>\n</components>"
     },
     {
       "user": "Scientists believe hard work leads to success.",
-      "assistant": "noun: ['scientists', 'work', 'success']\nsubject: ['scientists', 'work']\nobject: ['success']\nverb: ['believe', 'leads']\nadjective: ['hard']"
+      "assistant": "<components>\n  <noun>scientists, work, success</noun>\n  <subject>scientists, work</subject>\n  <object>success</object>\n  <verb>believe, leads</verb>\n  <adjective>hard</adjective>\n</components>"
     },
     {
       "user": "The brilliant professor explained complex theories to eager students during the engaging lecture.",
-      "assistant": "noun: ['professor', 'theories', 'students', 'lecture']\nsubject: ['professor']\nobject: ['theories', 'students']\nverb: ['explained']\nadjective: ['brilliant', 'complex', 'eager', 'engaging']"
+      "assistant": "<components>\n  <noun>professor, theories, students, lecture</noun>\n  <subject>professor</subject>\n  <object>theories, students</object>\n  <verb>explained</verb>\n  <adjective>brilliant, complex, eager, engaging</adjective>\n</components>"
     }
   ]
 }

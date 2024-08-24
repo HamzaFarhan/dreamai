@@ -23,14 +23,10 @@ def get_latest_cursor_versions():
         all_versions = re.findall(
             r"\b(\d+\.\d+(\.\d+){0,2}|\d+\.0|\b0\.\d+)\b", soup.get_text()
         )
-        all_versions = [
-            v[0] for v in all_versions
-        ]  # Extract the full match from each tuple
+        all_versions = [v[0] for v in all_versions]  # Extract the full match from each tuple
         all_versions = list(set(all_versions))  # Remove duplicates
         print(all_versions)
-        main_version_variations = [
-            v for v in all_versions if v.startswith(main_version)
-        ]
+        main_version_variations = [v for v in all_versions if v.startswith(main_version)]
         print(main_version_variations)
 
         latest_main_variation = max(

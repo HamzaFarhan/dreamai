@@ -4,14 +4,11 @@ from typing import Any, Literal
 from burr.core import State, action
 from instructor.client import T
 from lancedb.db import DBConnection as LancedbDBConnection
+from pydantic import BaseModel
 
 from dreamai.ai import ModelName
 from dreamai.dialog import Dialog, MessageType, assistant_message, user_message
-from dreamai.dialog_models import (
-    TableDescription,
-    create_response_with_confidence_model,
-)
-from dreamai.rag_utils import StepWithConfidence
+from dreamai.dialog_models import TableDescription, create_response_with_confidence_model
 from dreamai.settings import CreatorSettings, DialogSettings, RAGAppSettings
 
 creator_settings = CreatorSettings()
@@ -19,7 +16,6 @@ rag_app_settings = RAGAppSettings()
 dialog_settings = DialogSettings()
 
 MODEL = creator_settings.model
-ATTEMPTS = creator_settings.attempts
 ROUTER = rag_app_settings.router
 ASSISTANT = rag_app_settings.assistant
 TERMINATORS = rag_app_settings.terminators
@@ -29,6 +25,11 @@ WEB_OR_NOT = rag_app_settings.web_or_not
 DEFAULT_CONFIDENCE = rag_app_settings.default_confidence
 ASSISTANT_CONFIDENCE_THRESHOLD = rag_app_settings.assistant_confidence_threshold
 DIALOGS_FOLDER = dialog_settings.dialogs_folder
+
+
+class StepWithConfidence(BaseModel):
+    step: str
+    confidence: float
 
 
 def _get_route(query: str) -> str:
@@ -48,7 +49,6 @@ def _query_to_response(
     template_data: dict | None = None,
     chat_history: list[MessageType] | None = None,
     validation_context: dict[str, Any] | None = None,
-    attempts: int = ATTEMPTS,
 ) -> T:
     dialog = dialog or Dialog(task=f"{DIALOGS_FOLDER}/assistant_task.txt")
     if chat_history:
@@ -57,10 +57,7 @@ def _query_to_response(
         model=model, user=query, template_data=template_data
     )
     response = creator.create(
-        response_model=response_model,
-        validation_context=validation_context,
-        max_retries=attempts,
-        **creator_kwargs,
+        response_model=response_model, validation_context=validation_context, **creator_kwargs
     )
     return response
 
@@ -70,11 +67,9 @@ def _query_to_route(
     model: ModelName,
     routes: list[Any],
     chat_history: list[MessageType] | None = None,
-) -> dict[str, str | float]:
+) -> StepWithConfidence:
     response_model = create_response_with_confidence_model(response_type=routes)
-    dialog = Dialog(
-        task=f"{DIALOGS_FOLDER}/router_task.txt", chat_history=chat_history or []
-    )
+    dialog = Dialog(task=f"{DIALOGS_FOLDER}/router_task.txt", chat_history=chat_history or [])
     response = _query_to_response(
         query=query,
         model=model,
@@ -82,26 +77,24 @@ def _query_to_route(
         response_model=response_model,
         template_data={"user_query": query, "available_routes": routes},
     )
-    return {"route": response.response, "confidence": response.confidence}  # type: ignore
+    return StepWithConfidence(step=response.response, confidence=response.confidence)  # type: ignore
 
 
 @action(reads=[], writes=["query", "steps"])
-def get_query(state: State, query: str) -> tuple[dict[str, str], State]:
+def get_query(state: State, query: str) -> tuple[dict[str, str | StepWithConfidence], State]:
     route = _get_route(query=query)
     if route == WEB:
         query = query.replace("@web", "").strip()
-    return {"query": query, "route": route}, state.update(query=query).append(
-        steps=StepWithConfidence(step=route, confidence=DEFAULT_CONFIDENCE)
-    )
+    step = StepWithConfidence(step=route, confidence=DEFAULT_CONFIDENCE)
+    return {"query": query, "step": step}, state.update(query=query).append(steps=step)
 
 
-@action(reads=["model", "query", "chat_history"], writes=["route", "confidence"])
-def followup_or_not(state: State) -> tuple[dict[str, str | float], State]:
+@action(reads=["model", "query", "chat_history"], writes=["steps"])
+def followup_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]:
     chat_history = state.get("chat_history", [])
     if len(chat_history) == 0:
-        return {"route": ROUTER, "confidence": DEFAULT_CONFIDENCE}, state.update(
-            route=ROUTER, confidence=DEFAULT_CONFIDENCE
-        )
+        step = StepWithConfidence(step=ROUTER, confidence=DEFAULT_CONFIDENCE)
+        return {"step": step}, state.append(steps=step)
     try:
         followup = _query_to_response(
             query=state["query"],
@@ -116,15 +109,12 @@ def followup_or_not(state: State) -> tuple[dict[str, str | float], State]:
         print(f"Error in followup_or_not: {e}")
         followup = False
     route = ASSISTANT if followup else ROUTER
-    return {"route": route, "confidence": DEFAULT_CONFIDENCE}, state.append(
-        steps=StepWithConfidence(step=route, confidence=DEFAULT_CONFIDENCE)
-    )
+    step = StepWithConfidence(step=route, confidence=DEFAULT_CONFIDENCE)
+    return {"step": step}, state.append(steps=step)
 
 
 @action(reads=["model", "query", "chat_history"], writes=["steps"])
-def web_or_not(
-    state: State,
-) -> tuple[dict[str, str | float], State]:
+def web_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]:
     try:
         dialog = Dialog.load(path=f"{DIALOGS_FOLDER}/web_or_not_dialog.json")
         dialog.chat_history += state.get("chat_history", [])
@@ -153,26 +143,21 @@ def web_or_not(
         print(f"Error in web_or_not: {e}")
         route = ASSISTANT
         confidence = DEFAULT_CONFIDENCE
-    return {"route": route, "confidence": confidence}, state.append(
-        steps=StepWithConfidence(step=route, confidence=confidence)
-    )
+    step = StepWithConfidence(step=route, confidence=confidence)
+    return {"step": step}, state.append(steps=step)
 
 
-@action(
-    reads=["query", "db", "chat_history", "has_web"],
-    writes=["steps", "table_names"],
-)
+@action(reads=["db", "model", "query", "chat_history", "has_web"], writes=["steps"])
 def router(
     state: State, table_descriptions: list[TableDescription] = []
-) -> tuple[dict[str, str | float | list[str]], State]:
+) -> tuple[dict[str, StepWithConfidence], State]:
     db: LancedbDBConnection = state["db"]
-    table_names = list(db.table_names())
     try:
         response = _query_to_response(
             model=state["model"],
             dialog=Dialog.load(path=f"{DIALOGS_FOLDER}/table_selection_dialog.json"),
             response_model=create_response_with_confidence_model(
-                response_type=table_names
+                response_type=list(db.table_names())
             ),
             template_data={
                 "user_query": state["query"],
@@ -194,10 +179,5 @@ def router(
     if route == ASSISTANT and state["has_web"]:
         route = WEB_OR_NOT
         confidence = DEFAULT_CONFIDENCE
-    return {
-        "route": route,
-        "confidence": confidence,
-        "table_names": table_names,
-    }, state.append(steps=StepWithConfidence(step=route, confidence=confidence)).update(
-        table_names=table_names
-    )
+    step = StepWithConfidence(step=route, confidence=confidence)
+    return {"step": step}, state.append(steps=step)

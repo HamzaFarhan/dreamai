@@ -41,9 +41,7 @@ DOCS_LIMIT = 3
 CHAT_HISTORY_LIMIT = 10
 TERMINATORS = ["exit", "quit", "q"]
 
-ask_kid = instructor.from_gemini(
-    client=GenerativeModel(model_name=ModelName.GEMINI_FLASH)
-)
+ask_kid = instructor.from_gemini(client=GenerativeModel(model_name=ModelName.GEMINI_FLASH))
 
 is_followup_dialog = Dialog(task="dreamai/dialogs/is_followup_task.txt")
 assistant_dialog = Dialog(task="dreamai/dialogs/chatbot_task.txt")
@@ -90,9 +88,7 @@ def add_data(
             table_description.name, table_description
         )
         table_descriptions_dict[table_description.name] = table_description
-        add_to_lance_table(
-            db=lance_db, table_name=table_description.name, data=md_data.chunks
-        )
+        add_to_lance_table(db=lance_db, table_name=table_description.name, data=md_data.chunks)
     return list(table_descriptions_dict.values())
 
 
@@ -300,8 +296,7 @@ def search_lancedb(
                     .rerank(reranker=reranker)  # type: ignore
                     .limit(docs_limit)
                     .to_pandas()
-                    for question in state.get("step_back_questions", [])
-                    + [state["query"]]
+                    for question in state.get("step_back_questions", []) + [state["query"]]
                 ]
             )
             .drop_duplicates("text")
@@ -325,9 +320,7 @@ def create_search_response(
     try:
         response = ask_kid.create(
             response_model=SourcedResponse,
-            **rag_dialog.gemini_kwargs(
-                user=user, chat_history_limit=chat_history_limit
-            ),  # type: ignore
+            **rag_dialog.gemini_kwargs(user=user, chat_history_limit=chat_history_limit),  # type: ignore
             validation_context={"num_documents": len(documents)},
             max_retries=attempts,
         )

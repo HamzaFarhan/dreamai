@@ -15,10 +15,7 @@ BULLET_PRESET = "BULLET_DISC_CIRCLE_SQUARE"
 
 def presentation_slides(service: Any, presentation_id: str) -> list[dict]:
     return (
-        service.presentations()
-        .get(presentationId=presentation_id)
-        .execute()
-        .get("slides", [])
+        service.presentations().get(presentationId=presentation_id).execute().get("slides", [])
     )
 
 
@@ -87,9 +84,7 @@ def add_text_to_slide(
         placeholder_type = [placeholder_type]
     slide = (
         slide
-        or presentation_slides(presentation_id=presentation_id, service=service)[
-            slide_id
-        ]
+        or presentation_slides(presentation_id=presentation_id, service=service)[slide_id]
     )
     batch_update_requests = []
     for text_content, ph_type in zip(text, placeholder_type):
@@ -119,9 +114,7 @@ def add_text_to_slide(
                         insertion_index=insertion_index,
                     )
                 )
-                bullet_request = create_bullet_request(
-                    placeholder, "".join(text_content)
-                )
+                bullet_request = create_bullet_request(placeholder, "".join(text_content))
                 batch_update_requests.append(bullet_request)
             elif isinstance(text_content, str):
                 batch_update_requests.append(

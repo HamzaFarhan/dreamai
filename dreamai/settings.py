@@ -5,9 +5,7 @@ from dreamai.ai import ModelName
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file="sai_settings.env", env_file_encoding="utf-8"
-    )
+    model_config = SettingsConfigDict(env_file="sai_settings.env", env_file_encoding="utf-8")
 
 
 class CreatorSettings(Settings):
@@ -18,7 +16,7 @@ class CreatorSettings(Settings):
 
 
 class DialogSettings(Settings):
-    dialogs_folder = "/home/hamza/dev/dreamai/dreamai/dialogs"
+    dialogs_folder: str = "/home/hamza/dev/dreamai/dreamai/dialogs"
     default_template: str = "{}"
     default_dialog_version: float = 1.0
     chat_history_limit: int = Field(
@@ -29,7 +27,7 @@ class DialogSettings(Settings):
 class DialogModelsSettings(Settings):
     max_sentence_components: int = Field(default=5, title="For SentenceComponents")
     max_step_back_questions: int = Field(default=3, title="For StepBackQuestions")
-    max_response_sentences: int = Field(default=5, title="For SourcedResponse")
+    max_response_sentences: int = Field(default=10, title="For SourcedResponse")
 
 
 class RAGSettings(Settings):
@@ -44,6 +42,7 @@ class RAGSettings(Settings):
         r"\n\n",
         r"\n",
     ]
+    lance_uri: str = "lance/rag/"
     ems_model: str = "hkunlp/instructor-base"
     reranker: str = "answerdotai/answerai-colbert-small-v1"
     device: str = "cuda"

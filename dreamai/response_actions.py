@@ -12,8 +12,7 @@ DIALOGS_FOLDER = dialog_settings.dialogs_folder
 
 
 @action(
-    reads=["model", "query", "chat_history"],
-    writes=["assistant_response", "chat_history"],
+    reads=["model", "query", "chat_history"], writes=["assistant_response", "chat_history"]
 )
 def ask_assistant(state: State) -> tuple[dict, State]:
     try:
@@ -25,15 +24,13 @@ def ask_assistant(state: State) -> tuple[dict, State]:
     except Exception as e:
         print(f"Error in ask_assistant: {e}")
         response = "I'm sorry, but I encountered an error while processing your request. Could you please try again?"
-    return {"assistant_response": response}, state.update(
-        assistant_response=response
-    ).append(chat_history=user_message(content=state["query"])).append(
-        chat_history=assistant_message(content=response)
-    )
+    return {"assistant_response": response}, state.update(assistant_response=response).append(
+        chat_history=user_message(content=state["query"])
+    ).append(chat_history=assistant_message(content=response))
 
 
 @action(
-    reads=["model", "query", "chat_history", "search_results"],
+    reads=["model", "query", "search_results", "chat_history"],
     writes=["assistant_response", "chat_history"],
 )
 def create_search_response(state: State) -> tuple[dict, State]:
@@ -46,7 +43,7 @@ def create_search_response(state: State) -> tuple[dict, State]:
             model=state["model"],
             dialog=dialog,
             response_model=SourcedResponse,
-            chat_history=state["chat_history"],
+            chat_history=state.get("chat_history", None),
             validation_context={"num_documents": len(documents)},
         )
     except Exception as e:

@@ -18,9 +18,7 @@ def create_quiz(
     name: str = "DREAMAI QUIZ",
     title: str = "DREAMAI",
 ) -> dict:
-    assert (
-        service or token_file or client_secrets_file
-    ), "No service or credentials provided."
+    assert service or token_file or client_secrets_file, "No service or credentials provided."
     service = service or create_service(
         api_name=api_name,
         api_version=api_version,
@@ -58,9 +56,7 @@ def create_question_request(
                         "required": True,
                         "grading": {
                             "pointValue": points_per_question,
-                            "correctAnswers": {
-                                "answers": [{"value": answers[correct_index]}]
-                            },
+                            "correctAnswers": {"answers": [{"value": answers[correct_index]}]},
                             "whenRight": {"text": "You got it!"},
                             "whenWrong": {"text": "Sorry, that's wrong"},
                         },

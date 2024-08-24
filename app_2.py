@@ -4,29 +4,30 @@ from pathlib import Path
 import lancedb
 from lancedb.rerankers import ColbertReranker
 
-from rag_app import add_data, application, get_user_query
+from dreamai.rag_utils import get_user_query
+from dreamai.search_actions import _add_data_with_descriptions
+from dreamai.settings import CreatorSettings, RAGSettings
+from rag_app_2 import application
 
-# Constants
-LANCE_URI = "lance/rag/"
+creator_settings = CreatorSettings()
+rag_settings = RAGSettings()
+
+MODEL = creator_settings.model
+LANCE_URI = rag_settings.lance_uri
+RERANKER = rag_settings.reranker
 DATA_PATH = "rag_data"
 
-# Remove existing database if it exists
 if Path(LANCE_URI).exists():
     shutil.rmtree(LANCE_URI)
-
-# Connect to the database and initialize reranker
 lance_db = lancedb.connect(uri=LANCE_URI)
-reranker = ColbertReranker("answerdotai/answerai-colbert-small-v1")
+reranker = ColbertReranker(RERANKER)
 
-# Add data to the database
-table_descriptions = add_data(lance_db=lance_db, data_path=DATA_PATH)
-
-# Initialize the application
-app = application(
-    db=lance_db, reranker=reranker, table_descriptions=table_descriptions, has_web=True
+table_descriptions = _add_data_with_descriptions(
+    model=MODEL, lance_db=lance_db, data_path=DATA_PATH
 )
-
-# Visualize the application state machine
+app = application(
+    db=lance_db, reranker=reranker, model=MODEL, table_descriptions=table_descriptions
+)
 app.visualize(
     output_file_path="statemachine",
     include_conditions=True,
@@ -35,7 +36,6 @@ app.visualize(
 )
 
 
-# Main interaction loop
 def main():
     inputs = {"query": get_user_query()}
     while True:
@@ -43,7 +43,7 @@ def main():
         if step_result is None:
             print("Error: app.step() returned None")
             break
-        action, result, state = step_result
+        action, result, _ = step_result
         print(f"\nRESULT: {result}\n")
         if action.name == "terminate":
             break
@@ -53,6 +53,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# Uncomment the following line to print the chat history after the main loop
-# print(app.state["chat_history"])

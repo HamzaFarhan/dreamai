@@ -23,7 +23,7 @@ CHUNK_SIZE = rag_settings.chunk_size
 CHUNK_OVERLAP = rag_settings.chunk_overlap
 
 
-def add_data_with_descriptions(
+def _add_data_with_descriptions(
     model: ModelName,
     lance_db: LancedbDBConnection,
     data_path: list[str | Path] | str | Path,
@@ -53,18 +53,14 @@ def add_data_with_descriptions(
             table_description.name, table_description
         )
         table_descriptions_dict[table_description.name] = table_description
-        add_to_lance_table(
-            db=lance_db, table_name=table_description.name, data=md_data.chunks
-        )
+        add_to_lance_table(db=lance_db, table_name=table_description.name, data=md_data.chunks)
     return list(table_descriptions_dict.values())
 
 
 @action(reads=["query"], writes=["search_results"])
 def search_web(state: State) -> tuple[dict[str, list[str]], State]:
     try:
-        results = search_and_scrape(
-            query=state["query"], max_results=MAX_SEARCH_RESULTS
-        )
+        results = search_and_scrape(query=state["query"], max_results=MAX_SEARCH_RESULTS)
         results = [result["markdown"] for result in results]
     except Exception as e:
         print(f"Error in search_web: {e}")
@@ -81,8 +77,8 @@ def create_step_back_questions(state: State) -> tuple[dict[str, list[str]], Stat
                 model=state["model"],
                 dialog=Dialog.load(f"{DIALOGS_FOLDER}/step_back_dialog.json"),
                 response_model=StepBackQuestions,
-                template_data={"original_question": state["query"]},
-                chat_history=state.get("chat_history", []),
+                template_data={"question": state["query"]},
+                chat_history=state.get("chat_history", None),
             ),
         ).questions
     except Exception as e:
@@ -94,14 +90,12 @@ def create_step_back_questions(state: State) -> tuple[dict[str, list[str]], Stat
 
 
 @action(
-    reads=["query", "route", "step_back_questions", "db"],
+    reads=["db", "query", "steps", "step_back_questions"],
     writes=["search_results"],
 )
-def search_lancedb(
-    state: State, reranker: Reranker
-) -> tuple[dict[str, list[str]], State]:
+def search_lancedb(state: State, reranker: Reranker) -> tuple[dict[str, list[str]], State]:
     db: LancedbDBConnection = state["db"]
-    table = db.open_table(name=state["route"])
+    table = db.open_table(name=state["steps"][-1].step)
     try:
         results = (
             pd.concat(
@@ -110,8 +104,7 @@ def search_lancedb(
                     .rerank(reranker=reranker)  # type: ignore
                     .limit(MAX_SEARCH_RESULTS)
                     .to_pandas()
-                    for question in state.get("step_back_questions", [])
-                    + [state["query"]]
+                    for question in state.get("step_back_questions", []) + [state["query"]]
                 ]
             )
             .drop_duplicates("text")
