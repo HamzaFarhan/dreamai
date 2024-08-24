@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import cast
 
-import pandas as pd
 from burr.core import State, action
 from lancedb.db import DBConnection as LancedbDBConnection
 from lancedb.rerankers import Reranker
@@ -9,41 +8,55 @@ from lancedb.rerankers import Reranker
 from dreamai.ai import ModelName
 from dreamai.dialog import Dialog
 from dreamai.dialog_models import StepBackQuestions, TableDescription
-from dreamai.rag_utils import add_to_lance_table, pdf_to_md_docs, search_and_scrape
+from dreamai.lance_utils import add_to_lance_table
+from dreamai.lance_utils import search_lancedb as _search_lancedb
+from dreamai.md_utils import data_to_md, search_query_to_md
 from dreamai.routing_actions import _query_to_response
 from dreamai.settings import DialogSettings, RAGSettings
-from dreamai.utils import resolve_data_path
 
 rag_settings = RAGSettings()
 dialog_settings = DialogSettings()
 
+TEXT_FIELD_NAME = rag_settings.text_field_name
 MAX_SEARCH_RESULTS = rag_settings.max_search_results
 DIALOGS_FOLDER = dialog_settings.dialogs_folder
 CHUNK_SIZE = rag_settings.chunk_size
 CHUNK_OVERLAP = rag_settings.chunk_overlap
+SAMPLE_TEXT_LIMIT = rag_settings.sample_text_limit
 
 
-def _add_data_with_descriptions(
+# @trace()
+def add_data_with_descriptions(
     model: ModelName,
     lance_db: LancedbDBConnection,
-    data_path: list[str | Path] | str | Path,
-    table_descriptions: list[TableDescription] = [],
+    data: list[str | Path] | str | Path | None = None,
+    search_query: str = "",
+    max_results: int = MAX_SEARCH_RESULTS,
+    table_descriptions: list[TableDescription] | None = None,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
 ) -> list[TableDescription]:
+    assert data or search_query, "Either data or search_query must be provided"
+    table_descriptions = table_descriptions or []
     table_descriptions_dict = {td.name: td for td in table_descriptions}
-    for file in resolve_data_path(data_path=data_path):
-        table_name = Path(file).stem
-        md_data = pdf_to_md_docs(
-            file_path=file, chunk_size=chunk_size, chunk_overlap=chunk_overlap
-        )
+
+    md_result_list = data_to_md(
+        data=data,
+        search_query=search_query,
+        max_results=max_results,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+    )
+
+    for md_result in md_result_list:
+        table_name = md_result.name
         table_description: TableDescription = _query_to_response(
             model=model,
             dialog=Dialog.load(f"{DIALOGS_FOLDER}/table_description_dialog.json"),
             response_model=TableDescription,
             template_data={
                 "database_name": table_name,
-                "sample_text": md_data.markdown,
+                "sample_text": md_result.markdown[:SAMPLE_TEXT_LIMIT],
                 "current_databases": [
                     td.model_dump_json(indent=2) for td in table_descriptions
                 ],
@@ -53,15 +66,20 @@ def _add_data_with_descriptions(
             table_description.name, table_description
         )
         table_descriptions_dict[table_description.name] = table_description
-        add_to_lance_table(db=lance_db, table_name=table_description.name, data=md_data.chunks)
+        add_to_lance_table(
+            db=lance_db, table_name=table_description.name, data=md_result.chunks
+        )
+
     return list(table_descriptions_dict.values())
 
 
 @action(reads=["query"], writes=["search_results"])
-def search_web(state: State) -> tuple[dict[str, list[str]], State]:
+def search_web(state: State) -> tuple[dict[str, list[dict]], State]:
     try:
-        results = search_and_scrape(query=state["query"], max_results=MAX_SEARCH_RESULTS)
-        results = [result["markdown"] for result in results]
+        results = search_query_to_md(
+            query=state["query"], max_results=MAX_SEARCH_RESULTS, chunk_size=0
+        )
+        results = [result.model_dump(exclude={"chunks"}) for result in results]
     except Exception as e:
         print(f"Error in search_web: {e}")
         results = []
@@ -93,25 +111,16 @@ def create_step_back_questions(state: State) -> tuple[dict[str, list[str]], Stat
     reads=["db", "query", "steps", "step_back_questions"],
     writes=["search_results"],
 )
-def search_lancedb(state: State, reranker: Reranker) -> tuple[dict[str, list[str]], State]:
-    db: LancedbDBConnection = state["db"]
-    table = db.open_table(name=state["steps"][-1].step)
+def search_lancedb(state: State, reranker: Reranker) -> tuple[dict[str, list[dict]], State]:
     try:
-        results = (
-            pd.concat(
-                [
-                    table.search(query=question, query_type="hybrid")
-                    .rerank(reranker=reranker)  # type: ignore
-                    .limit(MAX_SEARCH_RESULTS)
-                    .to_pandas()
-                    for question in state.get("step_back_questions", []) + [state["query"]]
-                ]
-            )
-            .drop_duplicates("text")
-            .sort_values("_relevance_score", ascending=False)
-            .reset_index(drop=True)
-        )["text"].tolist()
+        results = _search_lancedb(
+            db=state["db"],
+            table_name=state["steps"][-1].step,
+            query=state["query"],
+            reranker=reranker,
+            max_results=MAX_SEARCH_RESULTS,
+        )
     except Exception as e:
-        print(f"Error in search_and_rerank: {e}")
+        print(f"Error in search_lancedb: {e}")
         results = []
     return {"search_results": results}, state.update(search_results=results)

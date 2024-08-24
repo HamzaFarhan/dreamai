@@ -14,7 +14,7 @@ from lancedb.db import DBConnection
 from pydantic import BaseModel, Field
 
 from dreamai.ai import assistant_message, user_message, ModelName
-from dreamai.rag_utils import (
+from dreamai.lance_utils import (
     add_to_lance_table,
     get_lance_ems_model,
     pdf_to_md_docs,

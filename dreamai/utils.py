@@ -1,18 +1,14 @@
 import inspect
-import json
 import os
 import quopri
 import re
 import textwrap
 import traceback
-import typing
-from functools import partial
 from itertools import chain
 from pathlib import Path
-from typing import Callable, Final, Iterable
+from typing import Final, Iterable
 
 import demoji
-from pydantic import create_model
 
 UNICODE_BULLETS: Final[list[str]] = [
     "\u0095",
@@ -49,6 +45,41 @@ PARAGRAPH_PATTERN_RE = re.compile(
 DOUBLE_PARAGRAPH_PATTERN_RE = re.compile("(" + PARAGRAPH_PATTERN + "){2}")
 
 
+def chunk_text(
+    text: str,
+    chunk_size: int = 800,
+    chunk_overlap: int = 200,
+    keep_separator: bool = True,
+    separators: list[str] | None = None,
+) -> list[str]:
+    if chunk_size == 0:
+        return [text]
+    assert chunk_size > chunk_overlap, "chunk_size must be greater than chunk_overlap"
+    separators = separators or [r"#{1,6}\s+", r"\*\*.*?\*\*", r"---", r"\n\n", r"\n"]
+    pattern = f'({"|".join(separators)})' if keep_separator else f'(?:{"|".join(separators)})'
+
+    chunks = re.split(pattern, text)
+    chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
+
+    result = []
+    current_chunk = ""
+
+    for chunk in chunks:
+        if len(current_chunk) + len(chunk) <= chunk_size or not current_chunk:
+            current_chunk += (" " if current_chunk else "") + chunk
+        else:
+            if current_chunk:
+                result.append(current_chunk)
+                if chunk_overlap > 0 and len(current_chunk) > chunk_overlap:
+                    chunk = current_chunk[-chunk_overlap:] + " " + chunk
+            current_chunk = chunk
+
+    if current_chunk:
+        result.append(current_chunk)
+
+    return result
+
+
 def run_code(code, *args, **kwargs):
     try:
         function_def = "def " + code.split("def ")[1].split("\n")[0]
@@ -83,14 +114,6 @@ def to_snake(s: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", "_", s).lower()
 
 
-def extract_json(s):
-    s = s[next(idx for idx, c in enumerate(s) if c in "{[") :]
-    try:
-        return json.loads(s)
-    except json.JSONDecodeError as e:
-        return json.loads(s[: e.pos])
-
-
 def noop(x=None, *args, **kwargs):
     return x
 
@@ -118,7 +141,6 @@ def resolve_data_path(
 
 
 def flatten_list(my_list: list) -> list:
-    """Flatten a list of lists."""
     new_list = []
     for x in my_list:
         if isinstance(x, list):
@@ -163,59 +185,26 @@ def _process_content(content: str | Path | list[str]) -> str:
     return deindent(str(content))
 
 
-def dict_to_markdown(
-    content_dict: dict[str, str | Path | list[str]] | None = None,
-    prefix: str = "",
-    suffix: str = "",
-) -> str:
-    content_dict = content_dict or {}
-    prompt = deindent(prefix).strip()
-    for header, content in content_dict.items():
-        if content:
-            header = " ".join(header.split("_")).strip().title()
-            content = _process_content(content).strip()
-            if content:
-                if prompt:
-                    prompt += "\n\n"
-                prompt += f"## {header}\n\n{content}"
-    if suffix:
-        prompt += "\n\n" + deindent(suffix).strip()
-    return prompt.strip()
-
-
 def format_encoding_str(encoding: str) -> str:
     formatted_encoding = encoding.lower().replace("_", "-")
-    annotated_encodings = [
-        "iso-8859-6-i",
-        "iso-8859-6-e",
-        "iso-8859-8-i",
-        "iso-8859-8-e",
-    ]
+    annotated_encodings = ["iso-8859-6-i", "iso-8859-6-e", "iso-8859-8-i", "iso-8859-8-e"]
     if formatted_encoding in annotated_encodings:
         formatted_encoding = formatted_encoding[:-2]
-
     return formatted_encoding
 
 
 def bytes_string_to_string(text: str, encoding: str = "utf-8"):
-    text_bytes = bytes([ord(char) for char in text])
-    formatted_encoding = format_encoding_str(encoding)
-    return text_bytes.decode(formatted_encoding)
+    return bytes([ord(char) for char in text]).decode(format_encoding_str(encoding))
 
 
 def clean_non_ascii_chars(text) -> str:
-    en = text.encode("ascii", "ignore")
-    return en.decode()
+    return text.encode("ascii", "ignore").decode()
 
 
 def group_bullet_paragraph(paragraph: str) -> list:
-    clean_paragraphs = []
     paragraph = (re.sub(E_BULLET_PATTERN, "·", paragraph)).strip()
     bullet_paras = re.split(UNICODE_BULLETS_RE_0W, paragraph)
-    for bullet in bullet_paras:
-        if bullet:
-            clean_paragraphs.append(re.sub(PARAGRAPH_PATTERN, " ", bullet))
-    return clean_paragraphs
+    return [re.sub(PARAGRAPH_PATTERN, " ", bullet) for bullet in bullet_paras if bullet]
 
 
 def group_broken_paragraphs(
@@ -238,7 +227,6 @@ def group_broken_paragraphs(
             clean_paragraphs.extend([line for line in para_split if line.strip()])
         else:
             clean_paragraphs.append(re.sub(PARAGRAPH_PATTERN, " ", paragraph))
-
     return "\n\n".join(clean_paragraphs)
 
 
@@ -311,60 +299,3 @@ def clean_text(
     if no_emojis:
         text = demoji.replace(text, "")
     return text.strip()
-
-
-def get_param_names(func: Callable):
-    func = func.func if type(func) == partial else func
-    return inspect.signature(func).parameters.keys()
-
-
-def get_required_param_names(func: Callable) -> list[str]:
-    if type(func) == partial:
-        params = inspect.signature(func.func).parameters
-        return [
-            name
-            for name, param in params.items()
-            if param.default == inspect.Parameter.empty and name not in func.keywords.keys()
-        ]
-    params = inspect.signature(func).parameters
-    return [name for name, param in params.items() if param.default == inspect.Parameter.empty]
-
-
-def function_schema(f: Callable) -> dict:
-    kw = {
-        n: (o.annotation, ... if o.default == inspect.Parameter.empty else o.default)
-        for n, o in inspect.signature(f).parameters.items()
-    }
-    s = create_model(f"Input for `{f.__name__}`", **kw).schema()  # type: ignore
-    return dict(name=f.__name__, description=f.__doc__, parameters=s)
-
-
-def get_function_return_type(func: Callable) -> type:
-    func = func.func if type(func) == partial else func
-    sig = typing.get_type_hints(func)
-    return sig.get("return", None)
-
-
-def get_function_name(func: Callable) -> str:
-    func = func.func if type(func) == partial else func
-    return func.__name__
-
-
-def get_function_source(func: Callable) -> str:
-    func = func.func if type(func) == partial else func
-    return inspect.getsource(func)
-
-
-def get_function_info(func: Callable) -> str:
-    """Get a string with the name, signature, and docstring of a function."""
-
-    func = func.func if type(func) == partial else func
-    name = func.__name__
-    signature = inspect.signature(func)
-    docstring = inspect.getdoc(func)
-    desc = f"\n---\nA function:\nName: {name}\n"
-    if signature:
-        desc += f"Signature: {signature}\n"
-    if docstring:
-        desc += f"Docstring: {docstring}\n"
-    return inspect.cleandoc(desc + "---\n\n")

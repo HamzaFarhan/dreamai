@@ -33,20 +33,13 @@ class DialogModelsSettings(Settings):
 class RAGSettings(Settings):
     chunk_size: int = 800
     chunk_overlap: int = 200
-    separators: list[str] = [
-        r"#{1,6} ",
-        r"```\n",
-        r"\*{2,}",
-        r"---+\n",
-        r"__+\n",
-        r"\n\n",
-        r"\n",
-    ]
+    separators: list[str] = [r"#{1,6}\s+", r"\*\*.*?\*\*", r"---", r"\n\n", r"\n", r"\.\s+"]
     lance_uri: str = "lance/rag/"
     ems_model: str = "hkunlp/instructor-base"
     reranker: str = "answerdotai/answerai-colbert-small-v1"
     device: str = "cuda"
     text_field_name: str = "text"
+    sample_text_limit: int = 300_000
     max_search_results: int = Field(
         default=5,
         description="The maximum number of results to get from the vector database or search engine.",

@@ -75,7 +75,14 @@ def application(
             tracker,
             resume_at_next_action=True,
             default_entrypoint="get_query",
-            default_state=dict(db=db, model=model, chat_history=[], has_web=has_web, steps=[]),
+            default_state=dict(
+                db=db,
+                model=model,
+                chat_history=[],
+                has_web=has_web,
+                steps=[],
+                search_results=[],
+            ),
         )
     )
     return builder.build()

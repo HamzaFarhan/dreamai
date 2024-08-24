@@ -28,7 +28,7 @@ numpy = "1.26.4"
 pandas = "^2.2.2"
 sentence-transformers = "^3.0.1"
 lancedb = "^0.12.0"
-burr = {extras = ["start"], version = "^0.22.1"}
+burr = "^0.28.0"
 graphviz = "^0.20.3"
 click = "^8.1.7"
 loguru = "^0.7.2"
@@ -54,6 +54,7 @@ pydantic-settings = "^2.4.0"
 python-fasthtml = "^0.4.5"
 html2text = "^2024.2.26"
 lxml = "^5.3.0"
+trafilatura = "^1.12.1"
 
 [tool.ruff]
 line-length = 95

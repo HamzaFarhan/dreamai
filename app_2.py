@@ -4,7 +4,7 @@ from pathlib import Path
 import lancedb
 from lancedb.rerankers import ColbertReranker
 
-from dreamai.rag_utils import get_user_query
+from dreamai.lance_utils import get_user_query
 from dreamai.search_actions import _add_data_with_descriptions
 from dreamai.settings import CreatorSettings, RAGSettings
 from rag_app_2 import application
@@ -15,16 +15,14 @@ rag_settings = RAGSettings()
 MODEL = creator_settings.model
 LANCE_URI = rag_settings.lance_uri
 RERANKER = rag_settings.reranker
-DATA_PATH = "rag_data"
+DATA = "rag_data"
 
 if Path(LANCE_URI).exists():
     shutil.rmtree(LANCE_URI)
 lance_db = lancedb.connect(uri=LANCE_URI)
 reranker = ColbertReranker(RERANKER)
 
-table_descriptions = _add_data_with_descriptions(
-    model=MODEL, lance_db=lance_db, data_path=DATA_PATH
-)
+table_descriptions = _add_data_with_descriptions(model=MODEL, lance_db=lance_db, data=DATA)
 app = application(
     db=lance_db, reranker=reranker, model=MODEL, table_descriptions=table_descriptions
 )

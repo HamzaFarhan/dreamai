@@ -20,7 +20,7 @@ from dreamai.dialog_models import (
     TableDescription,
     create_response_with_confidence_model,
 )
-from dreamai.rag_utils import (
+from dreamai.lance_utils import (
     CHUNK_OVERLAP,
     CHUNK_SIZE,
     add_to_lance_table,

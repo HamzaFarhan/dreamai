@@ -83,15 +83,11 @@ class SourcedSentence(BaseModel):
         if context is None:
             return v
         num_documents = context.get("num_documents", 0)
-        valid_sources = []
-        for source in v:
-            if source in valid_sources:
-                continue
-            if source < -1 or source >= num_documents:
-                valid_sources.append(-1)
-            else:
-                valid_sources.append(source)
-        return valid_sources
+        return list(
+            dict.fromkeys(
+                -1 if source < -1 or source >= num_documents else source for source in v
+            )
+        )
 
     def __str__(self) -> str:
         return f"{self.sentence} {self.sources}"
