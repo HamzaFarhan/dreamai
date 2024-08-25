@@ -7,8 +7,8 @@ from lancedb.rerankers import ColbertReranker
 from dreamai.ai import ModelName
 from dreamai.lance_utils import get_user_query
 from dreamai.search_actions import add_data_with_descriptions
-from dreamai.settings import CreatorSettings, RAGSettings, RAGAppSettings
-from rag_app_2 import application
+from dreamai.settings import CreatorSettings, RAGAppSettings, RAGSettings
+from rag_app import application
 
 creator_settings = CreatorSettings()
 rag_settings = RAGSettings()

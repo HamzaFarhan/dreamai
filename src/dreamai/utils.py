@@ -30,7 +30,6 @@ UNICODE_BULLETS: Final[list[str]] = [
     "\u29bf",
     "\u002d",
     "",
-    "\*",  # type: ignore
     "\x95",
     "·",
 ]

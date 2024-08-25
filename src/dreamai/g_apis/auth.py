@@ -23,8 +23,7 @@ def authenticate(
             creds.refresh(Request())
         elif client_secrets_file:
             flow = InstalledAppFlow.from_client_secrets_file(
-                client_secrets_file=client_secrets_file,
-                scopes=scopes,
+                client_secrets_file=client_secrets_file, scopes=scopes
             )
             creds = flow.run_local_server(port=0)
         else:
@@ -42,9 +41,7 @@ def create_service(
     scopes: list = API_SCOPES,
 ) -> Any:
     creds = authenticate(
-        token_file=token_file,
-        client_secrets_file=client_secrets_file,
-        scopes=scopes,
+        token_file=token_file, client_secrets_file=client_secrets_file, scopes=scopes
     )
     service = build(serviceName=api_name, version=api_version, credentials=creds)
     return service

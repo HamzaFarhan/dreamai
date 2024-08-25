@@ -28,6 +28,10 @@ class DialogModelsSettings(Settings):
     max_sentence_components: int = Field(default=5, title="For SentenceComponents")
     max_step_back_questions: int = Field(default=3, title="For StepBackQuestions")
     max_response_sentences: int = Field(default=10, title="For SourcedResponse")
+    max_non_sourced_factor: float = Field(
+        default=0.5,
+        description="The maximum percentage of the sentences that can be non-sourced.",
+    )
 
 
 class RAGSettings(Settings):
@@ -55,6 +59,7 @@ class RAGAppSettings(Settings):
     followup_or_not: str = "followup_or_not"
     web_or_not: str = "web_or_not"
     web: str = "web"
+    update_chat_history: str = "update_chat_history"
     terminate: str = "terminate"
     default_confidence: float = 1.0
     route_confidence_threshold: float = 0.6

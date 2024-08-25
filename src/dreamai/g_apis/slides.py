@@ -20,9 +20,7 @@ def presentation_slides(service: Any, presentation_id: str) -> list[dict]:
 
 
 def find_placeholder_in_slide(
-    slide: dict,
-    placeholder_type: str = PLACEHOLDER_TYPE,
-    keys: list[str] = [PLACEHOLDER_KEY],
+    slide: dict, placeholder_type: str = PLACEHOLDER_TYPE, keys: list[str] = [PLACEHOLDER_KEY]
 ) -> str:
     # page_elements = slide.get("pageElements")
     body_placeholder = ""
@@ -43,11 +41,7 @@ def find_placeholder_in_slide(
 
 def insert_text_request(object_id: str, text: str, insertion_index: int = 0) -> dict:
     return {
-        "insertText": {
-            "objectId": object_id,
-            "insertionIndex": insertion_index,
-            "text": text,
-        }
+        "insertText": {"objectId": object_id, "insertionIndex": insertion_index, "text": text}
     }
 
 

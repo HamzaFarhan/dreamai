@@ -7,12 +7,12 @@ from pydantic import create_model
 
 
 def get_param_names(func: Callable):
-    func = func.func if type(func) == partial else func
+    func = func.func if isinstance(func, partial) else func
     return inspect.signature(func).parameters.keys()
 
 
 def get_required_param_names(func: Callable) -> list[str]:
-    if type(func) == partial:
+    if isinstance(func, partial):
         params = inspect.signature(func.func).parameters
         return [
             name
@@ -33,25 +33,25 @@ def function_schema(f: Callable) -> dict:
 
 
 def get_function_return_type(func: Callable) -> type:
-    func = func.func if type(func) == partial else func
+    func = func.func if isinstance(func, partial) else func
     sig = typing.get_type_hints(func)
     return sig.get("return", None)
 
 
 def get_function_name(func: Callable) -> str:
-    func = func.func if type(func) == partial else func
+    func = func.func if isinstance(func, partial) else func
     return func.__name__
 
 
 def get_function_source(func: Callable) -> str:
-    func = func.func if type(func) == partial else func
+    func = func.func if isinstance(func, partial) else func
     return inspect.getsource(func)
 
 
 def get_function_info(func: Callable) -> str:
     """Get a string with the name, signature, and docstring of a function."""
 
-    func = func.func if type(func) == partial else func
+    func = func.func if isinstance(func, partial) else func
     name = func.__name__
     signature = inspect.signature(func)
     docstring = inspect.getdoc(func)

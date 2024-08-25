@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Self
 from uuid import uuid4
 
 from pydantic import (
@@ -8,6 +8,7 @@ from pydantic import (
     ValidationInfo,
     create_model,
     field_validator,
+    model_validator,
 )
 
 from dreamai.settings import DialogModelsSettings
@@ -18,6 +19,7 @@ settings = DialogModelsSettings()
 MAX_SENTENCE_COMPONENTS = settings.max_sentence_components
 MAX_STEP_BACK_QUESTIONS = settings.max_step_back_questions
 MAX_RESPONSE_SENTENCES = settings.max_response_sentences
+MAX_NON_SOURCED_FACTOR = settings.max_non_sourced_factor
 ASSERTION_CATEGORIES = Literal[
     "Presentation Format",
     "Example Demonstration",
@@ -71,7 +73,7 @@ class TableDescription(BaseModel):
 
 
 class SourcedSentence(BaseModel):
-    sentence: str
+    text: str
     sources: list[int] = Field(
         default_factory=lambda: [-1], description="The source document indices."
     )
@@ -81,7 +83,7 @@ class SourcedSentence(BaseModel):
     def validate_sources(cls, v: list[int], info: ValidationInfo) -> list[int]:
         context = info.context
         if context is None:
-            return v
+            return v or [-1]
         num_documents = context.get("num_documents", 0)
         sources = list(
             dict.fromkeys(
@@ -91,15 +93,25 @@ class SourcedSentence(BaseModel):
         return sources or [-1]
 
     def __str__(self) -> str:
-        return f"{self.sentence} {self.sources}"
+        return f"{self.text} {self.sources}"
 
 
 class SourcedResponse(BaseModel):
     sentences: list[SourcedSentence] = Field(min_length=1, max_length=MAX_RESPONSE_SENTENCES)
 
+    @model_validator(mode="after")
+    def validate_non_sourced_factor(self, info: ValidationInfo) -> Self:
+        context = info.context or {}
+        max_non_sourced_factor = context.get("max_non_sourced_factor", MAX_NON_SOURCED_FACTOR)
+        non_sourced_sentences = [
+            sentence for sentence in self.sentences if sentence.sources == [-1]
+        ]
+        self._sure = len(non_sourced_sentences) <= max_non_sourced_factor * len(self.sentences)
+        return self
+
     def __str__(self) -> str:
         if len(self.sentences) == 1:
-            return self.sentences[0].sentence
+            return self.sentences[0].text
         else:
             return "\n".join(f"- {sentence}" for sentence in self.sentences)
 

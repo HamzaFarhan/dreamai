@@ -5,8 +5,19 @@ from lancedb.rerankers import Reranker
 
 from dreamai.ai import ModelName
 from dreamai.dialog_models import TableDescription
-from dreamai.response_actions import ask_assistant, create_search_response, terminate
-from dreamai.routing_actions import followup_or_not, get_query, router, web_or_not
+from dreamai.response_actions import (
+    ask_assistant,
+    create_search_response,
+    terminate,
+    update_chat_history,
+)
+from dreamai.routing_actions import (
+    evaluate_answer,
+    followup_or_not,
+    get_query,
+    router,
+    web_or_not,
+)
 from dreamai.search_actions import create_step_back_questions, search_lancedb, search_web
 from dreamai.settings import CreatorSettings, RAGAppSettings
 
@@ -21,6 +32,7 @@ ASSISTANT = rag_app_settings.assistant
 WEB_OR_NOT = rag_app_settings.web_or_not
 WEB = rag_app_settings.web
 TERMINATE = rag_app_settings.terminate
+UPDATE_CHAT_HISTORY = rag_app_settings.update_chat_history
 ROUTE_CONFIDENCE_THRESHOLD = rag_app_settings.route_confidence_threshold
 
 
@@ -47,13 +59,14 @@ def application(
             create_step_back_questions,
             search_lancedb.bind(reranker=reranker),
             create_search_response,
+            evaluate_answer,
+            update_chat_history,
             ask_assistant,
             terminate,
         )
         .with_transitions(
             ("get_query", "terminate", expr(f"steps[-1].step == '{TERMINATE}'")),  # type: ignore
             ("get_query", "search_web", expr(f"steps[-1].step == '{WEB}'")),  # type: ignore
-            # ("get_query", "router", when(only_data=True)),  # type: ignore
             ("get_query", "followup_or_not"),
             (
                 ["followup_or_not", "router", "web_or_not"],
@@ -71,7 +84,15 @@ def application(
             ),
             ("create_step_back_questions", "search_lancedb"),
             (["search_web", "search_lancedb"], "create_search_response"),
-            (["create_search_response", "ask_assistant"], "get_query"),
+            ("create_search_response", "evaluate_answer"),
+            ("evaluate_answer", "ask_assistant", expr(f"steps[-1].step == '{ASSISTANT}'")),
+            (
+                "evaluate_answer",
+                "update_chat_history",
+                expr(f"steps[-1].step == '{UPDATE_CHAT_HISTORY}'"),
+            ),
+            ("ask_assistant", "update_chat_history"),
+            ("update_chat_history", "get_query"),
         )
         .with_tracker("local", project=project)
         .with_identifiers(app_id=app_id, partition_key=username)  # type: ignore

@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 from burr.core import State, action
 
 from dreamai.dialog import Dialog, assistant_message, user_message
@@ -11,9 +13,7 @@ CHAT_HISTORY_LIMIT = dialog_settings.chat_history_limit
 DIALOGS_FOLDER = dialog_settings.dialogs_folder
 
 
-@action(
-    reads=["model", "query", "chat_history"], writes=["assistant_response", "chat_history"]
-)
+@action(reads=["model", "query", "chat_history"], writes=["assistant_response"])
 def ask_assistant(state: State) -> tuple[dict, State]:
     try:
         response = _query_to_response(
@@ -24,14 +24,12 @@ def ask_assistant(state: State) -> tuple[dict, State]:
     except Exception as e:
         print(f"Error in ask_assistant: {e}")
         response = "I'm sorry, but I encountered an error while processing your request. Could you please try again?"
-    return {"assistant_response": response}, state.update(assistant_response=response).append(
-        chat_history=user_message(content=state["query"])
-    ).append(chat_history=assistant_message(content=response))
+    return {"assistant_response": response}, state.update(assistant_response=response)
 
 
 @action(
     reads=["model", "query", "search_results", "chat_history"],
-    writes=["assistant_response", "chat_history"],
+    writes=["assistant_response"],
 )
 def create_search_response(state: State) -> tuple[dict, State]:
     dialog = Dialog.load(f"{DIALOGS_FOLDER}/sourced_rag_dialog.json")
@@ -54,15 +52,21 @@ def create_search_response(state: State) -> tuple[dict, State]:
         response = SourcedResponse(
             sentences=[
                 SourcedSentence(
-                    sentence="Sorry, I couldn't find an answer to your question. Please try again."
+                    text="Sorry, I couldn't find an answer to your question. Please try again."
                 )
             ]
         )
-    return {"assistant_response": str(response)}, state.update(
-        assistant_response=response
-    ).append(chat_history=user_message(content=user)).append(
-        chat_history=assistant_message(content=str(response))
-    )
+    return {"assistant_response": str(response)}, state.update(assistant_response=response)
+
+
+@action(reads=["query", "assistant_response"], writes=["chat_history"])
+def update_chat_history(state: State) -> tuple[dict, State]:
+    chat_history = deepcopy(state["chat_history"])
+    user = user_message(content=state["query"])
+    assistant = assistant_message(content=state["assistant_response"])
+    return {"chat_history": chat_history + [user, assistant]}, state.append(
+        chat_history=user
+    ).append(chat_history=assistant)
 
 
 @action(reads=["chat_history"], writes=[])

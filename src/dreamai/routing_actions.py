@@ -23,6 +23,7 @@ TERMINATORS = rag_app_settings.terminators
 TERMINATE = rag_app_settings.terminate
 WEB = rag_app_settings.web
 WEB_OR_NOT = rag_app_settings.web_or_not
+UPDATE_CHAT_HISTORY = rag_app_settings.update_chat_history
 DEFAULT_CONFIDENCE = rag_app_settings.default_confidence
 ASSISTANT_CONFIDENCE_THRESHOLD = rag_app_settings.assistant_confidence_threshold
 DIALOGS_FOLDER = dialog_settings.dialogs_folder
@@ -184,4 +185,22 @@ def router(
         route = WEB_OR_NOT
         confidence = DEFAULT_CONFIDENCE
     step = StepWithConfidence(step=route, confidence=confidence)
+    return {"step": step}, state.append(steps=step)
+
+
+@action(reads=["model", "query", "assistant_response", "chat_history"], writes=["steps"])
+def evaluate_answer(state: State) -> tuple[dict[str, StepWithConfidence], State]:
+    try:
+        is_query_answered = _query_to_response(
+            model=state["model"],
+            dialog=Dialog.load(f"{DIALOGS_FOLDER}/answer_eval_dialog.json"),
+            response_model=bool,  # type: ignore
+            template_data={"query": state["query"], "answer": state["assistant_response"]},
+            chat_history=state.get("chat_history", None),
+        )
+    except Exception as e:
+        print(f"Error in evaluate_answer: {e}")
+        is_query_answered = True
+    route = UPDATE_CHAT_HISTORY if is_query_answered else ASSISTANT
+    step = StepWithConfidence(step=route, confidence=DEFAULT_CONFIDENCE)
     return {"step": step}, state.append(steps=step)

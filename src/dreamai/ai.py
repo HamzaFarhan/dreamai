@@ -6,7 +6,6 @@ import instructor
 from anthropic import Anthropic
 from dotenv import load_dotenv
 from google.generativeai import GenerativeModel
-from langchain_core.messages import AnyMessage
 from openai import OpenAI
 from pydantic import BaseModel, create_model, validate_call
 
@@ -26,17 +25,6 @@ class ModelName(StrEnum):
 
 class Tool(BaseModel):
     tool_name: str
-
-
-def convert_lc_messages(messages: AnyMessage | list[AnyMessage]) -> list[dict[str, Any]]:
-    type_to_role = {"human": "user", "ai": "assistant"}
-
-    if not isinstance(messages, list):
-        messages = [messages]
-    return [
-        {"role": type_to_role[message.type], "content": message.content}
-        for message in messages
-    ]
 
 
 def create_tool_model(func: Callable) -> Type[BaseModel]:
