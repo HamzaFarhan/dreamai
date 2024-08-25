@@ -1,5 +1,5 @@
 {
-  "task": "/home/hamza/dev/dreamai/dreamai/dialogs/sourced_rag_task.txt",
+  "task": "sourced_rag_task.txt",
   "template": "<documents>\n{documents}\n</documents>\n\n<user_query>\n{user_query}\n</user_query>",
   "examples": [
     {

@@ -1,5 +1,5 @@
 {
-  "task": "/home/hamza/dev/dreamai/dreamai/dialogs/table_selection_task.txt",
+  "task": "table_selection_task.txt",
   "template": "<database_list>{database_list}</database_list>\n<user_query>{user_query}</user_query>",
   "examples": [
     {

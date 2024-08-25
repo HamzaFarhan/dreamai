@@ -1,5 +1,5 @@
 {
-  "task": "/home/hamza/dev/dreamai/dreamai/dialogs/web_or_not_task.txt",
+  "task": "web_or_not_task.txt",
   "template": "<current_date>{current_date}</current_date>\n<user_query>{user_query}</user_query>",
   "examples": [
     {

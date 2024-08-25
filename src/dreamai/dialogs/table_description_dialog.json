@@ -1,5 +1,5 @@
 {
-  "task": "/home/hamza/dev/dreamai/dreamai/dialogs/table_description_task.txt",
+  "task": "table_description_task.txt",
   "template": "<database_name>{database_name}</database_name>\n<sample_text>{sample_text}</sample_text>\n<current_databases>{current_databases}</current_databases>",
   "examples": [
     {

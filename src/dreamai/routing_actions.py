@@ -1,4 +1,5 @@
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Literal
 
 from burr.core import State, action
@@ -43,7 +44,7 @@ def _query_to_response(
     chat_history: list[MessageType] | None = None,
     validation_context: dict[str, Any] | None = None,
 ) -> T:
-    dialog = dialog or Dialog(task=f"{DIALOGS_FOLDER}/assistant_task.txt")
+    dialog = dialog or Dialog(task=str(Path(DIALOGS_FOLDER) / "assistant_task.txt"))
     if chat_history:
         dialog.chat_history = chat_history
     creator, creator_kwargs = dialog.creator_with_kwargs(
@@ -63,7 +64,9 @@ def _query_to_route(
     chat_history: list[MessageType] | None = None,
 ) -> StepWithConfidence:
     response_model = create_response_with_confidence_model(response_type=routes)
-    dialog = Dialog(task=f"{DIALOGS_FOLDER}/router_task.txt", chat_history=chat_history or [])
+    dialog = Dialog(
+        task=str(Path(DIALOGS_FOLDER) / "router_task.txt"), chat_history=chat_history or []
+    )
     response = _query_to_response(
         query=query,
         model=model,
@@ -103,7 +106,7 @@ def followup_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]
             query=state["query"],
             model=state["model"],
             dialog=Dialog(
-                task=f"{DIALOGS_FOLDER}/followup_or_not_task.txt",
+                task=str(Path(DIALOGS_FOLDER) / "followup_or_not_task.txt"),
                 chat_history=chat_history,
             ),
             response_model=bool,  # type: ignore
@@ -119,7 +122,7 @@ def followup_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]
 @action(reads=["model", "query", "chat_history"], writes=["steps"])
 def web_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]:
     try:
-        dialog = Dialog.load(path=f"{DIALOGS_FOLDER}/web_or_not_dialog.json")
+        dialog = Dialog.load(path=str(Path(DIALOGS_FOLDER) / "web_or_not_dialog.json"))
         dialog.chat_history += state.get("chat_history", [])
         route: str = _query_to_response(
             model=state["model"],
@@ -133,7 +136,7 @@ def web_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]:
         dialog.add_messages(
             [
                 assistant_message(content=route),
-                user_message(content=f"{DIALOGS_FOLDER}/confidence_message.txt"),
+                user_message(content=str(Path(DIALOGS_FOLDER) / "confidence_message.txt")),
             ]
         )
         confidence: float = _query_to_response(
@@ -160,7 +163,7 @@ def router(
     try:
         response = _query_to_response(
             model=state["model"],
-            dialog=Dialog.load(path=f"{DIALOGS_FOLDER}/table_selection_dialog.json"),
+            dialog=Dialog.load(path=str(Path(DIALOGS_FOLDER) / "table_selection_dialog.json")),
             response_model=create_response_with_confidence_model(
                 response_type=list(db.table_names())
             ),
@@ -193,7 +196,7 @@ def evaluate_answer(state: State) -> tuple[dict[str, StepWithConfidence], State]
     try:
         is_query_answered = _query_to_response(
             model=state["model"],
-            dialog=Dialog.load(f"{DIALOGS_FOLDER}/answer_eval_dialog.json"),
+            dialog=Dialog.load(path=str(Path(DIALOGS_FOLDER) / "answer_eval_dialog.json")),
             response_model=bool,  # type: ignore
             template_data={"query": state["query"], "answer": state["assistant_response"]},
             chat_history=state.get("chat_history", None),

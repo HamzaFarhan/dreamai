@@ -50,7 +50,9 @@ def add_data_with_descriptions(
         table_name = md_data.name
         table_description: TableDescription = _query_to_response(
             model=model,
-            dialog=Dialog.load(f"{DIALOGS_FOLDER}/table_description_dialog.json"),
+            dialog=Dialog.load(
+                path=str(Path(DIALOGS_FOLDER) / "table_description_dialog.json")
+            ),
             response_model=TableDescription,
             template_data={
                 "database_name": table_name,
@@ -89,7 +91,7 @@ def create_step_back_questions(state: State) -> tuple[dict[str, list[str]], Stat
             StepBackQuestions,
             _query_to_response(
                 model=state["model"],
-                dialog=Dialog.load(f"{DIALOGS_FOLDER}/step_back_dialog.json"),
+                dialog=Dialog.load(path=str(Path(DIALOGS_FOLDER) / "step_back_dialog.json")),
                 response_model=StepBackQuestions,
                 template_data={"question": state["query"]},
                 chat_history=state.get("chat_history", None),

@@ -18,6 +18,7 @@ from dreamai.settings import DialogSettings, CreatorSettings
 dialog_settings = DialogSettings()
 creator_settings = CreatorSettings()
 
+DIALOGS_FOLDER = dialog_settings.dialogs_folder
 DEFAULT_TEMPLATE = dialog_settings.default_template
 DEFAULT_DIALOG_VERSION = dialog_settings.default_dialog_version
 CHAT_HISTORY_LIMIT = dialog_settings.chat_history_limit + 1
@@ -37,7 +38,7 @@ def load_dialog_str(content: Any) -> Any:
     string_path = Path(str(content).strip())
     suffix = string_path.suffix.strip()
     if suffix == ".txt":
-        return string_path.read_text()
+        return (Path(DIALOGS_FOLDER) / Path(string_path).name).read_text()
     if suffix in [".json", ".py", ".yaml", ".yml"]:
         raise ValueError(
             f"String must be a .txt file or a plain string. Suffix received: {suffix}"

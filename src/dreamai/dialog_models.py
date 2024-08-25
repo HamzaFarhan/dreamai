@@ -78,19 +78,22 @@ class SourcedSentence(BaseModel):
         default_factory=lambda: [-1], description="The source document indices."
     )
 
-    @field_validator("sources")
-    @classmethod
-    def validate_sources(cls, v: list[int], info: ValidationInfo) -> list[int]:
+    @model_validator(mode="after")
+    def validate_sources(self, info: ValidationInfo) -> Self:
+        self._source_docs = []
+        self.sources = self.sources or [-1]
         context = info.context
         if context is None:
-            return v or [-1]
-        num_documents = context.get("num_documents", 0)
-        sources = list(
+            return self
+        documents = context.get("documents", 0)
+        self.sources = list(
             dict.fromkeys(
-                -1 if source < -1 or source >= num_documents else source for source in v
+                -1 if source < -1 or source >= len(documents) else source
+                for source in self.sources
             )
         )
-        return sources or [-1]
+        self._source_docs = [documents[source] for source in self.sources if source != -1]
+        return self
 
     def __str__(self) -> str:
         return f"{self.text} {self.sources}"
@@ -100,20 +103,21 @@ class SourcedResponse(BaseModel):
     sentences: list[SourcedSentence] = Field(min_length=1, max_length=MAX_RESPONSE_SENTENCES)
 
     @model_validator(mode="after")
-    def validate_non_sourced_factor(self, info: ValidationInfo) -> Self:
+    def validate_sources(self, info: ValidationInfo) -> Self:
         context = info.context or {}
         max_non_sourced_factor = context.get("max_non_sourced_factor", MAX_NON_SOURCED_FACTOR)
         non_sourced_sentences = [
             sentence for sentence in self.sentences if sentence.sources == [-1]
         ]
         self._sure = len(non_sourced_sentences) <= max_non_sourced_factor * len(self.sentences)
+        self._source_docs = [sentence._source_docs for sentence in self.sentences]
         return self
 
     def __str__(self) -> str:
+        res = "\n".join(f"- {sentence}" for sentence in self.sentences).strip()
         if len(self.sentences) == 1:
-            return self.sentences[0].text
-        else:
-            return "\n".join(f"- {sentence}" for sentence in self.sentences)
+            res = res[2:]
+        return res
 
 
 def create_response_with_confidence_model(

@@ -1,5 +1,5 @@
 {
-  "task": "/home/hamza/dev/dreamai/dreamai/dialogs/router_task.txt",
+  "task": "router_task.txt",
   "template": "<user_query>{user_query}</user_query>\n\n<available_routes>{routes}</available_routes>",
   "examples": [
     {

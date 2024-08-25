@@ -18,7 +18,7 @@ MODEL = creator_settings.model
 LANCE_URI = rag_settings.lance_uri
 RERANKER = rag_settings.reranker
 HAS_WEB = rag_app_settings.has_web
-DATA = "docs.md"
+DATA = "/media/hamza/data2/RFP/docs"
 
 if Path(LANCE_URI).exists():
     shutil.rmtree(LANCE_URI)
@@ -28,6 +28,7 @@ reranker = ColbertReranker(RERANKER)
 table_descriptions = add_data_with_descriptions(
     model=ModelName.GEMINI_FLASH, lance_db=lance_db, data=DATA
 )
+print(f"\n\nTABLE DESCRIPTIONS\n\n{table_descriptions}\n\n")
 app = application(
     db=lance_db,
     reranker=reranker,

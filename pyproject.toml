@@ -1,6 +1,6 @@
 [project]
 name = "dreamai"
-version = "0.1.0"
+version = "3.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12, <3.13"
@@ -28,6 +28,10 @@ dependencies = [
     "fastcore>=1.7.1",
     "termcolor>=2.4.0",
     "google-auth-oauthlib>=1.2.1",
+    "python-fasthtml>=0.4.5",
+    "sentence-transformers>=3.0.1",
+    "tantivy>=0.22.0",
+    "graphviz>=0.20.3",
 ]
 
 [tool.ruff]

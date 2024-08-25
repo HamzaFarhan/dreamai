@@ -1,4 +1,5 @@
 from copy import deepcopy
+from pathlib import Path
 
 from burr.core import State, action
 
@@ -29,10 +30,10 @@ def ask_assistant(state: State) -> tuple[dict, State]:
 
 @action(
     reads=["model", "query", "search_results", "chat_history"],
-    writes=["assistant_response"],
+    writes=["assistant_response", "source_docs"],
 )
 def create_search_response(state: State) -> tuple[dict, State]:
-    dialog = Dialog.load(f"{DIALOGS_FOLDER}/sourced_rag_dialog.json")
+    dialog = Dialog.load(path=str(Path(DIALOGS_FOLDER) / "sourced_rag_dialog.json"))
     documents = [
         {k: v for k, v in document.items() if k != "index"}
         for document in state["search_results"]
@@ -45,7 +46,7 @@ def create_search_response(state: State) -> tuple[dict, State]:
             dialog=dialog,
             response_model=SourcedResponse,
             chat_history=state.get("chat_history", None),
-            validation_context={"num_documents": len(documents)},
+            validation_context={"documents": documents},
         )
     except Exception as e:
         print(f"Error in create_search_response: {e}")
@@ -56,7 +57,10 @@ def create_search_response(state: State) -> tuple[dict, State]:
                 )
             ]
         )
-    return {"assistant_response": str(response)}, state.update(assistant_response=response)
+    return {
+        "assistant_response": str(response),
+        "source_docs": response._source_docs,
+    }, state.update(assistant_response=response).update(source_docs=response._source_docs)
 
 
 @action(reads=["query", "assistant_response"], writes=["chat_history"])
