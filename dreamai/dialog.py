@@ -3,6 +3,7 @@ import os
 from difflib import unified_diff
 from pathlib import Path
 from typing import Annotated, Any, Self, cast
+from copy import deepcopy
 from uuid import uuid4
 
 from anthropic import Anthropic
@@ -19,7 +20,7 @@ creator_settings = CreatorSettings()
 
 DEFAULT_TEMPLATE = dialog_settings.default_template
 DEFAULT_DIALOG_VERSION = dialog_settings.default_dialog_version
-CHAT_HISTORY_LIMIT = dialog_settings.chat_history_limit
+CHAT_HISTORY_LIMIT = dialog_settings.chat_history_limit + 1
 TEMPERATURE = creator_settings.temperature
 MAX_TOKENS = creator_settings.max_tokens
 ATTEMPTS = creator_settings.attempts
@@ -69,12 +70,12 @@ def merge_same_role_messages(messages: list[MessageType]) -> list[MessageType]:
     last_message = None
     for message in messages:
         if last_message is None:
-            last_message = message
+            last_message = deepcopy(message)
         elif last_message["role"] == message["role"]:
             last_message["content"] += "\n\n--- Next Message ---\n\n" + message["content"]
         else:
             new_messages.append(last_message)
-            last_message = message
+            last_message = deepcopy(message)
     if last_message is not None:
         new_messages.append(last_message)
     return new_messages
@@ -236,22 +237,38 @@ class Dialog(BaseModel):
                 messages.extend(self.chat_history)
         return messages
 
-    @property
-    def merged_messages(self) -> list[MessageType]:
-        return merge_same_role_messages(messages=self.messages)
-
     def _add_user_query(
         self,
         messages: list[MessageType],
         user: str = "",
         template_data: dict | None = None,
+        merge: bool = True,
     ) -> list[MessageType]:
         user = "" if template_data is not None else user
         if user:
             messages.append(user_message(content=user))
         elif template_data:
             messages.append(user_message(content=self.template.format(**template_data)))
+        if merge:
+            return merge_same_role_messages(messages)
         return messages
+
+    def get_shorter_messages(
+        self, messages: list[MessageType], chat_history_limit: int = CHAT_HISTORY_LIMIT
+    ) -> list[MessageType]:
+        if len(messages) > chat_history_limit:
+            shorter_messages = messages[-chat_history_limit:]
+            if shorter_messages[0]["role"] != "user":
+                if len(shorter_messages) > 1:
+                    shorter_messages = shorter_messages[1:]
+                elif len(messages) - len(shorter_messages) > 1:
+                    chat_history_limit += 1
+                    shorter_messages = messages[-chat_history_limit:]
+                else:
+                    shorter_messages = []
+        else:
+            shorter_messages = messages
+        return shorter_messages
 
     def gpt_kwargs(
         self,
@@ -262,9 +279,12 @@ class Dialog(BaseModel):
     ) -> dict[str, Any]:
         return {
             "model": model,
-            "messages": self._add_user_query(
-                messages=self.messages, user=user, template_data=template_data
-            )[-chat_history_limit:],
+            "messages": self.get_shorter_messages(
+                messages=self._add_user_query(
+                    messages=self.messages, user=user, template_data=template_data, merge=False
+                ),
+                chat_history_limit=chat_history_limit,
+            ),
         }
 
     def claude_kwargs(
@@ -274,14 +294,15 @@ class Dialog(BaseModel):
         template_data: dict | None = None,
         chat_history_limit: int = CHAT_HISTORY_LIMIT,
     ) -> dict[str, Any]:
-        messages = self._add_user_query(
-            messages=self.merged_messages, user=user, template_data=template_data
-        )[-chat_history_limit:]
-        return {
-            "model": model,
-            "system": str(self.task),
-            "messages": messages[1:] if self.task else messages,
-        }
+        messages = self.get_shorter_messages(
+            messages=self._add_user_query(
+                messages=self.messages, user=user, template_data=template_data
+            ),
+            chat_history_limit=chat_history_limit,
+        )
+        if messages[0]["role"] == "system":
+            messages = messages[1:]
+        return {"model": model, "system": str(self.task), "messages": messages}
 
     def gemini_kwargs(
         self,
@@ -290,9 +311,12 @@ class Dialog(BaseModel):
         chat_history_limit: int = CHAT_HISTORY_LIMIT,
     ) -> dict[str, Any]:
         return {
-            "messages": self._add_user_query(
-                messages=self.merged_messages, user=user, template_data=template_data
-            )[-chat_history_limit:],
+            "messages": self.get_shorter_messages(
+                messages=self._add_user_query(
+                    messages=self.messages, user=user, template_data=template_data
+                ),
+                chat_history_limit=chat_history_limit,
+            ),
         }
 
     def creator_with_kwargs(

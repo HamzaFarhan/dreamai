@@ -35,11 +35,10 @@ def ask_assistant(state: State) -> tuple[dict, State]:
 )
 def create_search_response(state: State) -> tuple[dict, State]:
     dialog = Dialog.load(f"{DIALOGS_FOLDER}/sourced_rag_dialog.json")
-    documents = state["search_results"]
-    if isinstance(documents[0], dict) and "index" in documents[0]:
-        documents = [
-            {k: v for k, v in document.items() if k != "index"} for document in documents
-        ]
+    documents = [
+        {k: v for k, v in document.items() if k != "index"}
+        for document in state["search_results"]
+    ]
     user = dialog.template.format(documents=documents, user_query=state["query"])
     try:
         response = _query_to_response(

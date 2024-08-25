@@ -54,7 +54,8 @@ def chunk_text(
 ) -> list[str]:
     if chunk_size == 0:
         return [text]
-    assert chunk_size > chunk_overlap, "chunk_size must be greater than chunk_overlap"
+    chunk_overlap = min(chunk_overlap, chunk_size // 2)
+    # assert chunk_size > chunk_overlap, "chunk_size must be greater than chunk_overlap"
     separators = separators or [r"#{1,6}\s+", r"\*\*.*?\*\*", r"---", r"\n\n", r"\n"]
     pattern = f'({"|".join(separators)})' if keep_separator else f'(?:{"|".join(separators)})'
 

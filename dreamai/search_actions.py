@@ -25,7 +25,6 @@ CHUNK_OVERLAP = rag_settings.chunk_overlap
 SAMPLE_TEXT_LIMIT = rag_settings.sample_text_limit
 
 
-# @trace()
 def add_data_with_descriptions(
     model: ModelName,
     lance_db: LancedbDBConnection,
@@ -40,25 +39,24 @@ def add_data_with_descriptions(
     table_descriptions = table_descriptions or []
     table_descriptions_dict = {td.name: td for td in table_descriptions}
 
-    md_result_list = data_to_md(
+    md_data_list = data_to_md(
         data=data,
         search_query=search_query,
         max_results=max_results,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
     )
-
-    for md_result in md_result_list:
-        table_name = md_result.name
+    for md_data in md_data_list:
+        table_name = md_data.name
         table_description: TableDescription = _query_to_response(
             model=model,
             dialog=Dialog.load(f"{DIALOGS_FOLDER}/table_description_dialog.json"),
             response_model=TableDescription,
             template_data={
                 "database_name": table_name,
-                "sample_text": md_result.markdown[:SAMPLE_TEXT_LIMIT],
+                "sample_text": md_data.markdown[:SAMPLE_TEXT_LIMIT],
                 "current_databases": [
-                    td.model_dump_json(indent=2) for td in table_descriptions
+                    td.model_dump_json(indent=2) for td in table_descriptions_dict.values()
                 ],
             },
         )
@@ -66,9 +64,7 @@ def add_data_with_descriptions(
             table_description.name, table_description
         )
         table_descriptions_dict[table_description.name] = table_description
-        add_to_lance_table(
-            db=lance_db, table_name=table_description.name, data=md_result.chunks
-        )
+        add_to_lance_table(db=lance_db, table_name=table_description.name, data=md_data.chunks)
 
     return list(table_descriptions_dict.values())
 

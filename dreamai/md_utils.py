@@ -1,8 +1,10 @@
+import json
 import os
 import re
 import tempfile
 from pathlib import Path
 from textwrap import dedent
+from typing import Self
 
 import httpx
 import lxml
@@ -11,7 +13,7 @@ import pymupdf4llm
 from duckduckgo_search import DDGS
 from html2text import HTML2Text
 from lxml.html.clean import Cleaner
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationInfo, model_validator
 from pymupdf import Pixmap
 from trafilatura import extract
 
@@ -23,6 +25,7 @@ rag_settings = RAGSettings()
 CHUNK_SIZE = rag_settings.chunk_size
 CHUNK_OVERLAP = rag_settings.chunk_overlap
 SEPARATORS = rag_settings.separators
+MIN_FULL_TEXT_SIZE = rag_settings.min_full_text_size
 TEXT_FIELD_NAME = rag_settings.text_field_name
 MAX_SEARCH_RESULTS = rag_settings.max_search_results
 
@@ -30,30 +33,52 @@ MAX_SEARCH_RESULTS = rag_settings.max_search_results
 class MarkdownChunk(BaseModel):
     name: str
     index: int
-    text: str = Field(alias=TEXT_FIELD_NAME)
+    text: str = Field(serialization_alias=TEXT_FIELD_NAME)
     metadata: dict = Field(default_factory=dict)
 
 
-class MarkdownResult(BaseModel):
+class MarkdownData(BaseModel):
     name: str
     markdown: str
     chunks: list[MarkdownChunk] = Field(default_factory=list)
 
+    @model_validator(mode="after")
+    def create_chunks(self, info: ValidationInfo) -> Self:
+        if len(self.chunks) > 0:
+            return self
+        context = info.context or {}
+        chunk_size = context.get("chunk_size", CHUNK_SIZE)
+        chunk_overlap = context.get("chunk_overlap", CHUNK_OVERLAP)
+        separators = context.get("separators", SEPARATORS)
+        self.chunks = [
+            MarkdownChunk(text=chunk, name=self.name, index=i)
+            for i, chunk in enumerate(
+                chunk_text(
+                    text=self.markdown,
+                    chunk_size=chunk_size,
+                    chunk_overlap=chunk_overlap,
+                    separators=separators,
+                )
+            )
+        ]
+        return self
 
-def url_or_pdf_or_txt(input_string: str) -> str:
-    url_pattern = re.compile(
-        r"^(https?:\/\/)?"  # http:// or https:// (optional)
-        r"([\da-z\.-]+)\.([a-z\.]{2,6})"  # domain
-        r"([\/\w \.-]*)*\/?$"  # path
-    )
+
+def get_data_type(input_string: str) -> str:
     pdf_pattern = re.compile(r"^.*\.pdf$", re.IGNORECASE)
     txt_pattern = re.compile(r"^.*\.txt$", re.IGNORECASE)
-    if url_pattern.match(input_string):
-        return "URL"
-    elif pdf_pattern.match(input_string):
+    md_pattern = re.compile(r"^.*\.md$", re.IGNORECASE)
+    url_pattern = re.compile(
+        r"^(https?:\/\/)?" r"(www\.)?[\da-z\.-]+\.[a-z]{2,}" r"([\/\w \.-]*)*\/?$"
+    )
+    if pdf_pattern.match(input_string):
         return "PDF"
     elif txt_pattern.match(input_string):
         return "TXT"
+    elif md_pattern.match(input_string):
+        return "MD"
+    elif url_pattern.match(input_string):
+        return "URL"
     else:
         return ""
 
@@ -121,8 +146,6 @@ def url_body_to_md(body: str, extractor: str = "h2t") -> str:
             output_format="markdown",
             favor_recall=True,
             include_tables=True,
-            include_links=False,
-            include_images=False,
             include_comments=True,
         )
     else:
@@ -165,7 +188,7 @@ def urls_to_md(
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
     separators: list[str] = SEPARATORS,
-) -> list[MarkdownResult]:
+) -> list[MarkdownData]:
     if isinstance(urls, str):
         urls = [urls]
     urls_md = []
@@ -173,22 +196,13 @@ def urls_to_md(
         md = url_body_to_md(body=get_url_body(url), extractor=extractor)
         md = clean_web_content(content=md) if clean_content else md
         urls_md.append(
-            MarkdownResult(
-                name=url,
-                markdown=md,
-                chunks=[
-                    MarkdownChunk(**{TEXT_FIELD_NAME: chunk, "name": url, "index": i})
-                    for i, chunk in enumerate(
-                        chunk_text(
-                            text=md,
-                            chunk_size=chunk_size,
-                            chunk_overlap=chunk_overlap,
-                            separators=separators,
-                        )
-                    )
-                ]
-                if chunk_size > 0
-                else [],
+            MarkdownData.model_validate(
+                {"name": url, "markdown": md},
+                context={
+                    "chunk_size": chunk_size,
+                    "chunk_overlap": chunk_overlap,
+                    "separators": separators,
+                },
             )
         )
     return urls_md
@@ -202,7 +216,7 @@ def search_query_to_md(
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
     separators: list[str] = SEPARATORS,
-) -> list[MarkdownResult]:
+) -> list[MarkdownData]:
     return urls_to_md(
         urls=[result["href"] for result in web_search(query=query, max_results=max_results)],
         extractor=extractor,
@@ -213,45 +227,44 @@ def search_query_to_md(
     )
 
 
-def pdfs_to_md(
-    pdfs: list[str | Path] | str | Path,
+def docs_to_md(
+    docs: list[str | Path] | str | Path,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
     separators: list[str] = SEPARATORS,
-) -> list[MarkdownResult]:
-    pdfs_md = []
-    for pdf in resolve_data_path(data_path=pdfs):
-        pdf = str(pdf)
-        with tempfile.TemporaryDirectory() as image_folder:
-            md = replace_image_tags(
-                md=pymupdf4llm.to_markdown(
-                    pdf, write_images=True, image_path=image_folder, table_strategy="lines"
-                ),
-                image_folder=image_folder,
-            )
-        md = md.replace("```", "") if pdf.endswith(".txt") else md
-        pdfs_md.append(
-            MarkdownResult(
-                name=Path(pdf).name,
-                markdown=md,
-                chunks=[
-                    MarkdownChunk(
-                        **{TEXT_FIELD_NAME: chunk, "name": Path(pdf).name, "index": i}
-                    )
-                    for i, chunk in enumerate(
-                        chunk_text(
-                            text=md,
-                            chunk_size=chunk_size,
-                            chunk_overlap=chunk_overlap,
-                            separators=separators,
-                        )
-                    )
-                ]
-                if chunk_size > 0
-                else [],
+) -> list[MarkdownData]:
+    docs_md = []
+    for doc in resolve_data_path(data_path=docs):
+        doc = Path(doc)
+        if doc.suffix in [".md", ".txt"]:
+            md = doc.read_text()
+        elif doc.suffix == ".json":
+            md = json.dumps(doc.read_text())
+        elif doc.suffix == ".pdf":
+            with tempfile.TemporaryDirectory() as image_folder:
+                md = replace_image_tags(
+                    md=pymupdf4llm.to_markdown(
+                        doc=str(doc),
+                        write_images=True,
+                        image_path=image_folder,
+                        table_strategy="lines",
+                    ),
+                    image_folder=image_folder,
+                )
+        else:
+            md = str(doc)
+        # md = md.replace("```", "") if doc.endswith(".txt") else md
+        docs_md.append(
+            MarkdownData.model_validate(
+                {"name": doc.name, "markdown": md},
+                context={
+                    "chunk_size": chunk_size,
+                    "chunk_overlap": chunk_overlap,
+                    "separators": separators,
+                },
             )
         )
-    return pdfs_md
+    return docs_md
 
 
 def data_to_md(
@@ -260,7 +273,8 @@ def data_to_md(
     max_results: int = MAX_SEARCH_RESULTS,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
-) -> list[MarkdownResult]:
+    separators: list[str] = SEPARATORS,
+) -> list[MarkdownData]:
     assert search_query or data, "Either search_query or data must be provided"
     if search_query:
         return search_query_to_md(
@@ -268,6 +282,7 @@ def data_to_md(
             max_results=max_results,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
+            separators=separators,
         )
     else:
         if isinstance(data := (data or []), (str, Path)):
@@ -275,30 +290,34 @@ def data_to_md(
         data_md = []
         for item in data:
             item = str(item)
-            item_type = url_or_pdf_or_txt(item)
+            item_type = get_data_type(item)
             if item_type == "URL":
                 data_md.extend(
-                    urls_to_md(urls=item, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+                    urls_to_md(
+                        urls=item,
+                        chunk_size=chunk_size,
+                        chunk_overlap=chunk_overlap,
+                        separators=separators,
+                    )
                 )
-            elif item_type in ["PDF", "TXT"]:
+            elif os.path.exists(item):
                 data_md.extend(
-                    pdfs_to_md(pdfs=item, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+                    docs_to_md(
+                        docs=item,
+                        chunk_size=chunk_size,
+                        chunk_overlap=chunk_overlap,
+                        separators=separators,
+                    )
                 )
             else:
                 data_md.append(
-                    MarkdownResult(
-                        name="text",
-                        markdown=item,
-                        chunks=[
-                            MarkdownChunk(name="text", index=i, text=chunk)
-                            for i, chunk in enumerate(
-                                chunk_text(
-                                    text=item,
-                                    chunk_size=chunk_size,
-                                    chunk_overlap=chunk_overlap,
-                                )
-                            )
-                        ],
+                    MarkdownData.model_validate(
+                        {"name": "text", "markdown": item},
+                        context={
+                            "chunk_size": chunk_size,
+                            "chunk_overlap": chunk_overlap,
+                            "separators": separators,
+                        },
                     )
                 )
         return data_md

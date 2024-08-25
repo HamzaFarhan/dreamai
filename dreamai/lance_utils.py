@@ -71,7 +71,10 @@ def add_to_lance_table(
     else:
         table = db.create_table(name=table_name, schema=schema)
     table.add(
-        data=[{**chunk.model_dump(exclude={"metadata"}), **chunk.metadata} for chunk in data]
+        data=[
+            {**chunk.model_dump(by_alias=True, exclude={"metadata"}), **chunk.metadata}
+            for chunk in data
+        ]
     )
     table.create_fts_index(field_names=TEXT_FIELD_NAME, replace=True)  # type: ignore
     return table

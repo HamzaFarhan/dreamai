@@ -14,6 +14,8 @@ creator_settings = CreatorSettings()
 rag_app_settings = RAGAppSettings()
 
 MODEL = creator_settings.model
+ONLY_DATA = rag_app_settings.only_data
+HAS_WEB = rag_app_settings.has_web
 ROUTER = rag_app_settings.router
 ASSISTANT = rag_app_settings.assistant
 WEB_OR_NOT = rag_app_settings.web_or_not
@@ -27,7 +29,8 @@ def application(
     reranker: Reranker,
     model: ModelName = MODEL,
     table_descriptions: list[TableDescription] = [],
-    has_web: bool = False,
+    only_data: bool = ONLY_DATA,
+    has_web: bool = HAS_WEB,
     app_id: str | None = None,
     username: str | None = None,
     project: str = "DreamAIRAG",
@@ -50,6 +53,7 @@ def application(
         .with_transitions(
             ("get_query", "terminate", expr(f"steps[-1].step == '{TERMINATE}'")),  # type: ignore
             ("get_query", "search_web", expr(f"steps[-1].step == '{WEB}'")),  # type: ignore
+            # ("get_query", "router", when(only_data=True)),  # type: ignore
             ("get_query", "followup_or_not"),
             (
                 ["followup_or_not", "router", "web_or_not"],
@@ -79,6 +83,7 @@ def application(
                 db=db,
                 model=model,
                 chat_history=[],
+                only_data=only_data,
                 has_web=has_web,
                 steps=[],
                 search_results=[],

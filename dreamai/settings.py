@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
 
 class CreatorSettings(Settings):
-    model: ModelName = ModelName.GEMINI_FLASH
+    model: ModelName = ModelName.GPT_MINI
     temperature: float = 0.3
     max_tokens: int = 2048
     attempts: int = 4
@@ -31,8 +31,9 @@ class DialogModelsSettings(Settings):
 
 
 class RAGSettings(Settings):
-    chunk_size: int = 800
+    chunk_size: int = 0
     chunk_overlap: int = 200
+    min_full_text_size: int = 10_000
     separators: list[str] = [r"#{1,6}\s+", r"\*\*.*?\*\*", r"---", r"\n\n", r"\n", r"\.\s+"]
     lance_uri: str = "lance/rag/"
     ems_model: str = "hkunlp/instructor-base"
@@ -47,8 +48,11 @@ class RAGSettings(Settings):
 
 
 class RAGAppSettings(Settings):
+    only_data: bool = False
+    has_web: bool = True
     router: str = "router"
     assistant: str = "assistant"
+    followup_or_not: str = "followup_or_not"
     web_or_not: str = "web_or_not"
     web: str = "web"
     terminate: str = "terminate"

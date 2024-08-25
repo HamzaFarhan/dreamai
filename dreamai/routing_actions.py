@@ -18,6 +18,7 @@ dialog_settings = DialogSettings()
 MODEL = creator_settings.model
 ROUTER = rag_app_settings.router
 ASSISTANT = rag_app_settings.assistant
+FOLLOWUP_OR_NOT = rag_app_settings.followup_or_not
 TERMINATORS = rag_app_settings.terminators
 TERMINATE = rag_app_settings.terminate
 WEB = rag_app_settings.web
@@ -30,15 +31,6 @@ DIALOGS_FOLDER = dialog_settings.dialogs_folder
 class StepWithConfidence(BaseModel):
     step: str
     confidence: float
-
-
-def _get_route(query: str) -> str:
-    route = "followup_or_not"
-    if query.lower() in TERMINATORS:
-        route = TERMINATE
-    if "@web" in query.lower():
-        route = WEB
-    return route
 
 
 def _query_to_response(
@@ -56,6 +48,7 @@ def _query_to_response(
     creator, creator_kwargs = dialog.creator_with_kwargs(
         model=model, user=query, template_data=template_data
     )
+    # print(f"\n\nMESSAGES:\n{creator_kwargs['messages']}\n\n")
     response = creator.create(
         response_model=response_model, validation_context=validation_context, **creator_kwargs
     )
@@ -78,6 +71,15 @@ def _query_to_route(
         template_data={"user_query": query, "available_routes": routes},
     )
     return StepWithConfidence(step=response.response, confidence=response.confidence)  # type: ignore
+
+
+def _get_route(query: str) -> str:
+    route = FOLLOWUP_OR_NOT
+    if query.lower() in TERMINATORS:
+        route = TERMINATE
+    if "@web" in query.lower():
+        route = WEB
+    return route
 
 
 @action(reads=[], writes=["query", "steps"])
@@ -147,7 +149,9 @@ def web_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]:
     return {"step": step}, state.append(steps=step)
 
 
-@action(reads=["db", "model", "query", "chat_history", "has_web"], writes=["steps"])
+@action(
+    reads=["db", "model", "query", "chat_history", "only_data", "has_web"], writes=["steps"]
+)
 def router(
     state: State, table_descriptions: list[TableDescription] = []
 ) -> tuple[dict[str, StepWithConfidence], State]:
@@ -173,7 +177,7 @@ def router(
         print(f"Error in router: {e}")
         route = ASSISTANT
         confidence = DEFAULT_CONFIDENCE
-    if confidence <= ASSISTANT_CONFIDENCE_THRESHOLD:
+    if confidence <= ASSISTANT_CONFIDENCE_THRESHOLD and not state["only_data"]:
         route = ASSISTANT
         confidence = DEFAULT_CONFIDENCE
     if route == ASSISTANT and state["has_web"]:

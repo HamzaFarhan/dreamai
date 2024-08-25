@@ -1,0 +1,390 @@
+[
+  {
+    "Area": "01. Business Overview Of Vendor",
+    "Vendor Question": "Description of product/service provided?"
+  },
+  {
+    "Area": "01. Business Overview Of Vendor",
+    "Vendor Question": "Email of person(s) completing questionnaire?"
+  },
+  {
+    "Area": "01. Business Overview Of Vendor",
+    "Vendor Question": "Has your market share for the product/service remained stable or grown over the past 12 months? If possible, estimate market share in comments and describe changes in the last 12 months."
+  },
+  {
+    "Area": "01. Business Overview Of Vendor",
+    "Vendor Question": "Have there been any material changes to industry technology or your product/service delivery during the past 12 months?"
+  },
+  {
+    "Area": "01. Business Overview Of Vendor",
+    "Vendor Question": "Legal Address, City, State, Zip?"
+  },
+  {
+    "Area": "01. Business Overview Of Vendor",
+    "Vendor Question": "Legal Business Name?"
+  },
+  {
+    "Area": "01. Business Overview Of Vendor",
+    "Vendor Question": "Name/Title of person(s) completing questionnaire?"
+  },
+  {
+    "Area": "01. Business Overview Of Vendor",
+    "Vendor Question": "Phone of person(s) completing questionnaire?"
+  },
+  {
+    "Area": "01. Business Overview Of Vendor",
+    "Vendor Question": "Who is the primary contact(s) at OSG for providing product/service?"
+  },
+  {
+    "Area": "02. Financial Condition",
+    "Vendor Question": "Has the Vendor ever filed for bankruptcy?\u00a0"
+  },
+  {
+    "Area": "02. Financial Condition",
+    "Vendor Question": "Is the Vendor in the process of filing for bankruptcy?"
+  },
+  {
+    "Area": "02. Financial Condition Of Vendor",
+    "Vendor Question": "Are you financially stable without the business of our organization or your largest customer's business?"
+  },
+  {
+    "Area": "02. Financial Condition Of Vendor",
+    "Vendor Question": "Has your company been profitable in each of the last 2 years? If not, provide details in comments."
+  },
+  {
+    "Area": "02. Financial Condition Of Vendor",
+    "Vendor Question": "Have there been any material changes to your financial statements over the last 2 years? Describe changes."
+  },
+  {
+    "Area": "03. Legal Review",
+    "Vendor Question": "Are you subject to pending lawsuits materially affecting your legal existence or product/service? If yes, describe."
+  },
+  {
+    "Area": "03. Legal Review",
+    "Vendor Question": "Has the Vendor been involved in an active lawsuit in the last two (2) years?"
+  },
+  {
+    "Area": "03. Legal Review",
+    "Vendor Question": "Has the Vendor been subject to insurance claims in the last two (2) years?\u00a0"
+  },
+  {
+    "Area": "03. Legal Review",
+    "Vendor Question": "Has your active legal status changed? Describe any change."
+  },
+  {
+    "Area": "04. Operations/Transactions Review",
+    "Vendor Question": "Describe the environmental controls in place (UPS, generator, fire suppression, etc.)."
+  },
+  {
+    "Area": "04. Operations/Transactions Review",
+    "Vendor Question": "Describe the physical access controls in place."
+  },
+  {
+    "Area": "04. Operations/Transactions Review",
+    "Vendor Question": "Describe the visitor access controls that are in place."
+  },
+  {
+    "Area": "04. Operations/Transactions Review",
+    "Vendor Question": "Do you process any Consumer transactions outside the Organization's in-house operations?"
+  },
+  {
+    "Area": "05. Regulatory Compliance",
+    "Vendor Question": "Are changes able to be implemented in a timely manner in order to meet regulatory requirements? Provide process details."
+  },
+  {
+    "Area": "05. Regulatory Compliance",
+    "Vendor Question": "Are you free of outstanding orders or findings from an applicable supervisory agency, self-regulatory body related to regulatory compliance?Review summary of current status of actions."
+  },
+  {
+    "Area": "05. Regulatory Compliance",
+    "Vendor Question": "Are your compliance management controls in place to maintain or perform contracted regulatory compliance functions?"
+  },
+  {
+    "Area": "05. Regulatory Compliance",
+    "Vendor Question": "Are your training policies, procedures and internal controls adequate to address compliance responsibilities?"
+  },
+  {
+    "Area": "05. Regulatory Compliance",
+    "Vendor Question": "Do you certify that your data systems are GDPR compliant?"
+  },
+  {
+    "Area": "05. Regulatory Compliance",
+    "Vendor Question": "Do you have an established process to delete consumer personal information from your records/systems pursuant to your customer's request to delete?"
+  },
+  {
+    "Area": "05. Regulatory Compliance",
+    "Vendor Question": "Do you have an established process to report the deletion of consumer information to your customers?"
+  },
+  {
+    "Area": "05. Regulatory Compliance",
+    "Vendor Question": "Do you have an internal audit function that independently and effectively tests and reports on your internal controls?"
+  },
+  {
+    "Area": "05. Regulatory Compliance",
+    "Vendor Question": "Does the vendor comply with all applicable federal and state laws and regulations pertaining to the handling of non-public personal information, including laws requiring privacy notices?"
+  },
+  {
+    "Area": "05. Regulatory Compliance",
+    "Vendor Question": "Has your compliance plan and compliance program documentation remained current over the last year?"
+  },
+  {
+    "Area": "05. Regulatory Compliance",
+    "Vendor Question": "Have you addressed all new or proposed federal and state regulations impacting product/service?"
+  },
+  {
+    "Area": "05. Regulatory Compliance",
+    "Vendor Question": "Have you addressed all new or proposed network operating rules impacting product/service?"
+  },
+  {
+    "Area": "05. Regulatory Compliance",
+    "Vendor Question": "Provide a summary of the certifications your organization holds (e.g. PCI, HIPAA, ISO)."
+  },
+  {
+    "Area": "05. Regulatory Compliance",
+    "Vendor Question": "Will the vendor promptly report any security incident upon discovery, including breaches of unsecured PHI, to their customers?"
+  },
+  {
+    "Area": "06. Dependency",
+    "Vendor Question": "Are fourth parties utilized to provide product/services to OSG? (If NO, remaining questions in this section are NA.)"
+  },
+  {
+    "Area": "06. Dependency",
+    "Vendor Question": "Are your identified Third Parties bound by contractual obligations to safeguard your customer's data?"
+  },
+  {
+    "Area": "06. Dependency",
+    "Vendor Question": "Are your Third Parties prohibited from access to Organization data? Describe Vendor's Third Parties' access to Organization's data."
+  },
+  {
+    "Area": "06. Dependency",
+    "Vendor Question": "Do you have adequate indemnification or insurance protection with your identified Third Parties?"
+  },
+  {
+    "Area": "06. Dependency",
+    "Vendor Question": "Have you performed comprehensive due diligence on your Third Parties? Describe due diligence process details."
+  },
+  {
+    "Area": "06. Dependency",
+    "Vendor Question": "Have your identified critical Third Parties been stable during the last 12 months? Describe any changes in Third Parties during the last 12 months."
+  },
+  {
+    "Area": "06. Dependency",
+    "Vendor Question": "Have your identified Third Parties' information security, data disposal, regulatory compliance, business continuity and disaster recovery programs been verified?"
+  },
+  {
+    "Area": "06. Dependency",
+    "Vendor Question": "Have your Third Parties been subject to any incidents and/or data breaches?"
+  },
+  {
+    "Area": "07. Human Resources",
+    "Vendor Question": "Are vendor's employees and contractors (including both temporary and permanent workers) required to sign a privacy and/or secrecy agreement and/or NDA?"
+  },
+  {
+    "Area": "07. Human Resources",
+    "Vendor Question": "Do you conduct background checks, credit checks and/or drug testing on all employees, contractors and subcontractors?"
+  },
+  {
+    "Area": "07. Human Resources",
+    "Vendor Question": "Do you maintain and enforce background and testing enforcement policies?"
+  },
+  {
+    "Area": "07. Human Resources",
+    "Vendor Question": "Do you provide your employees with initial and ongoing training resources on products/services?"
+  },
+  {
+    "Area": "07. Human Resources",
+    "Vendor Question": "Do your employees receive initial and annual Security Awareness, Regulation Compliance and Data Privacy training?"
+  },
+  {
+    "Area": "07. Human Resources",
+    "Vendor Question": "Does the vendor apply appropriate sanctions against workforce members who fail to comply with the entity\u2019s security policies and procedures?"
+  },
+  {
+    "Area": "07. Human Resources",
+    "Vendor Question": "Has your staffing been stable in the last 12 months?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Are all users assigned unique IDs and prohibited from sharing accounts?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Are backups performed on a regular basis? Describe backup frequency, retention period and offsite data backup storage."
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Are devices containing OSG data rendered unreadable before being decommissioned or repurposed? Describe the process used to securely delete sensitive data."
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Are offshore resources utilized in services provided to Customers? If yes, do they have access to Customer's confidential data?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Are open sessions disabled or locked after a pre-defined period of inactivity? If yes, what is the inactivity configuration?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Are your employees regularly trained on information security and secure development best practices?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Describe password configuration requirements. How are these enforced?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Describe the patch management policy or program in place. Are all available high-risk security patches applied and verified at least monthly?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Describe the procedures and controls in place to remove access to information, systems and facilities upon employee separation."
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Describe the procedures in place for secure disposal and/or destruction of physical media (paper documents, DVDs, disk drives, etc.)."
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Do you actively maintain a change management process for implementing and testing new hardware and applications and all other changes?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Do you conduct employee screening, dual controls and segregation of duties to mitigate risks of insider threats?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Do you encrypt Consumer information and other sensitive information: in transit, at rest, in backups and in storage on the network and system? If yes, please describe encryption types/levels of encryption in the comments."
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Do you have an established reporting process to report security exceptions/incidents/breaches?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Do you have effective controls to protect backup data or replicated backup data that you store?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Do you maintain and regularly review logs that document access to your customer's data?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Do you monitor systems for logical and/or physical intrusions/attacks?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Do you perform penetration testing on segmentation controls at least every 6 months?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Do you periodically update and test your incident response plan to ensure that it functions as intended?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Do you require multi-factor authentication for access your data systems? If yes, internally, remotely or both?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Do you require multi-factor authentication for those who access a Cardholder Data Environment (CDE), internally or remotely?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Do you use a layered, anti-malware strategy and common controls (passwords, controlled devices) to detect and prevent malware threats?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Do you utilize a Systems Development Life Cycle (SDLC) process for all systems used by the your customers?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Do your employees have access to your Customer's confidential data? If yes, is it logical access, physical access or both?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Does the vendor review its policies and procedures at least annually and update them as needed in response to environmental or operational changes affecting data security?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Has an IT Security audit and/or SOC Report been performed by a third party in the last 12 months?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Has your organization been subject to any security incidents and/or data breaches in the last 2 years?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Have you conducted a vulnerability assessment/penetration test (in-house or Third Party) in the last 12 months?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Have you conducted an information security risk assessment in the last 12 months?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Is there a regular review of physical and logical access? Does it include a review of access levels based on role/function?"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Is there a security incident response plan that is formally documented and followed?\u00a0"
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Is your Customer's data shared/stored only within the US (no foreign access)? If foreign shared/stored, describe."
+  },
+  {
+    "Area": "08. Information Security",
+    "Vendor Question": "Is your security incident response plan adequate to inform your customers of security breach? If yes, provide details (communication process, response time)?"
+  },
+  {
+    "Area": "09. Cloud Computing",
+    "Vendor Question": "Do your clients have the ability to increase or decrease resources on demand without involving the Vendor (on demand self-service)?"
+  },
+  {
+    "Area": "10. Reputation",
+    "Vendor Question": "If you contact the Organization's consumers, has the number of your consumer complaints decreased or remained the same over the last 12 months?"
+  },
+  {
+    "Area": "11. Business Continuity",
+    "Vendor Question": "Are there alternate sites for all mission critical business processes?"
+  },
+  {
+    "Area": "11. Business Continuity",
+    "Vendor Question": "Did testing of your business continuity plan include: outage or disruption?"
+  },
+  {
+    "Area": "11. Business Continuity",
+    "Vendor Question": "Do you permit Organizations to participate in or audit your Business Continuity Testing?"
+  },
+  {
+    "Area": "11. Business Continuity",
+    "Vendor Question": "Do your Business Continuity and Disaster Recovery plans address inter-dependencies for mission critical systems and processes?"
+  },
+  {
+    "Area": "11. Business Continuity",
+    "Vendor Question": "Has a Business Continuity Test/Exercise been performed in the last 12 months?"
+  },
+  {
+    "Area": "11. Business Continuity",
+    "Vendor Question": "Has a Business Impact Analysis been performed in the last 12 months?"
+  },
+  {
+    "Area": "11. Business Continuity",
+    "Vendor Question": "Has a Disaster Recovery Test/Exercise been performed in the last 12 months? If yes, do those test results satisfy the stated RTO and RPO objectives? Please provide documentation."
+  },
+  {
+    "Area": "11. Business Continuity",
+    "Vendor Question": "Have all material points of failure been mitigated by the BC/DR program? If not, describe."
+  },
+  {
+    "Area": "11. Business Continuity",
+    "Vendor Question": "Have you conducted and provided any independent, Third Party assessments of your business continuity program?"
+  },
+  {
+    "Area": "11. Business Continuity",
+    "Vendor Question": "Have you updated your business continuity program based on your testing results as needed?"
+  },
+  {
+    "Area": "11. Business Continuity",
+    "Vendor Question": "Is there a redundant site for technology, media or data centers?"
+  }
+]
