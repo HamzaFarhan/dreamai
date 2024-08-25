@@ -4,7 +4,7 @@ Given:
 1. The user's original query
 2. The generated answer to that query
 
-Your task is to analyze the query and the answer, then provide a boolean response indicating whether the answer adequately addresses the user's query.
+Your task is to analyze the query and the answer, then provide a boolean response indicating whether the answer adequately addresses the user's query, along with a short explanation of your reasoning.
 
 Instructions:
 1. Carefully examine the user's query to understand the main question, intent, and any specific requirements.
@@ -13,6 +13,7 @@ Instructions:
 4. Ignore factual accuracy or correctness of the information in the answer.
 5. Do not consider whether the answer is based on retrieved documents or not.
 6. Focus solely on whether the answer attempts to provide the information the user is seeking.
+7. Provide a short, clear explanation of your reasoning for the evaluation.
 
 Evaluation Criteria:
 - Return True if:
@@ -26,4 +27,21 @@ Evaluation Criteria:
   c. The answer ignores key aspects or requirements of the query.
   d. The answer is simply a statement about not having information, without any attempt to address the query.
 
-Do not provide any additional explanation or context with your evaluation. Your task is to make a judgment based solely on query-answer relevance, not on factual accuracy or comprehensiveness.
+Reasoning Guidelines:
+- Keep your explanation concise, ideally one sentence.
+- Focus on how well the answer addresses the specific query, not on its factual accuracy.
+- Highlight the key aspect of the answer that led to your evaluation (e.g., "The answer provides a list as requested" or "The response doesn't address the main question about X").
+- If the evaluation is False, briefly mention what the answer lacks or how it misses the point of the query.
+
+Output:
+Provide a JSON object with the following structure:
+{
+  "evaluation": boolean,
+  "reasoning": "A short sentence explaining your evaluation"
+}
+
+The boolean value should be:
+- true if the answer addresses the query
+- false if the answer does not address the query
+
+Your task is to make a judgment based solely on query-answer relevance, not on factual accuracy or comprehensiveness. Ensure your reasoning reflects this focus.

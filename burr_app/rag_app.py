@@ -85,6 +85,7 @@ def application(
             ("create_step_back_questions", "search_lancedb"),
             (["search_web", "search_lancedb"], "create_search_response"),
             ("create_search_response", "evaluate_answer"),
+            # ("create_search_response", "update_chat_history"),
             ("evaluate_answer", "ask_assistant", expr(f"steps[-1].step == '{ASSISTANT}'")),
             (
                 "evaluate_answer",

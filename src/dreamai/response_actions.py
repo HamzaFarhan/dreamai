@@ -46,7 +46,12 @@ def create_search_response(state: State) -> tuple[dict, State]:
             dialog=dialog,
             response_model=SourcedResponse,
             chat_history=state.get("chat_history", None),
-            validation_context={"documents": documents},
+            validation_context={
+                "documents": [
+                    {"name": document["name"], "index": document["index"]}
+                    for document in state["search_results"]
+                ]
+            },
         )
     except Exception as e:
         print(f"Error in create_search_response: {e}")
@@ -60,7 +65,7 @@ def create_search_response(state: State) -> tuple[dict, State]:
     return {
         "assistant_response": str(response),
         "source_docs": response._source_docs,
-    }, state.update(assistant_response=response).update(source_docs=response._source_docs)
+    }, state.update(assistant_response=str(response)).update(source_docs=response._source_docs)
 
 
 @action(reads=["query", "assistant_response"], writes=["chat_history"])

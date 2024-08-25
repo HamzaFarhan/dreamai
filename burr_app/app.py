@@ -52,7 +52,7 @@ def main():
         print(f"\nRESULT: {result}\n")
         if action.name == "terminate":
             break
-        elif action.name in ["ask_assistant", "create_search_response"]:
+        elif action.name in ["update_chat_history"]:
             inputs["query"] = get_user_query()
 
 

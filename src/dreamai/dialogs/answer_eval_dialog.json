@@ -4,29 +4,29 @@
   "examples": [
     {
       "user": "User query: 'What is the capital of France?'\n\nGenerated answer: 'France is a beautiful country in Western Europe known for its rich history, art, and cuisine. It's a popular tourist destination with many famous landmarks.'",
-      "assistant": "False"
+      "assistant": "{\"evaluation\": false, \"reasoning\": \"The answer provides general information about France but does not mention the capital city as requested.\"}"
     },
     {
       "user": "User query: 'How does photosynthesis work?'\n\nGenerated answer: 'Plants are essential for life on Earth. They provide oxygen, food, and habitats for many organisms. Some plants have beautiful flowers that attract pollinators.'",
-      "assistant": "False"
+      "assistant": "{\"evaluation\": false, \"reasoning\": \"The answer discusses the importance of plants but does not explain the process of photosynthesis as asked.\"}"
     },
     {
       "user": "User query: 'What are the main causes of climate change?'\n\nGenerated answer: 'The main causes of climate change include burning fossil fuels, deforestation, industrial processes, and agricultural practices. These activities release greenhouse gases like carbon dioxide and methane into the atmosphere, trapping heat and leading to global warming.'",
-      "assistant": "True"
+      "assistant": "{\"evaluation\": true, \"reasoning\": \"The answer directly addresses the query by listing and explaining the main causes of climate change.\"}"
     },
     {
       "user": "User query: 'Can you explain the theory of relativity?'\n\nGenerated answer: 'The theory of relativity, proposed by Albert Einstein, consists of two parts: special relativity and general relativity. Special relativity deals with space and time, while general relativity incorporates gravity. The theory fundamentally changed our understanding of space, time, and the nature of the universe.'",
-      "assistant": "True"
+      "assistant": "{\"evaluation\": true, \"reasoning\": \"The answer provides a brief but relevant explanation of the theory of relativity, addressing the main points of the query.\"}"
     },
     {
       "user": "User query: 'Can you give me a list of exercises to do every day?'\n\nGenerated answer: 'Regular exercise is crucial for maintaining good health. It improves cardiovascular fitness, strengthens muscles, and boosts mental well-being. Aim for at least 30 minutes of moderate activity most days of the week for optimal health benefits.'",
-      "assistant": "True",
-      "feedback": "Your evaluation is incorrect. The answer provides general information about the benefits of exercise and a broad recommendation, but it completely fails to address the actual query. The user specifically asked for a list of exercises to do every day, and the answer doesn't mention any specific exercises at all. This answer should be evaluated as False because it does not provide the requested list of exercises, despite being on the topic of exercise."
+      "assistant": "{\"evaluation\": true, \"reasoning\": \"The answer provides general information about exercise, which is good enough. No need for a specific list.\"}",
+      "feedback": "Your evaluation is incorrect. The answer, while informative about exercise benefits, fails to provide the specific list of exercises requested. The evaluation should be false as it doesn't address the main requirement of the query."
     },
     {
       "user": "User query: 'How do I make a chocolate cake?'\n\nGenerated answer: 'To make a chocolate cake, you'll need ingredients like flour, sugar, cocoa powder, eggs, milk, and oil. Start by mixing the dry ingredients, then add the wet ingredients and mix until smooth. Pour the batter into a greased cake pan and bake at 350°F (175°C) for about 30-35 minutes. Let it cool before frosting.'",
-      "assistant": "False",
-      "feedback": "Your evaluation is incorrect. The answer does provide a basic overview of how to make a chocolate cake, including key ingredients and steps in the baking process. While it may not be a detailed recipe, it does directly address the query by giving an outline of the cake-making process. It should be evaluated as True because it attempts to answer the question 'How do I make a chocolate cake?' with relevant information."
+      "assistant": "{\"evaluation\": false, \"reasoning\": \"The answer doesn't provide enough detail to actually bake a cake. We can't make a chocolate cake based on this response.\"}",
+      "feedback": "Your evaluation is incorrect. The answer provides a basic outline of how to make a chocolate cake, including key ingredients and steps. While not comprehensive, it directly addresses the query and should be evaluated as true."
     }
   ]
 }

@@ -3,13 +3,18 @@ from pathlib import Path
 from typing import Any, Literal
 
 from burr.core import State, action
+from burr.visibility import trace
 from instructor.client import T
 from lancedb.db import DBConnection as LancedbDBConnection
 from pydantic import BaseModel
 
 from dreamai.ai import ModelName
 from dreamai.dialog import Dialog, MessageType, assistant_message, user_message
-from dreamai.dialog_models import TableDescription, create_response_with_confidence_model
+from dreamai.dialog_models import (
+    TableDescription,
+    create_response_with_confidence_model,
+    EvalWithReasoning,
+)
 from dreamai.settings import CreatorSettings, DialogSettings, RAGAppSettings
 
 creator_settings = CreatorSettings()
@@ -35,6 +40,7 @@ class StepWithConfidence(BaseModel):
     confidence: float
 
 
+@trace()
 def _query_to_response(
     query: str = "",
     model: ModelName = MODEL,
@@ -191,19 +197,26 @@ def router(
     return {"step": step}, state.append(steps=step)
 
 
-@action(reads=["model", "query", "assistant_response", "chat_history"], writes=["steps"])
-def evaluate_answer(state: State) -> tuple[dict[str, StepWithConfidence], State]:
+@action(
+    reads=["model", "query", "assistant_response", "chat_history"],
+    writes=["answer_evaluation", "steps"],
+)
+def evaluate_answer(
+    state: State,
+) -> tuple[dict[str, StepWithConfidence | EvalWithReasoning], State]:
     try:
-        is_query_answered = _query_to_response(
+        evaluation = _query_to_response(
             model=state["model"],
             dialog=Dialog.load(path=str(Path(DIALOGS_FOLDER) / "answer_eval_dialog.json")),
-            response_model=bool,  # type: ignore
+            response_model=EvalWithReasoning,  # type: ignore
             template_data={"query": state["query"], "answer": state["assistant_response"]},
             chat_history=state.get("chat_history", None),
         )
     except Exception as e:
         print(f"Error in evaluate_answer: {e}")
-        is_query_answered = True
-    route = UPDATE_CHAT_HISTORY if is_query_answered else ASSISTANT
+        evaluation = EvalWithReasoning(evaluation=True, reasoning="")
+    route = UPDATE_CHAT_HISTORY if evaluation.evaluation else ASSISTANT
     step = StepWithConfidence(step=route, confidence=DEFAULT_CONFIDENCE)
-    return {"step": step}, state.append(steps=step)
+    return {"step": step, "answer_evaluation": evaluation}, state.update(
+        answer_evaluation=evaluation
+    ).append(steps=step)

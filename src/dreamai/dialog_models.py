@@ -120,6 +120,11 @@ class SourcedResponse(BaseModel):
         return res
 
 
+class EvalWithReasoning(BaseModel):
+    evaluation: bool
+    reasoning: str
+
+
 def create_response_with_confidence_model(
     response_type: list | type, response_value: Any | None = None
 ) -> type[BaseModel]:
