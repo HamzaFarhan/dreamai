@@ -480,7 +480,7 @@ wheels = [
 
 [[package]]
 name = "dreamai"
-version = "3.0"
+version = "3.1"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
@@ -502,6 +502,7 @@ dependencies = [
     { name = "notebook" },
     { name = "openai" },
     { name = "pandas" },
+    { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pymupdf4llm" },
     { name = "python-dotenv" },
@@ -534,6 +535,7 @@ requires-dist = [
     { name = "notebook", specifier = ">=7.2.1" },
     { name = "openai", specifier = ">=1.42.0" },
     { name = "pandas", specifier = ">=2.2.2" },
+    { name = "pydantic" },
     { name = "pydantic-settings", specifier = ">=2.4.0" },
     { name = "pymupdf4llm", specifier = ">=0.0.12" },
     { name = "python-dotenv", specifier = ">=1.0.1" },

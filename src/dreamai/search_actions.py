@@ -46,6 +46,7 @@ def add_data_with_descriptions(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
     )
+    # print(f"\n\nmd_data_list: {md_data_list}\n\n")
     for md_data in md_data_list:
         table_name = md_data.name
         table_description: TableDescription = _query_to_response(

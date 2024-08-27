@@ -1,6 +1,6 @@
 [project]
 name = "dreamai"
-version = "3.0"
+version = "3.1"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12, <3.13"
@@ -33,10 +33,14 @@ dependencies = [
     "tantivy>=0.22.0",
     "graphviz>=0.20.3",
     "loguru>=0.7.2",
+    "pydantic",
 ]
 
 [tool.ruff]
 line-length = 95
+
+[tool.install_ruff]
+command = "curl -LsSf https://astral.sh/uv/install.sh | sh"
 
 [build-system]
 requires = ["hatchling"]

@@ -41,7 +41,8 @@ class RAGSettings(Settings):
     separators: list[str] = [r"#{1,6}\s+", r"\*\*.*?\*\*", r"---", r"\n\n", r"\n", r"\.\s+"]
     lance_uri: str = "lance/rag/"
     ems_model: str = "hkunlp/instructor-base"
-    reranker: str = "answerdotai/answerai-colbert-small-v1"
+    # reranker: str = "answerdotai/answerai-colbert-small-v1"
+    reranker: str = ""
     device: str = "cuda"
     text_field_name: str = "text"
     sample_text_limit: int = 300_000

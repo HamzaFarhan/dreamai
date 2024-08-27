@@ -180,6 +180,7 @@ def router(
                     for table_description in table_descriptions
                 ],
             },
+            chat_history=state.get("chat_history", None),
         )
         route = response.response  # type: ignore
         confidence = response.confidence  # type: ignore

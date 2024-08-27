@@ -84,21 +84,19 @@ def search_lancedb(
     db: LancedbDBConnection,
     table_name: str,
     query: list[str] | str,
-    reranker: Reranker,
+    reranker: Reranker | None = None,
     max_results: int = MAX_SEARCH_RESULTS,
 ) -> list[dict]:
     table = db.open_table(name=table_name)
     queries = [query] if isinstance(query, str) else query
+
+    def _searcher(q: str):
+        if reranker is None:
+            return table.search(query=q, query_type="hybrid")
+        return table.search(query=q, query_type="hybrid").rerank(reranker=reranker)  # type:ignore
+
     results = (
-        pd.concat(
-            [
-                table.search(query=q, query_type="hybrid")
-                .rerank(reranker=reranker)  # type: ignore
-                .limit(max_results)
-                .to_pandas()
-                for q in queries
-            ]
-        )
+        pd.concat([_searcher(q).limit(max_results).to_pandas() for q in queries])
         .drop_duplicates(TEXT_FIELD_NAME)
         .sort_values("_relevance_score", ascending=False)
         .reset_index(drop=True)

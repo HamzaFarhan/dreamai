@@ -38,7 +38,7 @@ ROUTE_CONFIDENCE_THRESHOLD = rag_app_settings.route_confidence_threshold
 
 def application(
     db: LancedbDBConnection,
-    reranker: Reranker,
+    reranker: Reranker | None = None,
     model: ModelName = MODEL,
     table_descriptions: list[TableDescription] = [],
     only_data: bool = ONLY_DATA,
