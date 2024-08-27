@@ -19,7 +19,7 @@ from fasthtml.common import (
 from lancedb.rerankers import ColbertReranker
 from rag_app import application
 
-from dreamai.search_actions import add_data_with_descriptions
+from dreamai.rag_utils import add_data_with_descriptions
 from dreamai.settings import CreatorSettings, RAGAppSettings, RAGSettings
 
 app = fast_app(live=True)[0]
@@ -106,7 +106,7 @@ async def ingest_files(files: UploadFile | list[UploadFile]):
     data_paths = []
     with tempfile.TemporaryDirectory() as temp_dir:
         for file in files:
-            temp_file_path = Path(temp_dir) / file.filename
+            temp_file_path = Path(temp_dir) / file.filename  # type: ignore
             with open(temp_file_path, "wb") as buffer:
                 content = await file.read()
                 buffer.write(content)
@@ -127,7 +127,7 @@ async def ingest_files(files: UploadFile | list[UploadFile]):
 
 @app.post("/ingest_query")
 async def ingest_query(search_query: str):
-    
+    global table_descriptions
     table_descriptions = add_data_with_descriptions(
         model=MODEL,
         lance_db=lance_db,

@@ -20,14 +20,6 @@ EMS_MODEL = rag_settings.ems_model
 DEVICE = rag_settings.device
 TEXT_FIELD_NAME = rag_settings.text_field_name
 MAX_SEARCH_RESULTS = rag_settings.max_search_results
-TERMINATORS = rag_app_settings.terminators
-
-
-def get_user_query() -> str:
-    query = ""
-    while not query:
-        query = input(f"({', '.join(TERMINATORS)} to exit) > ").strip()
-    return query
 
 
 def get_lance_ems_model(

@@ -1,20 +1,20 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
 from burr.core import State, action
-from burr.visibility import trace
-from instructor.client import T
 from lancedb.db import DBConnection as LancedbDBConnection
-from pydantic import BaseModel
+from loguru import logger
+from pydantic import BaseModel, model_validator
 
 from dreamai.ai import ModelName
-from dreamai.dialog import Dialog, MessageType, assistant_message, user_message
+from dreamai.dialog import BadExample, Dialog, MessageType, assistant_message, user_message
 from dreamai.dialog_models import (
+    EvalWithReasoning,
     TableDescription,
     create_response_with_confidence_model,
-    EvalWithReasoning,
 )
+from dreamai.response_actions import _query_to_response
 from dreamai.settings import CreatorSettings, DialogSettings, RAGAppSettings
 
 creator_settings = CreatorSettings()
@@ -31,36 +31,24 @@ WEB = rag_app_settings.web
 WEB_OR_NOT = rag_app_settings.web_or_not
 UPDATE_CHAT_HISTORY = rag_app_settings.update_chat_history
 DEFAULT_CONFIDENCE = rag_app_settings.default_confidence
-ASSISTANT_CONFIDENCE_THRESHOLD = rag_app_settings.assistant_confidence_threshold
+NON_ASSISTANT_CONFIDENCE_THRESHOLD = rag_app_settings.non_assistant_confidence_threshold
+STEP_CONFIDENCE_THRESHOLD = rag_app_settings.step_confidence_threshold
 DIALOGS_FOLDER = dialog_settings.dialogs_folder
 
 
 class StepWithConfidence(BaseModel):
     step: str
     confidence: float
+    comment: str = ""
 
-
-@trace()
-def _query_to_response(
-    query: str = "",
-    model: ModelName = MODEL,
-    dialog: Dialog | None = None,
-    response_model: type[T] = str,
-    template_data: dict | None = None,
-    chat_history: list[MessageType] | None = None,
-    validation_context: dict[str, Any] | None = None,
-) -> T:
-    dialog = dialog or Dialog(task=str(Path(DIALOGS_FOLDER) / "assistant_task.txt"))
-    if chat_history:
-        dialog.chat_history = chat_history
-    creator, creator_kwargs = dialog.creator_with_kwargs(
-        model=model, user=query, template_data=template_data
-    )
-    # print(f"\n\nMESSAGES:\n{creator_kwargs['messages']}\n\n")
-    response = creator.create(
-        response_model=response_model, validation_context=validation_context, **creator_kwargs
-    )
-    return response
+    @model_validator(mode="after")
+    def validate_disclaimer(self) -> Self:
+        if not self.comment:
+            if self.confidence <= STEP_CONFIDENCE_THRESHOLD:
+                self.comment = f"I believe the next step is {self.step}. But I'm only {self.confidence*100:.0f}% confident."
+            else:
+                self.comment = f"I am {self.confidence*100:.0f}% confident that the next step is {self.step}."
+        return self
 
 
 def _query_to_route(
@@ -117,8 +105,8 @@ def followup_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]
             ),
             response_model=bool,  # type: ignore
         )
-    except Exception as e:
-        print(f"Error in followup_or_not: {e}")
+    except Exception:
+        logger.exception("Error in followup_or_not")
         followup = False
     route = ASSISTANT if followup else ROUTER
     step = StepWithConfidence(step=route, confidence=DEFAULT_CONFIDENCE)
@@ -151,8 +139,8 @@ def web_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]:
             response_model=float,  # type: ignore
         )
 
-    except Exception as e:
-        print(f"Error in web_or_not: {e}")
+    except Exception:
+        logger.exception("Error in web_or_not")
         route = ASSISTANT
         confidence = DEFAULT_CONFIDENCE
     step = StepWithConfidence(step=route, confidence=confidence)
@@ -184,11 +172,11 @@ def router(
         )
         route = response.response  # type: ignore
         confidence = response.confidence  # type: ignore
-    except Exception as e:
-        print(f"Error in router: {e}")
+    except Exception:
+        logger.exception("Error in router")
         route = ASSISTANT
         confidence = DEFAULT_CONFIDENCE
-    if confidence <= ASSISTANT_CONFIDENCE_THRESHOLD and not state["only_data"]:
+    if confidence <= NON_ASSISTANT_CONFIDENCE_THRESHOLD and not state["only_data"]:
         route = ASSISTANT
         confidence = DEFAULT_CONFIDENCE
     if route == ASSISTANT and state["has_web"]:
@@ -199,12 +187,12 @@ def router(
 
 
 @action(
-    reads=["model", "query", "assistant_response", "chat_history"],
-    writes=["answer_evaluation", "steps"],
+    reads=["model", "query", "assistant_response", "chat_history", "action_attempts"],
+    writes=["answer_evaluation", "action_attempts", "bad_example"],
 )
 def evaluate_answer(
     state: State,
-) -> tuple[dict[str, StepWithConfidence | EvalWithReasoning], State]:
+) -> tuple[dict[str, EvalWithReasoning | int | BadExample | None], State]:
     try:
         evaluation = _query_to_response(
             model=state["model"],
@@ -213,11 +201,26 @@ def evaluate_answer(
             template_data={"query": state["query"], "answer": state["assistant_response"]},
             chat_history=state.get("chat_history", None),
         )
-    except Exception as e:
-        print(f"Error in evaluate_answer: {e}")
+    except Exception:
+        logger.exception("Error in evaluate_answer")
         evaluation = EvalWithReasoning(evaluation=True, reasoning="")
-    route = UPDATE_CHAT_HISTORY if evaluation.evaluation else ASSISTANT
-    step = StepWithConfidence(step=route, confidence=DEFAULT_CONFIDENCE)
-    return {"step": step, "answer_evaluation": evaluation}, state.update(
-        answer_evaluation=evaluation
-    ).append(steps=step)
+    # route = UPDATE_CHAT_HISTORY if evaluation.evaluation else ASSISTANT
+    # step = StepWithConfidence(step=route, confidence=DEFAULT_CONFIDENCE)
+    action_attempts = state.get("action_attempts", 0)
+    if not evaluation.evaluation:
+        action_attempts += 1
+        bad_example = BadExample(
+            user=state["query"],
+            assistant=state["assistant_response"],
+            feedback=evaluation.reasoning,
+        )
+    else:
+        action_attempts = 0
+        bad_example = None
+    return {
+        "answer_evaluation": evaluation,
+        "action_attempts": action_attempts,
+        "bad_example": bad_example,
+    }, state.update(answer_evaluation=evaluation).update(
+        action_attempts=action_attempts
+    ).update(bad_example=bad_example)

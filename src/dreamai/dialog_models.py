@@ -47,7 +47,12 @@ class SentenceComponents(BaseModel):
 
 
 class StepBackQuestions(BaseModel):
-    questions: list[str] = Field(..., min_length=1, max_length=MAX_STEP_BACK_QUESTIONS)
+    questions: list[str] = Field(..., min_length=1)
+
+    @field_validator("questions")
+    @classmethod
+    def validate_questions(cls, v: list[str]) -> list[str]:
+        return list(set(v))[:MAX_STEP_BACK_QUESTIONS]
 
 
 class AssertionConcept(BaseModel):

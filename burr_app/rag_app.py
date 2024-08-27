@@ -33,7 +33,7 @@ WEB_OR_NOT = rag_app_settings.web_or_not
 WEB = rag_app_settings.web
 TERMINATE = rag_app_settings.terminate
 UPDATE_CHAT_HISTORY = rag_app_settings.update_chat_history
-ROUTE_CONFIDENCE_THRESHOLD = rag_app_settings.route_confidence_threshold
+ACTION_ATTEMPTS_LIMIT = rag_app_settings.action_attempts_limit
 
 
 def application(
@@ -85,13 +85,14 @@ def application(
             ("create_step_back_questions", "search_lancedb"),
             (["search_web", "search_lancedb"], "create_search_response"),
             ("create_search_response", "evaluate_answer"),
-            # ("create_search_response", "update_chat_history"),
-            ("evaluate_answer", "ask_assistant", expr(f"steps[-1].step == '{ASSISTANT}'")),
+            ("evaluate_answer", "update_chat_history", expr("answer_evaluation.evaluation")),
             (
                 "evaluate_answer",
-                "update_chat_history",
-                expr(f"steps[-1].step == '{UPDATE_CHAT_HISTORY}'"),
+                "create_search_response",
+                ~expr("answer_evaluation.evaluation")
+                & expr(f"action_attempts <= {ACTION_ATTEMPTS_LIMIT}"),
             ),
+            ("evaluate_answer", "ask_assistant", expr(f"steps[-1].step == '{ASSISTANT}'")),
             ("ask_assistant", "update_chat_history"),
             ("update_chat_history", "get_query"),
         )

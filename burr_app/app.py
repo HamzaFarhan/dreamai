@@ -3,12 +3,11 @@ from pathlib import Path
 
 import lancedb
 from lancedb.rerankers import ColbertReranker
+from rag_app import application
 
 from dreamai.ai import ModelName
-from dreamai.lance_utils import get_user_query
-from dreamai.search_actions import add_data_with_descriptions
+from dreamai.rag_utils import add_data_with_descriptions, get_user_query
 from dreamai.settings import CreatorSettings, RAGAppSettings, RAGSettings
-from rag_app import application
 
 creator_settings = CreatorSettings()
 rag_settings = RAGSettings()

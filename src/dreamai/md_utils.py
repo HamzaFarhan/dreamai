@@ -217,14 +217,19 @@ def search_query_to_md(
     chunk_overlap: int = CHUNK_OVERLAP,
     separators: list[str] = SEPARATORS,
 ) -> list[MarkdownData]:
-    return urls_to_md(
-        urls=[result["href"] for result in web_search(query=query, max_results=max_results)],
-        extractor=extractor,
-        clean_content=clean_content,
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        separators=separators,
-    )
+    search_results = web_search(query=query, max_results=max_results)
+    mds = []
+    for search_result in search_results:
+        md = urls_to_md(
+            urls=search_result["href"],
+            extractor=extractor,
+            clean_content=clean_content,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            separators=separators,
+        )
+        mds.append(md if md else "\n".join([search_result["title"], search_result["body"]]))
+    return mds
 
 
 def docs_to_md(

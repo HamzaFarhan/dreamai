@@ -63,6 +63,7 @@ class RAGAppSettings(Settings):
     update_chat_history: str = "update_chat_history"
     terminate: str = "terminate"
     default_confidence: float = 1.0
-    route_confidence_threshold: float = 0.6
-    assistant_confidence_threshold: float = 0.4
+    step_confidence_threshold: float = 0.6
+    non_assistant_confidence_threshold: float = 0.4
     terminators: list[str] = ["exit", "quit", "q"]
+    action_attempts_limit: int = 3

@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from google.generativeai import GenerativeModel
 from openai import OpenAI
 from pydantic import BaseModel, create_model, validate_call
+from loguru import logger
 
 load_dotenv()
 
@@ -48,11 +49,11 @@ class ToolError(BaseModel):
 
 
 def run_tool(tool_model: Tool, tool_func: Callable, **kwargs) -> Any:
-    print(f"Running tool: {tool_model.tool_name}")
+    logger.info(f"Running tool: {tool_model.tool_name}")
     try:
         return tool_func(**tool_model.model_dump(exclude={"tool_name"}), **kwargs)
     except Exception as e:
-        print(f"Error running tool: {tool_model.tool_name}, {e}")
+        logger.exception(f"Error running tool: {tool_model.tool_name}")
         return ToolError(tool_name=tool_model.tool_name, error=str(e))
 
 
