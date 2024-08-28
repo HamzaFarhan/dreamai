@@ -2,6 +2,7 @@ import tempfile
 from pathlib import Path
 
 import lancedb
+from dotenv import load_dotenv
 from fastapi import UploadFile
 from fasthtml.common import (
     H1,
@@ -22,6 +23,7 @@ from rag_app import application
 from dreamai.rag_utils import add_data_with_descriptions
 from dreamai.settings import CreatorSettings, RAGAppSettings, RAGSettings
 
+load_dotenv()
 app = fast_app(live=True)[0]
 
 creator_settings = CreatorSettings()

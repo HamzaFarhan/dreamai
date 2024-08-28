@@ -2,6 +2,7 @@ import json
 import os
 import re
 import tempfile
+from functools import partial
 from pathlib import Path
 from textwrap import dedent
 from typing import Self
@@ -9,6 +10,7 @@ from typing import Self
 import httpx
 import lxml
 import pymupdf
+import pymupdf.pro
 import pymupdf4llm
 from duckduckgo_search import DDGS
 from html2text import HTML2Text
@@ -19,6 +21,8 @@ from trafilatura import extract
 
 from dreamai.settings import RAGSettings
 from dreamai.utils import _process_content, chunk_text, deindent, resolve_data_path
+
+pymupdf.pro.unlock()  # type: ignore
 
 rag_settings = RAGSettings()
 
@@ -228,7 +232,23 @@ def search_query_to_md(
             chunk_overlap=chunk_overlap,
             separators=separators,
         )
-        mds.append(md if md else "\n".join([search_result["title"], search_result["body"]]))
+        mds.extend(
+            md
+            if md
+            else [
+                MarkdownData.model_validate(
+                    {
+                        "name": search_result["href"],
+                        "markdown": "\n".join([search_result["title"], search_result["body"]]),
+                    },
+                    context={
+                        "chunk_size": chunk_size,
+                        "chunk_overlap": chunk_overlap,
+                        "separators": separators,
+                    },
+                )
+            ]
+        )
     return mds
 
 
@@ -241,11 +261,13 @@ def docs_to_md(
     docs_md = []
     for doc in resolve_data_path(data_path=docs):
         doc = Path(doc)
-        if doc.suffix in [".md", ".txt"]:
+        if not doc.exists():
+            md = str(doc)
+        elif doc.suffix in [".md", ".txt"]:
             md = doc.read_text()
         elif doc.suffix == ".json":
             md = json.dumps(doc.read_text())
-        elif doc.suffix == ".pdf":
+        elif doc.suffix in [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx"]:
             with tempfile.TemporaryDirectory() as image_folder:
                 md = replace_image_tags(
                     md=pymupdf4llm.to_markdown(
@@ -258,7 +280,6 @@ def docs_to_md(
                 )
         else:
             md = str(doc)
-        # md = md.replace("```", "") if doc.endswith(".txt") else md
         docs_md.append(
             MarkdownData.model_validate(
                 {"name": doc.name, "markdown": md},
@@ -274,55 +295,40 @@ def docs_to_md(
 
 def data_to_md(
     data: list[str | Path] | str | Path | None = None,
-    search_query: str = "",
+    search_queries: list[str] | str | None = None,
     max_results: int = MAX_SEARCH_RESULTS,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
     separators: list[str] = SEPARATORS,
 ) -> list[MarkdownData]:
-    assert search_query or data, "Either search_query or data must be provided"
-    if search_query:
-        return search_query_to_md(
-            query=search_query,
-            max_results=max_results,
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            separators=separators,
+    data = data or []
+    search_queries = search_queries or []
+    assert search_queries or data, "Either search_queries or data must be provided"
+    data_md = []
+    if not isinstance(search_queries, list):
+        search_queries = [search_queries]
+    for search_query in search_queries:
+        data_md.extend(
+            search_query_to_md(
+                query=search_query,
+                max_results=max_results,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                separators=separators,
+            )
         )
-    else:
-        if isinstance(data := (data or []), (str, Path)):
-            data = [data]
-        data_md = []
-        for item in data:
-            item = str(item)
-            item_type = get_data_type(item)
-            if item_type == "URL":
-                data_md.extend(
-                    urls_to_md(
-                        urls=item,
-                        chunk_size=chunk_size,
-                        chunk_overlap=chunk_overlap,
-                        separators=separators,
-                    )
-                )
-            elif os.path.exists(item):
-                data_md.extend(
-                    docs_to_md(
-                        docs=item,
-                        chunk_size=chunk_size,
-                        chunk_overlap=chunk_overlap,
-                        separators=separators,
-                    )
-                )
-            else:
-                data_md.append(
-                    MarkdownData.model_validate(
-                        {"name": "text", "markdown": item},
-                        context={
-                            "chunk_size": chunk_size,
-                            "chunk_overlap": chunk_overlap,
-                            "separators": separators,
-                        },
-                    )
-                )
-        return data_md
+    if not isinstance(data, list):
+        data = [data]
+    for item in data:
+        item = str(item)
+        extractor = (
+            partial(urls_to_md, urls=item)
+            if get_data_type(item) == "URL"
+            else partial(docs_to_md, docs=item)
+        )
+        data_md.extend(
+            extractor(
+                chunk_size=chunk_size, chunk_overlap=chunk_overlap, separators=separators
+            )
+        )
+    return data_md
