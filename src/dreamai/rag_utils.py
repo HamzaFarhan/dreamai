@@ -33,19 +33,18 @@ def add_data_with_descriptions(
     model: ModelName,
     lance_db: LancedbDBConnection,
     data: list[str | Path] | str | Path | None = None,
-    search_query: str = "",
+    search_queries: list[str] | str | None = None,
     max_results: int = MAX_SEARCH_RESULTS,
     table_descriptions: list[TableDescription] | None = None,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
 ) -> list[TableDescription]:
-    assert data or search_query, "Either data or search_query must be provided"
+    assert data or search_queries, "Either data or search_queries must be provided"
     table_descriptions = table_descriptions or []
     table_descriptions_dict = {td.name: td for td in table_descriptions}
-
     md_data_list = data_to_md(
         data=data,
-        search_query=search_query,
+        search_queries=search_queries,
         max_results=max_results,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,

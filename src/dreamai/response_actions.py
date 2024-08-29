@@ -42,40 +42,38 @@ def _query_to_response(
 
 
 @action(
-    reads=["model", "query", "chat_history", "bad_example"],
-    writes=["assistant_response", "bad_example"],
+    reads=["model", "query", "chat_history", "bad_interaction"],
+    writes=["assistant_response", "bad_interaction", "action_attempts"],
 )
 def ask_assistant(state: State) -> tuple[dict, State]:
-    dialog = Dialog(task=str(Path(DIALOGS_FOLDER) / "assistant_task.txt"))
-    bad_example = state.get("bad_example", None)
-    if bad_example:
-        dialog.add_examples(deepcopy(bad_example))
-        bad_example = None
+    query = state.get("query", "")
+    chat_history = state.get("chat_history", [])
+    if bad_interaction := state.get("bad_interaction", None):
+        chat_history += bad_interaction.messages
+        query = ""
+        bad_interaction = None
+    dialog = Dialog(
+        task=str(Path(DIALOGS_FOLDER) / "assistant_task.txt"), chat_history=chat_history
+    )
     try:
-        response = _query_to_response(
-            model=state["model"],
-            query=state["query"],
-            dialog=dialog,
-            chat_history=state.get("chat_history", None),
-        )
+        response = _query_to_response(model=state["model"], query=query, dialog=dialog)
     except Exception:
         logger.exception("Error in ask_assistant")
         response = "I'm sorry, but I encountered an error while processing your request. Could you please try again?"
     return {"assistant_response": response}, state.update(assistant_response=response).update(
-        bad_example=bad_example
-    )
+        bad_interaction=bad_interaction
+    ).update(action_attempts=0)
 
 
 @action(
-    reads=["model", "query", "search_results", "chat_history"],
-    writes=["assistant_response", "source_docs", "bad_example"],
+    reads=["model", "query", "search_results", "chat_history", "bad_interaction"],
+    writes=["assistant_response", "source_docs", "bad_interaction"],
 )
 def create_search_response(state: State) -> tuple[dict, State]:
     dialog = Dialog.load(path=str(Path(DIALOGS_FOLDER) / "sourced_rag_dialog.json"))
-    bad_example = state.get("bad_example", None)
-    if bad_example:
-        dialog.add_examples(deepcopy(bad_example))
-        bad_example = None
+    if bad_interaction := state.get("bad_interaction", None):
+        dialog.add_examples(deepcopy(bad_interaction))
+        bad_interaction = None
     documents = [
         {k: v for k, v in document.items() if k != "index"}
         for document in state["search_results"]
@@ -90,7 +88,7 @@ def create_search_response(state: State) -> tuple[dict, State]:
             chat_history=state.get("chat_history", None),
             validation_context={
                 "documents": [
-                    {"name": document["name"], "index": document["index"]}
+                    {"name": document["name"], "index": document.get("index", 0)}
                     for document in state["search_results"]
                 ]
             },
@@ -109,7 +107,7 @@ def create_search_response(state: State) -> tuple[dict, State]:
         "source_docs": response._source_docs,
     }, state.update(assistant_response=str(response)).update(
         source_docs=response._source_docs
-    ).update(bad_example=bad_example)
+    ).update(bad_interaction=bad_interaction)
 
 
 @action(reads=["query", "assistant_response"], writes=["chat_history"])

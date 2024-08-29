@@ -19,9 +19,8 @@ class ModelName(StrEnum):
     HAIKU = "claude-3-haiku-20240307"
     SONNET = "claude-3-5-sonnet-20240620"
     OPUS = "claude-3-opus-20240229"
-    GEMINI_PRO = "gemini-1.5-pro-latest"
-    GEMINI_PRO_EXP = "gemini-1.5-pro-exp-0801"
-    GEMINI_FLASH = "gemini-1.5-flash-latest"
+    GEMINI_PRO = "gemini-1.5-pro-exp-0801"
+    GEMINI_FLASH = "gemini-1.5-flash-exp-0827"
 
 
 class Tool(BaseModel):
@@ -63,11 +62,7 @@ def create_creator(model: ModelName) -> instructor.Instructor:
         return instructor.from_openai(OpenAI())
     elif model in [ModelName.HAIKU, ModelName.SONNET, ModelName.OPUS]:
         return instructor.from_anthropic(Anthropic())
-    elif model in [
-        ModelName.GEMINI_FLASH,
-        ModelName.GEMINI_PRO,
-        ModelName.GEMINI_PRO_EXP,
-    ]:
+    elif model in [ModelName.GEMINI_FLASH, ModelName.GEMINI_PRO]:
         return instructor.from_gemini(GenerativeModel(model_name=model))
     else:
         raise ValueError(f"Model {model} not supported")

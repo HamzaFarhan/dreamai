@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Any, Literal, Self
 
 from burr.core import State, action
-from lancedb.db import DBConnection as LancedbDBConnection
 from loguru import logger
 from pydantic import BaseModel, model_validator
 
@@ -15,25 +14,18 @@ from dreamai.dialog_models import (
     create_response_with_confidence_model,
 )
 from dreamai.response_actions import _query_to_response
-from dreamai.settings import CreatorSettings, DialogSettings, RAGAppSettings
+from dreamai.settings import CreatorSettings, DialogSettings, RAGAppSettings, RAGRoute
 
 creator_settings = CreatorSettings()
 rag_app_settings = RAGAppSettings()
 dialog_settings = DialogSettings()
 
 MODEL = creator_settings.model
-ROUTER = rag_app_settings.router
-ASSISTANT = rag_app_settings.assistant
-FOLLOWUP_OR_NOT = rag_app_settings.followup_or_not
-TERMINATORS = rag_app_settings.terminators
-TERMINATE = rag_app_settings.terminate
-WEB = rag_app_settings.web
-WEB_OR_NOT = rag_app_settings.web_or_not
-UPDATE_CHAT_HISTORY = rag_app_settings.update_chat_history
 DEFAULT_CONFIDENCE = rag_app_settings.default_confidence
 NON_ASSISTANT_CONFIDENCE_THRESHOLD = rag_app_settings.non_assistant_confidence_threshold
 STEP_CONFIDENCE_THRESHOLD = rag_app_settings.step_confidence_threshold
 DIALOGS_FOLDER = dialog_settings.dialogs_folder
+TERMINATORS = rag_app_settings.terminators
 
 
 class StepWithConfidence(BaseModel):
@@ -71,20 +63,29 @@ def _query_to_route(
     return StepWithConfidence(step=response.response, confidence=response.confidence)  # type: ignore
 
 
-def _get_route(query: str) -> str:
-    route = FOLLOWUP_OR_NOT
+def _get_route(query: str) -> tuple[str, str]:
+    route = RAGRoute.FOLLOWUP_OR_NOT
     if query.lower() in TERMINATORS:
-        route = TERMINATE
+        route = RAGRoute.TERMINATE
+    if "@ai" in query.lower():
+        route = RAGRoute.ASSISTANT
+    if "@data" in query.lower():
+        route = RAGRoute.ROUTER
     if "@web" in query.lower():
-        route = WEB
-    return route
+        route = RAGRoute.WEB
+    return route, query.replace("@ai", "").replace("@data", "").replace("@web", "").strip()
 
 
-@action(reads=[], writes=["query", "steps"])
+@action(reads=["only_ai", "only_data", "only_web"], writes=["query", "steps"])
 def get_query(state: State, query: str) -> tuple[dict[str, str | StepWithConfidence], State]:
-    route = _get_route(query=query)
-    if route == WEB:
-        query = query.replace("@web", "").strip()
+    if state["only_ai"]:
+        route = RAGRoute.ASSISTANT
+    elif state["only_data"]:
+        route = RAGRoute.ROUTER
+    elif state["only_web"]:
+        route = RAGRoute.WEB
+    else:
+        route, query = _get_route(query=query)
     step = StepWithConfidence(step=route, confidence=DEFAULT_CONFIDENCE)
     return {"query": query, "step": step}, state.update(query=query).append(steps=step)
 
@@ -93,7 +94,7 @@ def get_query(state: State, query: str) -> tuple[dict[str, str | StepWithConfide
 def followup_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]:
     chat_history = state.get("chat_history", [])
     if len(chat_history) == 0:
-        step = StepWithConfidence(step=ROUTER, confidence=DEFAULT_CONFIDENCE)
+        step = StepWithConfidence(step=RAGRoute.ROUTER, confidence=DEFAULT_CONFIDENCE)
         return {"step": step}, state.append(steps=step)
     try:
         followup = _query_to_response(
@@ -108,7 +109,7 @@ def followup_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]
     except Exception:
         logger.exception("Error in followup_or_not")
         followup = False
-    route = ASSISTANT if followup else ROUTER
+    route = RAGRoute.ASSISTANT if followup else RAGRoute.ROUTER
     step = StepWithConfidence(step=route, confidence=DEFAULT_CONFIDENCE)
     return {"step": step}, state.append(steps=step)
 
@@ -121,7 +122,7 @@ def web_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]:
         route: str = _query_to_response(
             model=state["model"],
             dialog=dialog,
-            response_model=Literal[ASSISTANT, WEB],  # type: ignore
+            response_model=Literal[RAGRoute.ASSISTANT, RAGRoute.WEB],  # type: ignore
             template_data={
                 "current_date": datetime.now().strftime("%Y-%m-%d"),
                 "user_query": state["query"],
@@ -141,7 +142,7 @@ def web_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]:
 
     except Exception:
         logger.exception("Error in web_or_not")
-        route = ASSISTANT
+        route = RAGRoute.ASSISTANT
         confidence = DEFAULT_CONFIDENCE
     step = StepWithConfidence(step=route, confidence=confidence)
     return {"step": step}, state.append(steps=step)
@@ -153,74 +154,88 @@ def web_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]:
 def router(
     state: State, table_descriptions: list[TableDescription] = []
 ) -> tuple[dict[str, StepWithConfidence], State]:
-    db: LancedbDBConnection = state["db"]
-    try:
-        response = _query_to_response(
-            model=state["model"],
-            dialog=Dialog.load(path=str(Path(DIALOGS_FOLDER) / "table_selection_dialog.json")),
-            response_model=create_response_with_confidence_model(
-                response_type=list(db.table_names())
-            ),
-            template_data={
-                "user_query": state["query"],
-                "database_list": [
-                    table_description.model_dump_json(indent=2)
-                    for table_description in table_descriptions
-                ],
-            },
-            chat_history=state.get("chat_history", None),
-        )
-        route = response.response  # type: ignore
-        confidence = response.confidence  # type: ignore
-    except Exception:
-        logger.exception("Error in router")
-        route = ASSISTANT
-        confidence = DEFAULT_CONFIDENCE
+    route = RAGRoute.ASSISTANT
+    confidence = DEFAULT_CONFIDENCE
+    if db := state.get("db", None):
+        if table_names := list(db.table_names()):
+            try:
+                response = _query_to_response(
+                    model=state["model"],
+                    dialog=Dialog.load(
+                        path=str(Path(DIALOGS_FOLDER) / "table_selection_dialog.json")
+                    ),
+                    response_model=create_response_with_confidence_model(
+                        response_type=table_names
+                    ),
+                    template_data={
+                        "user_query": state["query"],
+                        "database_list": [
+                            table_description.model_dump_json(indent=2)
+                            for table_description in table_descriptions
+                        ],
+                    },
+                    chat_history=state.get("chat_history", None),
+                )
+                route = response.response  # type: ignore
+                confidence = response.confidence  # type: ignore
+            except Exception:
+                logger.exception("Error in router")
     if confidence <= NON_ASSISTANT_CONFIDENCE_THRESHOLD and not state["only_data"]:
-        route = ASSISTANT
+        route = RAGRoute.ASSISTANT
         confidence = DEFAULT_CONFIDENCE
-    if route == ASSISTANT and state["has_web"]:
-        route = WEB_OR_NOT
+    if route == RAGRoute.ASSISTANT and state["has_web"]:
+        route = RAGRoute.WEB_OR_NOT
         confidence = DEFAULT_CONFIDENCE
     step = StepWithConfidence(step=route, confidence=confidence)
     return {"step": step}, state.append(steps=step)
 
 
 @action(
-    reads=["model", "query", "assistant_response", "chat_history", "action_attempts"],
-    writes=["answer_evaluation", "action_attempts", "bad_example"],
+    reads=[
+        "model",
+        "query",
+        "assistant_response",
+        "chat_history",
+        "source_docs",
+        "action_attempts",
+    ],
+    writes=["answer_evaluation", "action_attempts", "bad_interaction"],
 )
 def evaluate_answer(
     state: State,
-) -> tuple[dict[str, EvalWithReasoning | int | BadExample | None], State]:
+) -> tuple[dict[str, int | EvalWithReasoning | BadExample | None], State]:
+    dialog = Dialog.load(path=str(Path(DIALOGS_FOLDER) / "answer_eval_dialog.json"))
+    user = dialog.template.format(
+        query=state["query"],
+        source_docs=state.get("source_docs", []),
+        answer=state["assistant_response"],
+    )
     try:
         evaluation = _query_to_response(
+            query=user,
             model=state["model"],
-            dialog=Dialog.load(path=str(Path(DIALOGS_FOLDER) / "answer_eval_dialog.json")),
+            dialog=dialog,
             response_model=EvalWithReasoning,  # type: ignore
-            template_data={"query": state["query"], "answer": state["assistant_response"]},
             chat_history=state.get("chat_history", None),
         )
     except Exception:
         logger.exception("Error in evaluate_answer")
         evaluation = EvalWithReasoning(evaluation=True, reasoning="")
-    # route = UPDATE_CHAT_HISTORY if evaluation.evaluation else ASSISTANT
-    # step = StepWithConfidence(step=route, confidence=DEFAULT_CONFIDENCE)
     action_attempts = state.get("action_attempts", 0)
     if not evaluation.evaluation:
         action_attempts += 1
-        bad_example = BadExample(
-            user=state["query"],
+        bad_interaction = BadExample(
+            user=f"<source_docs>{state.get('source_docs', [])}</source_docs>\n\n<user>{state['query']}</user>",
             assistant=state["assistant_response"],
-            feedback=evaluation.reasoning,
+            feedback=evaluation.reasoning + f"\nThis was attempt number: {action_attempts}.",
         )
     else:
         action_attempts = 0
-        bad_example = None
+        bad_interaction = None
     return {
         "answer_evaluation": evaluation,
         "action_attempts": action_attempts,
-        "bad_example": bad_example,
+        "bad_interaction": bad_interaction,
     }, state.update(answer_evaluation=evaluation).update(
         action_attempts=action_attempts
-    ).update(bad_example=bad_example)
+    ).update(bad_interaction=bad_interaction)

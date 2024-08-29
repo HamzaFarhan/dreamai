@@ -18,8 +18,8 @@ from fasthtml.common import (
     serve,
 )
 from lancedb.rerankers import ColbertReranker
-from rag_app import application
 
+from dreamai.rag import application
 from dreamai.rag_utils import add_data_with_descriptions
 from dreamai.settings import CreatorSettings, RAGAppSettings, RAGSettings
 
@@ -133,7 +133,7 @@ async def ingest_query(search_query: str):
     table_descriptions = add_data_with_descriptions(
         model=MODEL,
         lance_db=lance_db,
-        search_query=search_query,
+        search_queries=search_query,
         table_descriptions=table_descriptions,
     )
     return Div(

@@ -73,10 +73,8 @@ def chunk_text(
                 if chunk_overlap > 0 and len(current_chunk) > chunk_overlap:
                     chunk = current_chunk[-chunk_overlap:] + " " + chunk
             current_chunk = chunk
-
     if current_chunk:
         result.append(current_chunk)
-
     return result
 
 

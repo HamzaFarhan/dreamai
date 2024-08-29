@@ -2,7 +2,6 @@ import json
 import os
 import re
 import tempfile
-from functools import partial
 from pathlib import Path
 from textwrap import dedent
 from typing import Self
@@ -68,23 +67,13 @@ class MarkdownData(BaseModel):
         return self
 
 
-def get_data_type(input_string: str) -> str:
-    pdf_pattern = re.compile(r"^.*\.pdf$", re.IGNORECASE)
-    txt_pattern = re.compile(r"^.*\.txt$", re.IGNORECASE)
-    md_pattern = re.compile(r"^.*\.md$", re.IGNORECASE)
-    url_pattern = re.compile(
-        r"^(https?:\/\/)?" r"(www\.)?[\da-z\.-]+\.[a-z]{2,}" r"([\/\w \.-]*)*\/?$"
+def is_url(text: str) -> bool:
+    return (
+        re.match(
+            r"^(https?:\/\/)?" r"(www\.)?[\da-z\.-]+\.[a-z]{2,}" r"([\/\w \.-]*)*\/?$", text
+        )
+        is not None
     )
-    if pdf_pattern.match(input_string):
-        return "PDF"
-    elif txt_pattern.match(input_string):
-        return "TXT"
-    elif md_pattern.match(input_string):
-        return "MD"
-    elif url_pattern.match(input_string):
-        return "URL"
-    else:
-        return ""
 
 
 def extract_text_from_image(image_path: str, min_len: int = 2) -> str:
@@ -221,6 +210,11 @@ def search_query_to_md(
     chunk_overlap: int = CHUNK_OVERLAP,
     separators: list[str] = SEPARATORS,
 ) -> list[MarkdownData]:
+    to_md_kwargs = {
+        "chunk_size": chunk_size,
+        "chunk_overlap": chunk_overlap,
+        "separators": separators,
+    }
     search_results = web_search(query=query, max_results=max_results)
     mds = []
     for search_result in search_results:
@@ -228,9 +222,7 @@ def search_query_to_md(
             urls=search_result["href"],
             extractor=extractor,
             clean_content=clean_content,
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            separators=separators,
+            **to_md_kwargs,
         )
         mds.extend(
             md
@@ -241,11 +233,7 @@ def search_query_to_md(
                         "name": search_result["href"],
                         "markdown": "\n".join([search_result["title"], search_result["body"]]),
                     },
-                    context={
-                        "chunk_size": chunk_size,
-                        "chunk_overlap": chunk_overlap,
-                        "separators": separators,
-                    },
+                    context=to_md_kwargs,
                 )
             ]
         )
@@ -304,31 +292,24 @@ def data_to_md(
     data = data or []
     search_queries = search_queries or []
     assert search_queries or data, "Either search_queries or data must be provided"
+    to_md_kwargs = {
+        "chunk_size": chunk_size,
+        "chunk_overlap": chunk_overlap,
+        "separators": separators,
+    }
     data_md = []
     if not isinstance(search_queries, list):
         search_queries = [search_queries]
     for search_query in search_queries:
         data_md.extend(
-            search_query_to_md(
-                query=search_query,
-                max_results=max_results,
-                chunk_size=chunk_size,
-                chunk_overlap=chunk_overlap,
-                separators=separators,
-            )
+            search_query_to_md(query=search_query, max_results=max_results, **to_md_kwargs)
         )
     if not isinstance(data, list):
         data = [data]
     for item in data:
         item = str(item)
-        extractor = (
-            partial(urls_to_md, urls=item)
-            if get_data_type(item) == "URL"
-            else partial(docs_to_md, docs=item)
-        )
-        data_md.extend(
-            extractor(
-                chunk_size=chunk_size, chunk_overlap=chunk_overlap, separators=separators
-            )
-        )
+        if is_url(item):
+            data_md.extend(urls_to_md(urls=item, **to_md_kwargs))
+        else:
+            data_md.extend(docs_to_md(docs=item, **to_md_kwargs))
     return data_md

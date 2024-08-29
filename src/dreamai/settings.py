@@ -1,5 +1,6 @@
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from enum import StrEnum
 
 from dreamai.ai import ModelName
 
@@ -38,7 +39,7 @@ class RAGSettings(Settings):
     chunk_size: int = 800
     chunk_overlap: int = 200
     min_full_text_size: int = 10_000
-    separators: list[str] = [r"#{1,6}\s+", r"\*\*.*?\*\*", r"---", r"\n\n", r"\n", r"\.\s+"]
+    separators: list[str] = [r"#{1,6}\s+", r"\*\*.*?\*\*", r"---", r"\n\n", r"\.\s+", r"\n"]
     lance_uri: str = "lance/rag/"
     ems_model: str = "hkunlp/instructor-base"
     # reranker: str = "answerdotai/answerai-colbert-small-v1"
@@ -52,16 +53,20 @@ class RAGSettings(Settings):
     )
 
 
+class RAGRoute(StrEnum):
+    ROUTER = "router"
+    ASSISTANT = "assistant"
+    FOLLOWUP_OR_NOT = "followup_or_not"
+    WEB_OR_NOT = "web_or_not"
+    WEB = "web"
+    TERMINATE = "terminate"
+
+
 class RAGAppSettings(Settings):
+    only_ai: bool = False
     only_data: bool = False
-    has_web: bool = True
-    router: str = "router"
-    assistant: str = "assistant"
-    followup_or_not: str = "followup_or_not"
-    web_or_not: str = "web_or_not"
-    web: str = "web"
-    update_chat_history: str = "update_chat_history"
-    terminate: str = "terminate"
+    only_web: bool = False
+    has_web: bool = False
     default_confidence: float = 1.0
     step_confidence_threshold: float = 0.6
     non_assistant_confidence_threshold: float = 0.4
