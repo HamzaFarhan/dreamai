@@ -87,8 +87,11 @@ def search_lancedb(
             return table.search(query=q, query_type="hybrid")
         return table.search(query=q, query_type="hybrid").rerank(reranker=reranker)  # type:ignore
 
+    search_results = [_searcher(q).limit(max_results).to_pandas() for q in queries]
+    if len(search_results) == 0:
+        return []
     results = (
-        pd.concat([_searcher(q).limit(max_results).to_pandas() for q in queries])
+        pd.concat(search_results)
         .drop_duplicates(TEXT_FIELD_NAME)
         .sort_values("_relevance_score", ascending=False)
         .reset_index(drop=True)

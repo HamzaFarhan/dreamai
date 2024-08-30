@@ -32,8 +32,7 @@ def search_web(state: State) -> tuple[dict[str, list[dict] | BadExample | None],
     bad_interaction = None
     if len(results) == 0:
         bad_interaction = BadExample(
-            user=state["query"].strip()
-            + "\n\nPlease search the web for the most up-to-date information to answer this question.",
+            user=f"<task>Please search the web for the most up-to-date information to answer the user query.</task>\n\n<user_query>{state['query'].strip()}</user_query>",
             assistant="I've attempted to search the web for information related to your query, but no relevant results were found. Would you like me to provide an answer based on my existing knowledge, with the caveat that it may not reflect the most current information?",
             feedback="Yes, please answer using your existing knowledge. Begin your response with '[Answering from internal knowledge due to lack of web results]' to help us track these instances. Also, suggest some alternative search terms or approaches that might yield better web results for this query.",
         )
@@ -84,8 +83,7 @@ def search_lancedb(
     bad_interaction = None
     if len(results) == 0:
         bad_interaction = BadExample(
-            user=state["query"].strip()
-            + "\n\nPlease answer this question using relevant information from the database.",
+            user=f"<task>Please search the database for the most up-to-date information to answer the user query.</task>\n\n<user_query>{state['query'].strip()}</user_query>",
             assistant="I've searched the database, but no relevant documents were found for your query. Would you like me to answer based on my general knowledge instead?",
             feedback="Yes, please answer using your general knowledge. Start your response with '[Answering from general knowledge due to lack of database results]' to help us track these instances.",
         )

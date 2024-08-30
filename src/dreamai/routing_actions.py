@@ -4,7 +4,7 @@ from typing import Any, Literal, Self
 
 from burr.core import State, action
 from loguru import logger
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, Field
 
 from dreamai.ai import ModelName
 from dreamai.dialog import BadExample, Dialog, MessageType, assistant_message, user_message
@@ -30,7 +30,7 @@ TERMINATORS = rag_app_settings.terminators
 
 class StepWithConfidence(BaseModel):
     step: str
-    confidence: float
+    confidence: float = Field(ge=0.0, le=1.0)
     comment: str = ""
 
     @model_validator(mode="after")
@@ -175,7 +175,7 @@ def web_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]:
 def router(
     state: State, table_descriptions: list[TableDescription] = []
 ) -> tuple[dict[str, StepWithConfidence | list[str]], State]:
-    only_data = state.get("only_data", False)
+    # only_data = state.get("only_data", False)
     has_web = state.get("has_web", False)
     menu = []
     route = RAGRoute.ASSISTANT
@@ -202,18 +202,22 @@ def router(
                 )
                 route = response.response  # type: ignore
                 confidence = response.confidence  # type: ignore
-                if confidence <= NON_ASSISTANT_CONFIDENCE_THRESHOLD:
-                    menu = _tables_menu(
-                        table=route,
-                        table_names=table_names,
-                        confidence=confidence,
-                        only_data=only_data,
-                        has_web=has_web,
-                    )
-                    route = RAGRoute.MENU
-                    confidence = DEFAULT_CONFIDENCE
+                # if confidence <= NON_ASSISTANT_CONFIDENCE_THRESHOLD:
+                #     menu = _tables_menu(
+                #         table=route,
+                #         table_names=table_names,
+                #         confidence=confidence,
+                #         only_data=only_data,
+                #         has_web=has_web,
+                #     )
+                #     route = RAGRoute.MENU
+                #     confidence = DEFAULT_CONFIDENCE
             except Exception:
                 logger.exception("Error in router")
+    if confidence <= NON_ASSISTANT_CONFIDENCE_THRESHOLD:
+        logger.info(f"Route: {route} with confidence: {confidence*100:.0f}%")
+        route = RAGRoute.ASSISTANT
+        confidence = DEFAULT_CONFIDENCE
     if route == RAGRoute.ASSISTANT and has_web:
         route = RAGRoute.WEB_OR_NOT
         confidence = DEFAULT_CONFIDENCE

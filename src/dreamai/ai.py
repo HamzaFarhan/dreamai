@@ -20,7 +20,8 @@ class ModelName(StrEnum):
     SONNET = "claude-3-5-sonnet-20240620"
     OPUS = "claude-3-opus-20240229"
     GEMINI_PRO = "gemini-1.5-pro-exp-0827"
-    GEMINI_FLASH = "gemini-1.5-flash-exp-0827"
+    GEMINI_FLASH = "gemini-1.5-flash-latest"
+    GEMINI_FLASH_EXP = "gemini-1.5-flash-exp-0827"
 
 
 class Tool(BaseModel):

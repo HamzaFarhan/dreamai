@@ -102,7 +102,7 @@ def application(
                 expr(f"steps[-1].step == '{RAGRoute.ASSISTANT}'"),
             ),
             ("followup_or_not", "router"),
-            ("router", "ask_assistant", expr(f"steps[-1].step == '{RAGRoute.MENU}'")),
+            # ("router", "ask_assistant", expr(f"steps[-1].step == '{RAGRoute.MENU}'")),
             ("router", "web_or_not", expr(f"steps[-1].step == '{RAGRoute.WEB_OR_NOT}'")),
             ("router", "create_step_back_questions"),
             ("web_or_not", "search_web"),
