@@ -67,16 +67,37 @@ def _get_route(query: str) -> tuple[str, str]:
     route = RAGRoute.FOLLOWUP_OR_NOT
     if query.lower() in TERMINATORS:
         route = RAGRoute.TERMINATE
-    if "@ai" in query.lower():
+    elif "@ai" in query.lower():
         route = RAGRoute.ASSISTANT
-    if "@data" in query.lower():
+    elif "@data" in query.lower():
         route = RAGRoute.ROUTER
-    if "@web" in query.lower():
+    elif "@web" in query.lower():
         route = RAGRoute.WEB
     return route, query.replace("@ai", "").replace("@data", "").replace("@web", "").strip()
 
 
-@action(reads=["only_ai", "only_data", "only_web"], writes=["query", "steps"])
+def _tables_menu(
+    table: str,
+    table_names: list[str],
+    confidence: float,
+    only_data: bool = False,
+    has_web: bool = False,
+) -> list[str]:
+    menu = [f"{i}. {table_name}" for i, table_name in enumerate(table_names, start=1)]
+    menu.append(f"{len(menu) + 1}. Use the selected table: {table}")
+    if not only_data:
+        if has_web:
+            menu.append(f"{len(menu) + 1}. Search the web")
+        menu.append(f"{len(menu) + 1}. Ignore tables and answering from general knowledge")
+    menu.append(f"\nJust the number (1-{len(menu)}) > ")
+    menu.insert(
+        0,
+        f"\n\nI've selected a table but I'm only {confidence*100:.0f}% confident. What should I do?\n",
+    )
+    return menu
+
+
+@action(reads=["only_ai", "only_data", "only_web", "steps"], writes=["query", "steps"])
 def get_query(state: State, query: str) -> tuple[dict[str, str | StepWithConfidence], State]:
     if state["only_ai"]:
         route = RAGRoute.ASSISTANT
@@ -139,7 +160,6 @@ def web_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]:
             dialog=dialog,
             response_model=float,  # type: ignore
         )
-
     except Exception:
         logger.exception("Error in web_or_not")
         route = RAGRoute.ASSISTANT
@@ -149,11 +169,15 @@ def web_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]:
 
 
 @action(
-    reads=["db", "model", "query", "chat_history", "only_data", "has_web"], writes=["steps"]
+    reads=["db", "model", "query", "chat_history", "only_data", "has_web"],
+    writes=["steps", "menu"],
 )
 def router(
     state: State, table_descriptions: list[TableDescription] = []
-) -> tuple[dict[str, StepWithConfidence], State]:
+) -> tuple[dict[str, StepWithConfidence | list[str]], State]:
+    only_data = state.get("only_data", False)
+    has_web = state.get("has_web", False)
+    menu = []
     route = RAGRoute.ASSISTANT
     confidence = DEFAULT_CONFIDENCE
     if db := state.get("db", None):
@@ -178,16 +202,23 @@ def router(
                 )
                 route = response.response  # type: ignore
                 confidence = response.confidence  # type: ignore
+                if confidence <= NON_ASSISTANT_CONFIDENCE_THRESHOLD:
+                    menu = _tables_menu(
+                        table=route,
+                        table_names=table_names,
+                        confidence=confidence,
+                        only_data=only_data,
+                        has_web=has_web,
+                    )
+                    route = RAGRoute.MENU
+                    confidence = DEFAULT_CONFIDENCE
             except Exception:
                 logger.exception("Error in router")
-    if confidence <= NON_ASSISTANT_CONFIDENCE_THRESHOLD and not state["only_data"]:
-        route = RAGRoute.ASSISTANT
-        confidence = DEFAULT_CONFIDENCE
-    if route == RAGRoute.ASSISTANT and state["has_web"]:
+    if route == RAGRoute.ASSISTANT and has_web:
         route = RAGRoute.WEB_OR_NOT
         confidence = DEFAULT_CONFIDENCE
     step = StepWithConfidence(step=route, confidence=confidence)
-    return {"step": step}, state.append(steps=step)
+    return {"step": step, "menu": menu}, state.append(steps=step).update(menu=menu)
 
 
 @action(

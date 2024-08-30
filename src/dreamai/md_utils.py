@@ -78,16 +78,14 @@ def is_url(text: str) -> bool:
 
 def extract_text_from_image(image_path: str, min_len: int = 2) -> str:
     pmap = Pixmap(image_path)
-    ocr = pmap.pdfocr_tobytes()
-    doc = pymupdf.open("pdf", ocr)
+    doc = pymupdf.open("pdf", pmap.pdfocr_tobytes())
     res = "".join([page.get_text() for page in doc.pages()])
     return res if len(res) > min_len else ""
 
 
 def replace_image_tags(md: str, image_folder: str) -> str:
     def replace_tag(match):
-        image_path = match.group(1)
-        full_image_path = os.path.join(image_folder, image_path)
+        full_image_path = os.path.join(image_folder, match.group(1))
         return extract_text_from_image(full_image_path)
 
     return re.sub(r"!\[\]\((.*?)\)", replace_tag, md)
@@ -113,8 +111,7 @@ def remove_sponsor_related_words(text: str) -> str:
 
 
 def clean_web_content(content: str, min_length: int = 3) -> str:
-    cleaned_content = remove_links_from_md(md=content)
-    cleaned_content = remove_sponsor_related_words(text=cleaned_content)
+    cleaned_content = remove_sponsor_related_words(text=remove_links_from_md(md=content))
     return "\n".join(
         [line for line in cleaned_content.split("\n") if len(line.strip()) > min_length]
     )
@@ -132,8 +129,7 @@ def get_url_body(url: str) -> str:
 
 def url_body_to_md(body: str, extractor: str = "h2t") -> str:
     if extractor == "traf":
-        if "<article>" not in body.lower():
-            body = f"<article>{body}</article>"
+        body = f"<article>{body}</article>" if "<article>" not in body.lower() else body
         res = extract(
             f"<html><body>{body}</body></html>",
             output_format="markdown",
@@ -223,20 +219,16 @@ def search_query_to_md(
             extractor=extractor,
             clean_content=clean_content,
             **to_md_kwargs,
-        )
-        mds.extend(
-            md
-            if md
-            else [
-                MarkdownData.model_validate(
-                    {
-                        "name": search_result["href"],
-                        "markdown": "\n".join([search_result["title"], search_result["body"]]),
-                    },
-                    context=to_md_kwargs,
-                )
-            ]
-        )
+        ) or [
+            MarkdownData.model_validate(
+                {
+                    "name": search_result["href"],
+                    "markdown": "\n".join([search_result["title"], search_result["body"]]),
+                },
+                context=to_md_kwargs,
+            )
+        ]
+        mds.extend(md)
     return mds
 
 

@@ -5,7 +5,7 @@ from burr.core import State, action
 from lancedb.rerankers import Reranker
 from loguru import logger
 
-from dreamai.dialog import Dialog
+from dreamai.dialog import BadExample, Dialog
 from dreamai.dialog_models import StepBackQuestions
 from dreamai.lance_utils import search_lancedb as _search_lancedb
 from dreamai.md_utils import search_query_to_md
@@ -19,8 +19,8 @@ MAX_SEARCH_RESULTS = rag_settings.max_search_results
 DIALOGS_FOLDER = dialog_settings.dialogs_folder
 
 
-@action(reads=["query"], writes=["search_results"])
-def search_web(state: State) -> tuple[dict[str, list[dict]], State]:
+@action(reads=["query"], writes=["search_results", "bad_interaction"])
+def search_web(state: State) -> tuple[dict[str, list[dict] | BadExample | None], State]:
     try:
         results = search_query_to_md(
             query=state["query"], max_results=MAX_SEARCH_RESULTS, chunk_size=0
@@ -29,7 +29,17 @@ def search_web(state: State) -> tuple[dict[str, list[dict]], State]:
     except Exception:
         logger.exception("Error in search_web")
         results = []
-    return {"search_results": results}, state.update(search_results=results)
+    bad_interaction = None
+    if len(results) == 0:
+        bad_interaction = BadExample(
+            user=state["query"].strip()
+            + "\n\nPlease search the web for the most up-to-date information to answer this question.",
+            assistant="I've attempted to search the web for information related to your query, but no relevant results were found. Would you like me to provide an answer based on my existing knowledge, with the caveat that it may not reflect the most current information?",
+            feedback="Yes, please answer using your existing knowledge. Begin your response with '[Answering from internal knowledge due to lack of web results]' to help us track these instances. Also, suggest some alternative search terms or approaches that might yield better web results for this query.",
+        )
+    return {"search_results": results, "bad_interaction": bad_interaction}, state.update(
+        search_results=results
+    ).update(bad_interaction=bad_interaction)
 
 
 @action(reads=["model", "query", "chat_history"], writes=["step_back_questions"])
@@ -55,9 +65,11 @@ def create_step_back_questions(state: State) -> tuple[dict[str, list[str]], Stat
 
 @action(
     reads=["db", "query", "steps", "step_back_questions"],
-    writes=["search_results"],
+    writes=["search_results", "bad_interaction"],
 )
-def search_lancedb(state: State, reranker: Reranker) -> tuple[dict[str, list[dict]], State]:
+def search_lancedb(
+    state: State, reranker: Reranker
+) -> tuple[dict[str, list[dict] | BadExample | None], State]:
     try:
         results = _search_lancedb(
             db=state["db"],
@@ -69,4 +81,14 @@ def search_lancedb(state: State, reranker: Reranker) -> tuple[dict[str, list[dic
     except Exception:
         logger.exception("Error in search_lancedb")
         results = []
-    return {"search_results": results}, state.update(search_results=results)
+    bad_interaction = None
+    if len(results) == 0:
+        bad_interaction = BadExample(
+            user=state["query"].strip()
+            + "\n\nPlease answer this question using relevant information from the database.",
+            assistant="I've searched the database, but no relevant documents were found for your query. Would you like me to answer based on my general knowledge instead?",
+            feedback="Yes, please answer using your general knowledge. Start your response with '[Answering from general knowledge due to lack of database results]' to help us track these instances.",
+        )
+    return {"search_results": results, "bad_interaction": bad_interaction}, state.update(
+        search_results=results
+    ).update(bad_interaction=bad_interaction)

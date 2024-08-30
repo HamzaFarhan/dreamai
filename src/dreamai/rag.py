@@ -38,8 +38,8 @@ ACTION_ATTEMPTS_LIMIT = rag_app_settings.action_attempts_limit
 
 def action_loop(
     action: str,
-    checker: str,
-    condition: str,
+    checker: str = "evaluate_answer",
+    condition: str = "answer_evaluation.evaluation",
     updater_action: str = "update_chat_history",
     assistant_action: str = "ask_assistant",
     action_attempts_limit: int = ACTION_ATTEMPTS_LIMIT,
@@ -102,6 +102,7 @@ def application(
                 expr(f"steps[-1].step == '{RAGRoute.ASSISTANT}'"),
             ),
             ("followup_or_not", "router"),
+            ("router", "ask_assistant", expr(f"steps[-1].step == '{RAGRoute.MENU}'")),
             ("router", "web_or_not", expr(f"steps[-1].step == '{RAGRoute.WEB_OR_NOT}'")),
             ("router", "create_step_back_questions"),
             ("web_or_not", "search_web"),
@@ -118,7 +119,6 @@ def application(
                 condition="answer_evaluation.evaluation",
                 updater_action="update_chat_history",
                 assistant_action="ask_assistant",
-                action_attempts_limit=ACTION_ATTEMPTS_LIMIT,
             ),
             ("ask_assistant", "update_chat_history"),
             ("update_chat_history", "get_query"),

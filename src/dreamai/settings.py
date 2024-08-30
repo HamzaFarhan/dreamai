@@ -55,6 +55,7 @@ class RAGSettings(Settings):
 
 class RAGRoute(StrEnum):
     ROUTER = "router"
+    MENU = "menu"
     ASSISTANT = "assistant"
     FOLLOWUP_OR_NOT = "followup_or_not"
     WEB_OR_NOT = "web_or_not"

@@ -30,8 +30,7 @@ def _query_to_response(
     validation_context: dict[str, Any] | None = None,
 ) -> T:
     dialog = dialog or Dialog(task=str(Path(DIALOGS_FOLDER) / "assistant_task.txt"))
-    if chat_history:
-        dialog.chat_history = chat_history
+    dialog.chat_history = chat_history or dialog.chat_history
     creator, creator_kwargs = dialog.creator_with_kwargs(
         model=model, user=query, template_data=template_data
     )
@@ -72,7 +71,8 @@ def ask_assistant(state: State) -> tuple[dict, State]:
 def create_search_response(state: State) -> tuple[dict, State]:
     dialog = Dialog.load(path=str(Path(DIALOGS_FOLDER) / "sourced_rag_dialog.json"))
     if bad_interaction := state.get("bad_interaction", None):
-        dialog.add_examples(deepcopy(bad_interaction))
+        # dialog.add_examples(deepcopy(bad_interaction))
+        dialog.add_messages(bad_interaction.messages)
         bad_interaction = None
     documents = [
         {k: v for k, v in document.items() if k != "index"}
@@ -110,7 +110,7 @@ def create_search_response(state: State) -> tuple[dict, State]:
     ).update(bad_interaction=bad_interaction)
 
 
-@action(reads=["query", "assistant_response"], writes=["chat_history"])
+@action(reads=["query", "assistant_response", "chat_history"], writes=["chat_history"])
 def update_chat_history(state: State) -> tuple[dict, State]:
     chat_history = deepcopy(state["chat_history"])
     user = user_message(content=state["query"])
