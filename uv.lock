@@ -515,6 +515,7 @@ dependencies = [
     { name = "tantivy" },
     { name = "termcolor" },
     { name = "trafilatura" },
+    { name = "typer" },
 ]
 
 [package.metadata]
@@ -551,6 +552,7 @@ requires-dist = [
     { name = "tantivy", specifier = ">=0.22.0" },
     { name = "termcolor", specifier = ">=2.4.0" },
     { name = "trafilatura", specifier = ">=1.12.1" },
+    { name = "typer", specifier = ">=0.12.5" },
 ]
 
 [[package]]

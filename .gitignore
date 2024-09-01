@@ -7,3 +7,5 @@ __pycache__
 resume.pdf
 dist
 .sesskey
+*.log
+*_data.json
