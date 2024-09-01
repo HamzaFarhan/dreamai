@@ -19,9 +19,9 @@ class DAICrawler:
         url_prefix: str = "",
         max_depth: int = 3,
         max_links: int = 100,
-        rate_limit: int = 1,
         file_path: str = "crawled_data.json",
         overwrite: bool = True,
+        rate_limit: float = 0.5,
     ):
         if overwrite:
             Path(file_path).unlink(missing_ok=True)
@@ -91,12 +91,10 @@ class DAICrawler:
         try:
             await page.goto(url, wait_until="networkidle")
             self.visited.add(url)
-
             md_data = [md.model_dump() for md in urls_to_md(url)]
             try:
                 current_data = json.loads(Path(self.file_path).read_text())
             except Exception:
-                logger.exception("Could not load current data")
                 current_data = []
             current_data.extend(md_data)
             with open(self.file_path, "w") as f:
@@ -111,7 +109,7 @@ class DAICrawler:
                         if urlparse(full_url).netloc == urlparse(self.start_url).netloc:
                             await self.crawl(page, full_url, depth + 1)
                 except Exception as e:
-                    logger.warning(f"Error processing link on {url}: {str(e)}")
+                    logger.warning(f"Error processing link on {url}: {e}")
                     continue
 
         except Exception as e:
