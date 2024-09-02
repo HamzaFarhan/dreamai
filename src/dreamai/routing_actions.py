@@ -152,7 +152,7 @@ def web_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]:
         dialog.add_messages(
             [
                 assistant_message(content=route),
-                user_message(content=str(Path(DIALOGS_FOLDER) / "confidence_message.txt")),
+                user_message(content=str(Path(DIALOGS_FOLDER) / "confidence_task.txt")),
             ]
         )
         confidence: float = _query_to_response(
