@@ -10,7 +10,6 @@ import httpx
 import lxml
 import mammoth
 import pymupdf
-import pymupdf.pro
 import pymupdf4llm
 from duckduckgo_search import DDGS
 from html2text import HTML2Text
@@ -23,7 +22,7 @@ from trafilatura import extract
 from dreamai.settings import RAGSettings
 from dreamai.utils import _process_content, chunk_text, deindent, resolve_data_path
 
-pymupdf.pro.unlock()  # type: ignore
+# pymupdf.pro.unlock()  # type: ignore
 
 rag_settings = RAGSettings()
 
@@ -268,7 +267,8 @@ def docs_to_md(
             md = json.dumps(doc.read_text())
         elif doc.suffix == ".docx":
             md = docx_to_md(docx_path=doc)
-        elif doc.suffix in [".pdf", ".doc", ".ppt", ".pptx", ".xls", ".xlsx"]:
+        elif doc.suffix == ".pdf":
+            # elif doc.suffix in [".pdf", ".doc", ".ppt", ".pptx", ".xls", ".xlsx"]:
             with tempfile.TemporaryDirectory() as image_folder:
                 md = replace_image_tags(
                     md=pymupdf4llm.to_markdown(

@@ -1,5 +1,9 @@
 version = 1
 requires-python = "==3.12.*"
+resolution-markers = [
+    "python_full_version < '3.13'",
+    "python_full_version >= '3.13'",
+]
 
 [[package]]
 name = "aiofiles"
@@ -514,7 +518,6 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pymupdf4llm" },
-    { name = "pymupdfpro" },
     { name = "python-docx" },
     { name = "python-dotenv" },
     { name = "python-fasthtml" },
@@ -555,7 +558,6 @@ requires-dist = [
     { name = "pydantic" },
     { name = "pydantic-settings", specifier = ">=2.4.0" },
     { name = "pymupdf4llm", specifier = ">=0.0.12" },
-    { name = "pymupdfpro", specifier = ">=1.24.9.1" },
     { name = "python-docx", specifier = ">=1.1.2" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "python-fasthtml", specifier = ">=0.4.5" },
@@ -2320,19 +2322,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pymupdfpro"
-version = "1.24.9.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pymupdf" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f8/e7/4934a8a6e1203c73614f4bda2be0ded6a73cc8318e80f2cbb2449564fd47/PyMuPDFPro-1.24.9.1-cp312-none-macosx_10_9_x86_64.whl", hash = "sha256:92cc49ec05e904aa5d92d0f27c43939e85a3a5464e43c0ece2b283cad597849d", size = 6237114 },
-    { url = "https://files.pythonhosted.org/packages/4a/17/d1536d6345b1f60391b1f219454473b7162726c279be754d7108e227c420/PyMuPDFPro-1.24.9.1-cp312-none-manylinux2014_x86_64.whl", hash = "sha256:7a664acb6849ddab1c5168be375e7602d282366cba097cd5fadd15c98999603c", size = 9225239 },
-    { url = "https://files.pythonhosted.org/packages/89/f2/88c2bf3fc69005e240270db25f05c523024ba23d6192a0e462d998f5462f/PyMuPDFPro-1.24.9.1-cp312-none-win_amd64.whl", hash = "sha256:38eb09a427ae71a0643923d3194710785ff536012ea064db2d82c256ba6b38bc", size = 6580044 },
-]
-
-[[package]]
 name = "pyparsing"
 version = "3.1.4"
 source = { registry = "https://pypi.org/simple" }
@@ -3037,7 +3026,7 @@ dependencies = [
     { name = "nvidia-nvtx-cu12", marker = "platform_machine == 'x86_64' and platform_system == 'Linux'" },
     { name = "setuptools" },
     { name = "sympy" },
-    { name = "triton", marker = "platform_machine == 'x86_64' and platform_system == 'Linux'" },
+    { name = "triton", marker = "python_full_version < '3.13' and platform_machine == 'x86_64' and platform_system == 'Linux'" },
     { name = "typing-extensions" },
 ]
 wheels = [
@@ -3130,7 +3119,7 @@ name = "triton"
 version = "3.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "filelock" },
+    { name = "filelock", marker = "python_full_version < '3.13'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fe/7b/7757205dee3628f75e7991021d15cd1bd0c9b044ca9affe99b50879fc0e1/triton-3.0.0-1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:34e509deb77f1c067d8640725ef00c5cbfcb2052a1a3cb6a6d343841f92624eb", size = 209464695 },
