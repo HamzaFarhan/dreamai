@@ -8,11 +8,13 @@ from typing import Self
 
 import httpx
 import lxml
+import mammoth
 import pymupdf
 import pymupdf.pro
 import pymupdf4llm
 from duckduckgo_search import DDGS
 from html2text import HTML2Text
+from loguru import logger
 from lxml.html.clean import Cleaner
 from pydantic import BaseModel, Field, ValidationInfo, model_validator
 from pymupdf import Pixmap
@@ -170,6 +172,23 @@ def dict_to_md(
     return prompt.strip()
 
 
+def docx_to_md(docx_path: str | Path) -> str:
+    docx_path = str(docx_path)
+    html = ""
+    try:
+        with open(docx_path, "rb") as docx_file:
+            html = mammoth.convert_to_html(docx_file).value
+    except Exception:
+        logger.exception(f"Could not convert {docx_path} to html.")
+    md = html
+    if html:
+        try:
+            md = url_body_to_md(body=html)
+        except Exception:
+            logger.exception(f"Could not convert {docx_path} to markdown.")
+    return md
+
+
 def urls_to_md(
     urls: list[str] | str,
     extractor: str = "h2t",
@@ -247,7 +266,9 @@ def docs_to_md(
             md = doc.read_text()
         elif doc.suffix == ".json":
             md = json.dumps(doc.read_text())
-        elif doc.suffix in [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx"]:
+        elif doc.suffix == ".docx":
+            md = docx_to_md(docx_path=doc)
+        elif doc.suffix in [".pdf", ".doc", ".ppt", ".pptx", ".xls", ".xlsx"]:
             with tempfile.TemporaryDirectory() as image_folder:
                 md = replace_image_tags(
                     md=pymupdf4llm.to_markdown(

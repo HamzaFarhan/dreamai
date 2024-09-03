@@ -50,7 +50,7 @@ def create_step_back_questions(state: State) -> tuple[dict[str, list[str]], Stat
                 model=state["model"],
                 dialog=Dialog.load(path=str(Path(DIALOGS_FOLDER) / "step_back_dialog.json")),
                 response_model=StepBackQuestions,
-                template_data={"question": state["query"]},
+                template_data={"question": state["query"].replace(":", "")},
                 chat_history=state.get("chat_history", None),
             ),
         ).questions

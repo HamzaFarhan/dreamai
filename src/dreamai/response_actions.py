@@ -88,7 +88,11 @@ def create_search_response(state: State) -> tuple[dict, State]:
             chat_history=state.get("chat_history", None),
             validation_context={
                 "documents": [
-                    {"name": document["name"], "index": document.get("index", 0)}
+                    {
+                        "name": document["name"],
+                        "index": document.get("index", 0),
+                        "text": document.get("text", "") or document.get("markdown", ""),
+                    }
                     for document in state["search_results"]
                 ]
             },

@@ -4,7 +4,7 @@ from typing import Any, Literal, Self
 
 from burr.core import State, action
 from loguru import logger
-from pydantic import BaseModel, model_validator, Field
+from pydantic import BaseModel, Field, model_validator
 
 from dreamai.ai import ModelName
 from dreamai.dialog import BadExample, Dialog, MessageType, assistant_message, user_message
@@ -175,7 +175,7 @@ def web_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]:
 def router(
     state: State, table_descriptions: list[TableDescription] = []
 ) -> tuple[dict[str, StepWithConfidence | list[str]], State]:
-    # only_data = state.get("only_data", False)
+    only_data = state.get("only_data", False)
     has_web = state.get("has_web", False)
     menu = []
     route = RAGRoute.ASSISTANT
@@ -214,7 +214,7 @@ def router(
                 #     confidence = DEFAULT_CONFIDENCE
             except Exception:
                 logger.exception("Error in router")
-    if confidence <= NON_ASSISTANT_CONFIDENCE_THRESHOLD:
+    if confidence <= NON_ASSISTANT_CONFIDENCE_THRESHOLD and not only_data:
         logger.info(f"Route: {route} with confidence: {confidence*100:.0f}%")
         route = RAGRoute.ASSISTANT
         confidence = DEFAULT_CONFIDENCE

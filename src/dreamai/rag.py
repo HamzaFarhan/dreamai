@@ -70,6 +70,9 @@ def application(
     username: str | None = None,
     project: str = "DreamAIRAG",
 ) -> Application:
+    assert (
+        sum([only_ai, only_data, only_web]) <= 1
+    ), "Only 1 of the following should be true: only_ai, only_data, only_web"
     tracker = LocalTrackingClient(project=project)
     builder = (
         ApplicationBuilder()
