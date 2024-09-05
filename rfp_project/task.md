@@ -1,0 +1,9 @@
+I am making an app for automated RFP question answering. The Request for Proposal (RFP) is a critical phase in the sourcing process. This tool should outline what you as the client need and want from a prospective vendor. RFPs also help vendors understand how to demonstrate that they are excellent candidates for the project.
+
+Here is the user experience I want to build:
+1. Upload the company docs. Can be one or many files. It MUST work if there is a single file or multiple uploaded all at once. very important. docs can be pdf, docx, txt, or md.
+2. Upload the RFP. This will be a single csv file with one column with one question per row. There may also be a scenario where we already have some docs stored so we may only do step 2 and not step 1. So in terms of UI/UX there shouldn't be a difference.
+3. Wait for our AI to use the company docs to answer each question. 4. A download button appears for us to download the resulting docx file. This file will be formatted to have question+answer+souces triplets.
+   
+I am an experienced python dev but I have no experience with JS/CSS/HMTL or any UI framework or even FastHTML. I have some experience with FastAPI and Pydantic so I understand some API terminology. Since I have no UI/UX experience, I would like to do this step by step while learning as much as I can.
+For each component, keep in mind that I know nothing about HTML or CSS or JS or HTMX or any commonly understood terms within them. So I would like a detailed explanation of everything you do and why you did it. For a complete newbie. But don't sacrifice the functionality. I am a quick learner. We will get there together.

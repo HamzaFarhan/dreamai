@@ -69,6 +69,7 @@ class TableDescription(BaseModel):
     @classmethod
     def validate_name(cls, v: str, info: ValidationInfo) -> str:
         v = to_camel(to_camel(v.strip(), sep="_"), sep=" ")
+        v = "".join(c for c in v if c.isalnum() or c in ["_", "-", "."])
         context = info.context
         if context is None:
             return v

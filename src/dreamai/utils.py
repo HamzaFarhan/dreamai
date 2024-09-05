@@ -51,7 +51,7 @@ def chunk_text(
     keep_separator: bool = True,
     separators: list[str] | None = None,
 ) -> list[str]:
-    if chunk_size == 0:
+    if chunk_size == 0 or len(text) <= chunk_size:
         return [text]
     chunk_overlap = min(chunk_overlap, chunk_size // 2)
     # assert chunk_size > chunk_overlap, "chunk_size must be greater than chunk_overlap"

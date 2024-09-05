@@ -13,13 +13,10 @@ from fasthtml.common import (
     Container,
     Div,
     Form,
-    Html,
     Input,
     Li,
-    Ol,
     P,
     Script,
-    Style,
     Ul,
     fast_app,
     serve,
@@ -39,39 +36,12 @@ MODEL = ModelName.GEMINI_FLASH
 if os.path.exists(LANCE_URI):
     shutil.rmtree(LANCE_URI)
 
-style = """
-.spinner-container {
-    margin-top: 7px;  /* This adds space above the spinner */
-    margin-bottom: 10px;  /* This adds space below the spinner */
-    display: none;  /* Hidden by default */
-}
-.spinner {
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #3498db;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    animation: spin 1s linear infinite;
-    display: inline-block;
-    margin-right: 10px;
-    vertical-align: middle;  /* This aligns the spinner with the text */
-}
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-"""
-
 added_files = []
 table_descriptions = []
 rfp_questions = []
 qna = {}
 lance_db = lancedb.connect(uri=LANCE_URI)
-app = fast_app(live=True, hdrs=(Style(style), Html(data_theme="light")))[0]
-
-
-def Spinner(message):
-    return Div(Div(cls="spinner"), message, cls="spinner-container", id="spinner")
+app = fast_app(live=True)[0]
 
 
 @app.get("/")
@@ -94,7 +64,6 @@ async def home():
                     id="upload-button",
                     style="display: none;",
                 ),
-                Spinner("Uploading documents..."),
                 hx_post="/upload",
                 hx_target="#file-list",
                 hx_swap="beforeend",
@@ -126,30 +95,18 @@ async def home():
                 hx_target="#processing-status",
                 style="display: none;",
             ),
-            Spinner("Processing RFP Questions..."),
             Div(id="processing-status"),
             id="processing-section",
         ),
         Script("""
-        document.body.addEventListener('htmx:beforeRequest', function(evt) {
-            if (evt.detail.pathInfo.requestPath === '/upload') {
-                document.querySelector('#document-upload-section .spinner-container').style.display = 'block';
-            } else if (evt.detail.pathInfo.requestPath === '/process') {
-                document.querySelector('#processing-section .spinner-container').style.display = 'block';
-            }
-        });
-
         document.body.addEventListener('htmx:afterRequest', function(evt) {
             if (evt.detail.successful) {
                 if (evt.detail.pathInfo.requestPath === '/upload') {
                     document.getElementById('document-input').value = '';
                     document.getElementById('upload-button').style.display = 'none';
-                    document.querySelector('#document-upload-section .spinner-container').style.display = 'none';
                 } else if (evt.detail.pathInfo.requestPath === '/upload-rfp') {
                     document.getElementById('rfp-input').value = '';
                     document.getElementById('rfp-upload-button').style.display = 'none';
-                } else if (evt.detail.pathInfo.requestPath === '/process') {
-                    document.querySelector('#processing-section .spinner-container').style.display = 'none';
                 }
                 updateProcessButton();
             }
@@ -231,7 +188,7 @@ async def upload_rfp(request):
     return Div(
         P(f"RFP file '{rfp_file.filename}' uploaded successfully."),
         P(f"Number of questions: {question_count}"),
-        Ol(
+        Ul(
             *[
                 Li(question[:100] + "..." if len(question) > 100 else question)
                 for question in rfp_questions[:5]
