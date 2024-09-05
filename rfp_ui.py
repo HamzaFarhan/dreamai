@@ -77,7 +77,7 @@ def Spinner(message):
 @app.get("/")
 async def home():
     return Container(
-        H1("RFP Question Answering Tool"),
+        H1("RFP Questionnaire Tool"),
         Div(
             P("Upload your company documents (PDF, DOCX, TXT, or MD files)"),
             Form(

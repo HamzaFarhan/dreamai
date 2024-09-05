@@ -26,6 +26,7 @@ NON_ASSISTANT_CONFIDENCE_THRESHOLD = rag_app_settings.non_assistant_confidence_t
 STEP_CONFIDENCE_THRESHOLD = rag_app_settings.step_confidence_threshold
 DIALOGS_FOLDER = dialog_settings.dialogs_folder
 TERMINATORS = rag_app_settings.terminators
+ACTION_ATTEMPTS_LIMIT = rag_app_settings.action_attempts_limit
 
 
 class StepWithConfidence(BaseModel):
@@ -262,7 +263,8 @@ def evaluate_answer(
         bad_interaction = BadExample(
             user=f"<source_docs>{state.get('source_docs', [])}</source_docs>\n\n<user>{state['query']}</user>",
             assistant=state["assistant_response"],
-            feedback=evaluation.reasoning + f"\nThis was attempt number: {action_attempts}.",
+            feedback=evaluation.reasoning
+            + f"\nThis was attempt: {action_attempts}/{ACTION_ATTEMPTS_LIMIT}.",
         )
     else:
         action_attempts = 0

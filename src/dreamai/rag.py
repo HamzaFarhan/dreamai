@@ -50,7 +50,7 @@ def action_loop(
         (
             checker,
             action,
-            ~expr(condition) & expr(f"action_attempts <= {action_attempts_limit}"),
+            ~expr(condition) & expr(f"action_attempts < {action_attempts_limit}"),
         ),
         (checker, assistant_action, ~expr(condition)),
     ]
@@ -69,6 +69,7 @@ def application(
     app_id: str | None = None,
     username: str | None = None,
     project: str = "DreamAIRAG",
+    include_conditions_in_vis: bool = True,
 ) -> Application:
     assert (
         sum([only_ai, only_data, only_web]) <= 1
@@ -122,8 +123,17 @@ def application(
                 condition="answer_evaluation.evaluation",
                 updater_action="update_chat_history",
                 assistant_action="ask_assistant",
+                action_attempts_limit=ACTION_ATTEMPTS_LIMIT,
             ),
-            ("ask_assistant", "update_chat_history"),
+            *action_loop(
+                action="ask_assistant",
+                checker="evaluate_answer",
+                condition="answer_evaluation.evaluation",
+                updater_action="update_chat_history",
+                assistant_action="ask_assistant",
+                action_attempts_limit=ACTION_ATTEMPTS_LIMIT,
+            ),
+            # ("ask_assistant", "update_chat_history"),
             ("update_chat_history", "get_query"),
         )
         .with_tracker("local", project=project)
@@ -146,7 +156,11 @@ def application(
         )
     )
     app = builder.build()
-    app.visualize(output_file_path="statemachine", include_conditions=True, format="png")
+    app.visualize(
+        output_file_path="statemachine",
+        include_conditions=include_conditions_in_vis,
+        format="png",
+    )
     return app
 
 
