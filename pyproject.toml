@@ -42,7 +42,6 @@ dependencies = [
     "tqdm>=4.66.5",
     "mammoth>=1.8.0",
     "modal>=0.64.90",
-    "jsonref>=1.1.0",
 ]
 
 [tool.ruff]

@@ -4,12 +4,11 @@ from rfp_ui import app as fasthtml_app
 
 image = (
     Image.debian_slim()
-    .pip_install("uv")
+    .pip_install("uv", "jsonref")
     .apt_install("git")
     .run_commands(
         "git clone https://github.com/HamzaFarhan/dreamai.git",
         "cd dreamai && uv pip install --system --compile-bytecode -r pyproject.toml",
-        "uv pip install jsonref",
     )
 )
 
