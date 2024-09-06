@@ -98,7 +98,10 @@ def _tables_menu(
     return menu
 
 
-@action(reads=["only_ai", "only_data", "only_web", "steps"], writes=["query", "steps"])
+@action(
+    reads=["only_ai", "only_data", "only_web", "steps"],
+    writes=["query", "steps", "source_docs"],
+)
 def get_query(state: State, query: str) -> tuple[dict[str, str | StepWithConfidence], State]:
     if state["only_ai"]:
         route = RAGRoute.ASSISTANT
@@ -109,7 +112,9 @@ def get_query(state: State, query: str) -> tuple[dict[str, str | StepWithConfide
     else:
         route, query = _get_route(query=query)
     step = StepWithConfidence(step=route, confidence=DEFAULT_CONFIDENCE)
-    return {"query": query, "step": step}, state.update(query=query).append(steps=step)
+    return {"query": query, "step": step}, state.update(query=query).append(steps=step).update(
+        source_docs=[]
+    )
 
 
 @action(reads=["model", "query", "chat_history"], writes=["steps"])
