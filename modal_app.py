@@ -1,4 +1,4 @@
-from modal import App, Image, Mount, asgi_app
+from modal import App, Image, Mount, Secret, asgi_app
 
 from rfp_ui import app as fasthtml_app
 
@@ -22,6 +22,7 @@ app = App("rfp-ui")
             "src/dreamai/dialogs", remote_path="/root/dreamai/src/dreamai/dialogs"
         )
     ],
+    secrets=[Secret.from_dotenv()],
 )
 @asgi_app()
 def get():

@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
 
 class CreatorSettings(Settings):
-    model: ModelName = ModelName.GEMINI_FLASH
+    model: ModelName = ModelName.GPT_MINI
     temperature: float = 0.3
     max_tokens: int = 2048
     attempts: int = 4
