@@ -34,7 +34,7 @@ from dreamai.utils import flatten_list
 
 SOURCE_TEXT_SIZE = 100_000
 LANCE_URI = "lance/RFP/"
-MODEL = ModelName.GEMINI_FLASH
+MODEL = ModelName.GPT_MINI
 
 if os.path.exists(LANCE_URI):
     shutil.rmtree(LANCE_URI)
