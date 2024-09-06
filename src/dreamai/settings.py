@@ -1,6 +1,7 @@
+from enum import StrEnum
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from enum import StrEnum
 
 from dreamai.ai import ModelName
 
@@ -17,7 +18,7 @@ class CreatorSettings(Settings):
 
 
 class DialogSettings(Settings):
-    dialogs_folder: str = "/home/hamza/dev/dreamai/src/dreamai/dialogs"
+    dialogs_folder: str = "../dialogs"
     default_template: str = "{}"
     default_dialog_version: float = 1.0
     chat_history_limit: int = Field(
