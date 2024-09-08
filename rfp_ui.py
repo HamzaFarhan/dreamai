@@ -277,6 +277,7 @@ async def process_questions(app, questions):
 async def process_rfp(request):
     app = application(db=lance_db, model=MODEL, has_web=False, only_data=True)
     await process_questions(app=app, questions=rfp_questions)
+    logger.info(f"\n\nQNA: {qna}\n\n")
     return Div(
         P("Processing complete!"),
         A(

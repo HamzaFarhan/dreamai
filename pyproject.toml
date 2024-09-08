@@ -39,7 +39,6 @@ dependencies = [
     "typer>=0.12.5",
     "openpyxl>=3.1.5",
     "python-docx>=1.1.2",
-    "tqdm>=4.66.5",
     "mammoth>=1.8.0",
     "modal>=0.64.90",
 ]

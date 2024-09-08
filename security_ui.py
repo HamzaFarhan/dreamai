@@ -13,10 +13,13 @@ from fasthtml.common import (
     Container,
     Div,
     Form,
+    Html,
     Input,
     Li,
+    Ol,
     P,
     Script,
+    Style,
     Ul,
     fast_app,
     serve,
@@ -30,24 +33,51 @@ from dreamai.rag_utils import add_data_with_descriptions
 from dreamai.utils import flatten_list
 
 SOURCE_TEXT_SIZE = 100_000
-LANCE_URI = "lance/RFP/"
-MODEL = ModelName.GEMINI_FLASH
+LANCE_URI = "lance/SECURITY/"
+MODEL = ModelName.GPT_MINI
 
 if os.path.exists(LANCE_URI):
     shutil.rmtree(LANCE_URI)
 
+style = """
+.spinner-container {
+    margin-top: 7px;  /* This adds space above the spinner */
+    margin-bottom: 10px;  /* This adds space below the spinner */
+    display: none;  /* Hidden by default */
+}
+.spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+    margin-right: 10px;
+    vertical-align: middle;  /* This aligns the spinner with the text */
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+"""
+
 added_files = []
 table_descriptions = []
-rfp_questions = []
+questions = []
 qna = {}
 lance_db = lancedb.connect(uri=LANCE_URI)
-app = fast_app(live=True)[0]
+app = fast_app(live=True, hdrs=(Style(style), Html(data_theme="light")))[0]
+
+
+def Spinner(message):
+    return Div(Div(cls="spinner"), message, cls="spinner-container", id="spinner")
 
 
 @app.get("/")
 async def home():
     return Container(
-        H1("RFP Question Answering Tool"),
+        H1("Security Questionnaire Tool"),
         Div(
             P("Upload your company documents (PDF, DOCX, TXT, or MD files)"),
             Form(
@@ -64,6 +94,7 @@ async def home():
                     id="upload-button",
                     style="display: none;",
                 ),
+                Spinner("Uploading documents..."),
                 hx_post="/upload",
                 hx_target="#file-list",
                 hx_swap="beforeend",
@@ -73,40 +104,52 @@ async def home():
             id="document-upload-section",
         ),
         Div(
-            P("Upload your RFP CSV file"),
+            P("Upload your Security Questionnaire CSV file"),
             Form(
-                Input(type="file", name="rfp", accept=".csv", id="rfp-input"),
+                Input(type="file", name="questions", accept=".csv", id="questions-input"),
                 Button(
-                    "Upload RFP", type="submit", id="rfp-upload-button", style="display: none;"
+                    "Upload Security Questionnaire", type="submit", id="questions-upload-button", style="display: none;"
                 ),
-                hx_post="/upload-rfp",
-                hx_target="#rfp-info",
+                hx_post="/upload-questions",
+                hx_target="#questions-info",
                 hx_swap="innerHTML",
                 enctype="multipart/form-data",
             ),
-            Div(id="rfp-info"),
-            id="rfp-upload-section",
+            Div(id="questions-info"),
+            id="questions-upload-section",
         ),
         Div(
             Button(
-                "Process RFP",
+                "Process Security Questionnaire",
                 id="process-button",
                 hx_post="/process",
                 hx_target="#processing-status",
                 style="display: none;",
             ),
+            Spinner("Processing Security Questionnaire..."),
             Div(id="processing-status"),
             id="processing-section",
         ),
         Script("""
+        document.body.addEventListener('htmx:beforeRequest', function(evt) {
+            if (evt.detail.pathInfo.requestPath === '/upload') {
+                document.querySelector('#document-upload-section .spinner-container').style.display = 'block';
+            } else if (evt.detail.pathInfo.requestPath === '/process') {
+                document.querySelector('#processing-section .spinner-container').style.display = 'block';
+            }
+        });
+
         document.body.addEventListener('htmx:afterRequest', function(evt) {
             if (evt.detail.successful) {
                 if (evt.detail.pathInfo.requestPath === '/upload') {
                     document.getElementById('document-input').value = '';
                     document.getElementById('upload-button').style.display = 'none';
-                } else if (evt.detail.pathInfo.requestPath === '/upload-rfp') {
-                    document.getElementById('rfp-input').value = '';
-                    document.getElementById('rfp-upload-button').style.display = 'none';
+                    document.querySelector('#document-upload-section .spinner-container').style.display = 'none';
+                } else if (evt.detail.pathInfo.requestPath === '/upload-questions') {
+                    document.getElementById('questions-input').value = '';
+                    document.getElementById('questions-upload-button').style.display = 'none';
+                } else if (evt.detail.pathInfo.requestPath === '/process') {
+                    document.querySelector('#processing-section .spinner-container').style.display = 'none';
                 }
                 updateProcessButton();
             }
@@ -117,15 +160,15 @@ async def home():
             uploadButton.style.display = this.files.length > 0 ? 'inline-block' : 'none';
         });
 
-        document.getElementById('rfp-input').addEventListener('change', function(evt) {
-            var uploadButton = document.getElementById('rfp-upload-button');
+        document.getElementById('questions-input').addEventListener('change', function(evt) {
+            var uploadButton = document.getElementById('questions-upload-button');
             uploadButton.style.display = this.files.length > 0 ? 'inline-block' : 'none';
         });
 
         function updateProcessButton() {
-            var rfpInfoEmpty = document.getElementById('rfp-info').children.length === 0;
+            var questionsInfoEmpty = document.getElementById('questions-info').children.length === 0;
             var processButton = document.getElementById('process-button');
-            processButton.style.display = !rfpInfoEmpty ? 'inline-block' : 'none';
+            processButton.style.display = !questionsInfoEmpty ? 'inline-block' : 'none';
         }
 
         // Call this function initially to set the correct state
@@ -165,40 +208,40 @@ async def upload(request):
     return Ul(*[Li(file) for file in uploaded_files])
 
 
-@app.post("/upload-rfp")
-async def upload_rfp(request):
-    global rfp_questions
+@app.post("/upload-questions")
+async def upload_questions(request):
+    global questions
     form = await request.form()
-    rfp_file = form.get("rfp")
-    if not rfp_file:
-        return Div("No RFP file was uploaded.", _="on load wait 2s then remove me")
+    questions_file = form.get("questions")
+    if not questions_file:
+        return Div("No questions file was uploaded.", _="on load wait 2s then remove me")
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        file_path = os.path.join(temp_dir, rfp_file.filename)
+        file_path = os.path.join(temp_dir, questions_file.filename)
         with open(file_path, "wb") as f:
-            f.write(rfp_file.file.read())
+            f.write(questions_file.file.read())
 
         df = pd.read_csv(file_path)
-        rfp_questions = df.iloc[:, 0].tolist()
-        question_count = len(rfp_questions)
+        questions = df.iloc[:, 0].tolist()
+        question_count = len(questions)
 
-        logger.info(f"Uploaded RFP file: {rfp_file.filename} with {question_count} questions")
+        logger.info(f"Uploaded questions file: {questions_file.filename} with {question_count} questions")
         logger.info(f"Stored {question_count} questions in global variable")
 
     return Div(
-        P(f"RFP file '{rfp_file.filename}' uploaded successfully."),
+        P(f"questions file '{questions_file.filename}' uploaded successfully."),
         P(f"Number of questions: {question_count}"),
-        Ul(
+        Ol(
             *[
                 Li(question[:100] + "..." if len(question) > 100 else question)
-                for question in rfp_questions[:5]
+                for question in questions[:5]
             ]
         ),
         P("..." if question_count > 5 else ""),
     )
 
 
-async def process_questions(app, questions):
+async def _process_questions(app, questions):
     global qna
     qna = {"questions": questions, "answers": [], "sources": []}
     for query in qna["questions"]:
@@ -231,15 +274,15 @@ async def process_questions(app, questions):
 
 
 @app.post("/process")
-async def process_rfp(request):
+async def process_questions(request):
     app = application(db=lance_db, model=MODEL, has_web=False, only_data=True)
-    await process_questions(app=app, questions=rfp_questions)
+    await _process_questions(app=app, questions=questions)
     return Div(
         P("Processing complete!"),
         A(
             "Download Results",
             href="/download",
-            download="rfp_answers.docx",
+            download="answers.docx",
             id="download-button",
             cls="button",
             style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 4px; border: none; cursor: pointer;",
@@ -252,7 +295,7 @@ async def process_rfp(request):
 async def download_results(request):
     logger.info(f"Downloading {len(qna['questions'])} questions")
     doc = Document()
-    doc.add_heading("RFP Answers", 0)
+    doc.add_heading("Security Questionnaire Answers", 0)
     for i, question in enumerate(qna["questions"]):
         doc.add_heading(f"Question {i+1}: {question}", level=1)
         doc.add_paragraph(qna["answers"][i])
@@ -266,7 +309,7 @@ async def download_results(request):
         tmp_path = tmp.name
     return FileResponse(
         tmp_path,
-        filename="rfp_answers.docx",
+        filename="answers.docx",
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
 

@@ -3,7 +3,7 @@ burr_docs
 lance
 *.pyc
 __pycache__
-.env
+.env*
 resume.pdf
 dist
 .sesskey

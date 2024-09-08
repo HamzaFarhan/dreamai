@@ -534,7 +534,6 @@ dependencies = [
     { name = "sentence-transformers" },
     { name = "tantivy" },
     { name = "termcolor" },
-    { name = "tqdm" },
     { name = "trafilatura" },
     { name = "typer" },
 ]
@@ -575,7 +574,6 @@ requires-dist = [
     { name = "sentence-transformers", specifier = ">=3.0.1" },
     { name = "tantivy", specifier = ">=0.22.0" },
     { name = "termcolor", specifier = ">=2.4.0" },
-    { name = "tqdm", specifier = ">=4.66.5" },
     { name = "trafilatura", specifier = ">=1.12.1" },
     { name = "typer", specifier = ">=0.12.5" },
 ]
