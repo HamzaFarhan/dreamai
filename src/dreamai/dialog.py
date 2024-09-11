@@ -419,3 +419,4 @@ class Dialog(BaseModel):
             )
             self.description = description
             self.save(name=name)
+

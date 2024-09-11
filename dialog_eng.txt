@@ -1,0 +1,13 @@
+dialog.py has a new type of prompt engineering technique that I'm calling "dialog engineering".
+The system prompt is defined as the task. This can be in str or a separate txt file. and example task file is the answer_eval_task.txt.
+In typical prompt engineering, the system prompt would have some examples of user inputs and AI outputs. This is to let the AI know what to expect and how to respond so that it responds correctly to similar scenarios in the future.
+But if we think about it, examples are just a type of dialog history. The user inputs are the user messages and the AI outputs are the assistant messages. So good examples are just a simulation of a good user-AI interaction. And bad examples are a simulation of a bad user-AI interaction.
+How would the AI know that an interaction is good or bad if each example is just a user message followed by an assistant message? To do that, we need to define a GoodExample and BadExample.
+A GoodExample is a user message followed by an assistant message. The assistant message is the AI's response to the user message.
+A BadExample is a user message followed by an assistant message and then a user message. The first assistant message is the AI's response to the user message. The second user message is the user's response to the first assistant message. If we compile some GoodExamples and BadExamples together, we get something that looks like a conversation. If the last example was good, the last message in the dialog would be an assistant message. If the last example was bad, the last message in the dialog would be a user message.
+So the initial task followed by this conversation becomes our "prompt". But we like to call this package a "dialog" and we out it all in a json file.
+If we load this json as a Dialog object, the messages attribute of this object will have a list of messages. The task will become a system message (the first message) and the examples will become a list of user and assistant messages.
+The next user input will be added as a new user message and then the AI will respond and the response will be added as an assistant message.
+What if we want the user message to be in a certain format? That's what the template is for. The template is a string that will be formatted with user inputs to create the user message.
+Each example will also be in this same format for consistency.
+I want to explain this concept to my team, use these details and any extra insights you can from the code to create a helpful guide/wiki for them. in md.
