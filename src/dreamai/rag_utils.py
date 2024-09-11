@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from lancedb.db import DBConnection as LancedbDBConnection
+from lancedb.db import DBConnection as LanceDBConnection
 
 from dreamai.ai import ModelName
 from dreamai.dialog import Dialog
@@ -31,7 +31,7 @@ def get_user_query() -> str:
 
 def add_data_with_descriptions(
     model: ModelName,
-    lance_db: LancedbDBConnection,
+    lance_db: LanceDBConnection,
     data: list[str | Path] | str | Path | None = None,
     search_queries: list[str] | str | None = None,
     max_results: int = MAX_SEARCH_RESULTS,

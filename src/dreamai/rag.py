@@ -2,7 +2,7 @@ from pathlib import Path
 
 from burr.core import Application, ApplicationBuilder, expr
 from burr.tracking import LocalTrackingClient
-from lancedb.db import DBConnection as LancedbDBConnection
+from lancedb.db import DBConnection as LanceDBConnection
 from lancedb.rerankers import Reranker
 from loguru import logger
 
@@ -57,7 +57,7 @@ def action_loop(
 
 
 def application(
-    db: LancedbDBConnection | None = None,
+    db: LanceDBConnection | None = None,
     reranker: Reranker | None = None,
     model: ModelName = MODEL,
     chat_history: list[MessageType] | None = None,

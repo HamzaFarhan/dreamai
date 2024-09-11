@@ -2,8 +2,7 @@ from typing import Type
 
 import pandas as pd
 from lancedb.db import DBConnection as LanceDBConnection
-from lancedb.db import DBConnection as LancedbDBConnection
-from lancedb.embeddings import SentenceTransformerEmbeddings, get_registry
+from lancedb.embeddings import get_registry
 from lancedb.pydantic import LanceModel
 from lancedb.pydantic import Vector as LanceVector
 from lancedb.rerankers import Reranker
@@ -22,14 +21,14 @@ TEXT_FIELD_NAME = rag_settings.text_field_name
 MAX_SEARCH_RESULTS = rag_settings.max_search_results
 
 
-def get_lance_ems_model(
-    name: str = EMS_MODEL, device: str = DEVICE
-) -> SentenceTransformerEmbeddings:
+def get_lance_ems_model(name: str = EMS_MODEL, device: str = DEVICE):
+    if "gemini" in name.lower():
+        return get_registry().get("gemini-text").create(name="models/text-embedding-004")
     return get_registry().get("sentence-transformers").create(name=name, device=device)
 
 
 def create_lance_schema(
-    ems_model: SentenceTransformerEmbeddings,
+    ems_model,
     name: str = "LanceChunk",
     metadata: dict | None = None,
 ) -> Type[LanceModel]:
@@ -48,7 +47,7 @@ def add_to_lance_table(
     db: LanceDBConnection,
     table_name: str,
     data: list[MarkdownChunk],
-    ems_model: SentenceTransformerEmbeddings | str = EMS_MODEL,
+    ems_model=EMS_MODEL,
     schema: Type[LanceModel] | None = None,
     ems_model_device: str = DEVICE,
 ) -> LanceTable:
@@ -73,7 +72,7 @@ def add_to_lance_table(
 
 
 def search_lancedb(
-    db: LancedbDBConnection,
+    db: LanceDBConnection,
     table_name: str,
     query: list[str] | str,
     reranker: Reranker | None = None,

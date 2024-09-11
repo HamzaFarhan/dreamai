@@ -44,7 +44,8 @@ class RAGSettings(Settings):
     min_full_text_size: int = 10_000
     separators: list[str] = [r"#{1,6}\s+", r"\*\*.*?\*\*", r"---", r"\n\n", r"\.\s+", r"\n"]
     lance_uri: str = "lance/rag/"
-    ems_model: str = "hkunlp/instructor-base"
+    ems_model: str = "gemini"
+    # ems_model: str = "hkunlp/instructor-base"
     reranker: str = "answerdotai/answerai-colbert-small-v1"
     # reranker: str = ""
     device: str = "cuda"
