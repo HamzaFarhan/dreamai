@@ -9,3 +9,4 @@ dist
 .sesskey
 *.log
 *_data.json
+.ruff_cache

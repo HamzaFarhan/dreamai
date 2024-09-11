@@ -3,12 +3,12 @@ from enum import StrEnum
 from typing import Any, Callable, Literal, Type
 
 import instructor
-from anthropic import Anthropic
+from anthropic import Anthropic, AsyncAnthropic
 from dotenv import load_dotenv
 from google.generativeai import GenerativeModel
-from openai import OpenAI
-from pydantic import BaseModel, create_model, validate_call
 from loguru import logger
+from openai import AsyncOpenAI, OpenAI
+from pydantic import BaseModel, create_model, validate_call
 
 load_dotenv()
 
@@ -58,12 +58,23 @@ def run_tool(tool_model: Tool, tool_func: Callable, **kwargs) -> Any:
 
 
 @validate_call
-def create_creator(model: ModelName) -> instructor.Instructor:
+def create_creator(
+    model: ModelName, use_async: bool = False
+) -> instructor.Instructor | instructor.AsyncInstructor:
     if model in [ModelName.GPT_MINI, ModelName.GPT]:
-        return instructor.from_openai(OpenAI())
+        if use_async:
+            return instructor.from_openai(AsyncOpenAI())
+        else:
+            return instructor.from_openai(OpenAI())
     elif model in [ModelName.HAIKU, ModelName.SONNET, ModelName.OPUS]:
-        return instructor.from_anthropic(Anthropic())
+        if use_async:
+            return instructor.from_anthropic(AsyncAnthropic())
+        else:
+            return instructor.from_anthropic(Anthropic())
     elif model in [ModelName.GEMINI_FLASH, ModelName.GEMINI_PRO]:
-        return instructor.from_gemini(GenerativeModel(model_name=model))
+        return instructor.from_gemini(
+            client=GenerativeModel(model_name=model),
+            use_async=use_async,  # type: ignore
+        )
     else:
         raise ValueError(f"Model {model} not supported")

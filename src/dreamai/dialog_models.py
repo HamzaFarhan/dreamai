@@ -102,7 +102,8 @@ class SourcedSentence(BaseModel):
         return self
 
     def __str__(self) -> str:
-        return f"{self.text} {self.sources}"
+        # return f"{self.text} {self.sources}"
+        return self.text
 
 
 class SourcedResponse(BaseModel):

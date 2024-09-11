@@ -1,0 +1,24 @@
+I am working on a service for automated software project management using AI.
+This is the flow I want to make:
+
+1. The team lead defines the project and its goals.
+2. The AI generates a detailed project plan.
+3. The plan will include:
+   1. A more thorough description of the project and its goals.
+   2. The tasks that need to be done or the modules that need to be built.
+   3. Each task/module will have:
+      1. A description
+      2. A list of ordered steps
+      3. A start date
+      4. An end date
+      5. A set of tests/evals that need to be run to ensure the task is completed.
+      6. Assignee(s)
+4. The AI will then generate an "Update Template" for the project. The team members will fill in the template with the latest updates on their task. Take inspo from the update_template.md file. You can keep it the same or make some enhancements.
+5. Each task will be a GitHub Issue in a GitHub Project.
+6. The Steps of the task will be in the first comment of the issue.
+7. The assignee(s) will add a comment in the issue with the latest updates on their task every day. This comment will be in the form of the "Update Template". They will fill in the template with the latest updates on their task.
+8. They will also push their latest code to the repository.
+9. Notice how all the updates are asynchronous. No need for meetings or for the team lead to ask the team members about their progress.
+10. Now, all of the initial project, issue, comment, template creation will be done by the AI using the GitHub API.
+11. As soon as an assignee adds a comment, the GitHub action/workflow will run. This will be connected to our API. The AI will look at the update and then the team lead will receive an email with a generated report on the updates and the assignee's progress on the task. This will also be used for employee evaluation. So for example, if the assignee did not add a comment for two days, the team lead will know about it and can address it. If the assignee's progress is slow, the team lead will also know about it and can address it. This is a way to automate the project management and the evaluation of the employees.
+12. Basically any insights we can extract from each update will be extracted and used to better manage the project and evaluate the employees. All automated.

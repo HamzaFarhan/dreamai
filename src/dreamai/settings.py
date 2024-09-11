@@ -5,6 +5,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from dreamai.ai import ModelName
 
+DEV_DIR = "/home/hamza/dev"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file="sai_settings.env", env_file_encoding="utf-8")
@@ -18,7 +20,7 @@ class CreatorSettings(Settings):
 
 
 class DialogSettings(Settings):
-    dialogs_folder: str = "/home/hamza/dev/dreamai/src/dreamai/dialogs"
+    dialogs_folder: str = f"{DEV_DIR}/dreamai/src/dreamai/dialogs"
     default_template: str = "{}"
     default_dialog_version: float = 1.0
     chat_history_limit: int = Field(
@@ -74,3 +76,8 @@ class RAGAppSettings(Settings):
     non_assistant_confidence_threshold: float = 0.4
     terminators: list[str] = ["exit", "quit", "q"]
     action_attempts_limit: int = 3
+
+
+class ModalSettings(Settings):
+    lance_dir: str = f"{DEV_DIR}/lance/"
+    model: ModelName = ModelName.GPT_MINI

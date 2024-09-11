@@ -1,19 +1,19 @@
 import json
 import os
+from copy import deepcopy
 from difflib import unified_diff
 from pathlib import Path
 from typing import Annotated, Any, Self, cast
-from copy import deepcopy
 from uuid import uuid4
 
 from anthropic import Anthropic
 from google.generativeai import GenerativeModel
-from instructor import Instructor
+from instructor import AsyncInstructor, Instructor
 from openai import OpenAI
 from pydantic import AfterValidator, BaseModel, Field, model_validator
 
 from dreamai.ai import ModelName, create_creator
-from dreamai.settings import DialogSettings, CreatorSettings
+from dreamai.settings import CreatorSettings, DialogSettings
 
 dialog_settings = DialogSettings()
 creator_settings = CreatorSettings()
@@ -326,8 +326,9 @@ class Dialog(BaseModel):
         user: str = "",
         template_data: dict | None = None,
         chat_history_limit: int = CHAT_HISTORY_LIMIT,
-    ) -> tuple[Instructor, dict[str, Any]]:
-        creator = create_creator(model=model)
+        use_async: bool = False,
+    ) -> tuple[Instructor | AsyncInstructor, dict[str, Any]]:
+        creator = create_creator(model=model, use_async=use_async)
         creator_kwargs = {}
         if isinstance(creator.client, OpenAI):
             creator_kwargs = self.gpt_kwargs(

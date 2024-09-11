@@ -1,11 +1,17 @@
 import json
 import os
-import shutil
 import tempfile
 
 import lancedb
 import pandas as pd
+from burr.core import Application
 from docx import Document
+from docx.enum.style import WD_STYLE_TYPE
+from docx.oxml.ns import qn
+from docx.oxml.parser import OxmlElement
+from docx.oxml.xmlchemy import BaseOxmlElement
+from docx.shared import Pt
+from docx.text.paragraph import Paragraph
 from fasthtml.common import (
     H1,
     A,
@@ -17,33 +23,40 @@ from fasthtml.common import (
     Input,
     Li,
     Ol,
+    Option,
     P,
     Script,
+    Select,
     Style,
     Ul,
     fast_app,
     serve,
 )
 from loguru import logger
+from lxml import etree
+from starlette.background import BackgroundTask
 from starlette.responses import FileResponse
 
-from dreamai.ai import ModelName
 from dreamai.rag import application
 from dreamai.rag_utils import add_data_with_descriptions
+from dreamai.settings import ModalSettings
 from dreamai.utils import flatten_list
 
-SOURCE_TEXT_SIZE = 100_000
-LANCE_URI = "lance/RFP/"
-MODEL = ModelName.GPT_MINI
+modal_settings = ModalSettings()
 
-if os.path.exists(LANCE_URI):
-    shutil.rmtree(LANCE_URI)
+SOURCE_TEXT_SIZE = 100_000
+LANCE_DIR = modal_settings.lance_dir
+MODEL = modal_settings.model
+
+logger.info(f"LANCE_DIR: {LANCE_DIR}")
+logger.info(f"MODEL: {MODEL}")
+
 
 style = """
 .spinner-container {
-    margin-top: 7px;  /* This adds space above the spinner */
-    margin-bottom: 10px;  /* This adds space below the spinner */
-    display: none;  /* Hidden by default */
+    margin-top: 7px;
+    margin-bottom: 10px;
+    display: none;
 }
 .spinner {
     border: 4px solid #f3f3f3;
@@ -54,19 +67,35 @@ style = """
     animation: spin 1s linear infinite;
     display: inline-block;
     margin-right: 10px;
-    vertical-align: middle;  /* This aligns the spinner with the text */
+    vertical-align: middle;
 }
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+.section {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    background-color: #f9f9f9;
+}
+.section-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.divider {
+    border-top: 1px solid #e0e0e0;
+    margin: 30px 0;
+}
 """
 
-added_files = []
 table_descriptions = []
 rfp_questions = []
 qna = {}
-lance_db = lancedb.connect(uri=LANCE_URI)
 app = fast_app(live=True, hdrs=(Style(style), Html(data_theme="light")))[0]
 
 
@@ -74,49 +103,116 @@ def Spinner(message):
     return Div(Div(cls="spinner"), message, cls="spinner-container", id="spinner")
 
 
+def get_sorted_indexes():
+    if not os.path.exists(LANCE_DIR):
+        os.makedirs(LANCE_DIR)
+    indexes = [d for d in os.listdir(LANCE_DIR) if os.path.isdir(os.path.join(LANCE_DIR, d))]
+    return sorted(
+        indexes, key=lambda x: os.path.getmtime(os.path.join(LANCE_DIR, x)), reverse=True
+    )
+
+
 @app.get("/")
-async def home():
+async def home(request):
+    current_index = request.query_params.get("index")
+    indexes = get_sorted_indexes()
+    if not current_index and indexes:
+        current_index = indexes[0]
+
+    index_selection = (
+        Select(
+            *[
+                Option(index, value=index, selected=(index == current_index))
+                for index in indexes
+            ],
+            Option("Create New Index", value="new"),
+            name="index",
+            id="index-select",
+        )
+        if indexes
+        else Input(
+            type="text",
+            name="new_index",
+            id="new-index-input",
+            placeholder="New Index Name",
+        )
+    )
+
     return Container(
         H1("RFP Questionnaire Tool"),
         Div(
-            P("Upload your company documents (PDF, DOCX, TXT, or MD files)"),
             Form(
+                index_selection,
                 Input(
-                    type="file",
-                    name="documents",
-                    multiple=True,
-                    accept=".pdf,.docx,.txt,.md",
-                    id="document-input",
-                ),
-                Button(
-                    "Upload Documents",
-                    type="submit",
-                    id="upload-button",
-                    style="display: none;",
-                ),
-                Spinner("Uploading documents..."),
-                hx_post="/upload",
-                hx_target="#file-list",
-                hx_swap="beforeend",
-                enctype="multipart/form-data",
-            ),
-            Div(id="file-list"),
-            id="document-upload-section",
-        ),
-        Div(
-            P("Upload your RFP CSV file"),
-            Form(
-                Input(type="file", name="rfp", accept=".csv", id="rfp-input"),
-                Button(
-                    "Upload RFP", type="submit", id="rfp-upload-button", style="display: none;"
-                ),
-                hx_post="/upload-rfp",
-                hx_target="#rfp-info",
+                    type="text",
+                    name="new_index",
+                    id="new-index-input",
+                    placeholder="New Index Name",
+                    style="display: none;" if indexes else "",
+                )
+                if indexes
+                else None,
+                Button("Select/Create Index", type="submit", id="index-button"),
+                hx_post="/select-index",
+                hx_target="#index-info",
                 hx_swap="innerHTML",
-                enctype="multipart/form-data",
             ),
-            Div(id="rfp-info"),
-            id="rfp-upload-section",
+            Div(id="index-info"),
+            cls="section",
+        ),
+        Div(cls="divider"),
+        Div(
+            Div(
+                P(
+                    "Upload your company documents (PDF, DOCX, TXT, or MD files)",
+                    cls="section-title",
+                ),
+                Form(
+                    Input(
+                        type="file",
+                        name="documents",
+                        multiple=True,
+                        accept=".pdf,.docx,.txt,.md",
+                        id="document-input",
+                    ),
+                    Button(
+                        "Upload Documents",
+                        type="submit",
+                        id="upload-button",
+                        style="display: none;",
+                    ),
+                    Spinner("Uploading documents..."),
+                    hx_post="/upload",
+                    hx_target="#file-list",
+                    hx_swap="beforeend",
+                    enctype="multipart/form-data",
+                ),
+                Div(id="file-list"),
+                id="document-upload-section",
+            ),
+            cls="section",
+        ),
+        Div(cls="divider"),
+        Div(
+            Div(
+                P("Upload your RFP CSV file", cls="section-title"),
+                Form(
+                    Input(type="file", name="rfp", accept=".csv", id="rfp-input"),
+                    Button(
+                        "Upload RFP",
+                        type="submit",
+                        id="rfp-upload-button",
+                        style="display: none;",
+                    ),
+                    hx_post="/upload-rfp",
+                    hx_target="#rfp-info",
+                    hx_swap="innerHTML",
+                    enctype="multipart/form-data",
+                ),
+                Div(id="rfp-info"),
+                id="rfp-upload-section",
+            ),
+            cls="section",
         ),
         Div(
             Button(
@@ -131,6 +227,17 @@ async def home():
             id="processing-section",
         ),
         Script("""
+        var indexSelect = document.getElementById('index-select');
+        var newIndexInput = document.getElementById('new-index-input');
+        
+        if (indexSelect) {
+            indexSelect.addEventListener('change', function() {
+                if (newIndexInput) {
+                    newIndexInput.style.display = this.value === 'new' ? 'block' : 'none';
+                }
+            });
+        }
+        
         document.body.addEventListener('htmx:beforeRequest', function(evt) {
             if (evt.detail.pathInfo.requestPath === '/upload') {
                 document.querySelector('#document-upload-section .spinner-container').style.display = 'block';
@@ -171,30 +278,113 @@ async def home():
             processButton.style.display = !rfpInfoEmpty ? 'inline-block' : 'none';
         }
 
-        // Call this function initially to set the correct state
         updateProcessButton();
+
+        document.body.addEventListener('click', function(evt) {
+            if (evt.target.id === 'download-button') {
+                setTimeout(function() {
+                    var currentIndex = document.getElementById('index-select').value;
+                    var indexInfo = document.getElementById('index-info').innerHTML;
+                    htmx.ajax('GET', '/?index=' + encodeURIComponent(currentIndex), {
+                        target: 'body',
+                        swap: 'innerHTML',
+                        complete: function() {
+                            document.getElementById('index-info').innerHTML = indexInfo;
+                            document.getElementById('index-select').value = currentIndex;
+                        }
+                    });
+                }, 1000);  // Wait for 1 second to ensure the download has started
+            }
+        });
+        document.addEventListener('DOMContentLoaded', function() {
+            var indexSelect = document.getElementById('index-select');
+            if (indexSelect) {
+                var currentIndex = indexSelect.value;
+                htmx.ajax('GET', '/set-index?index=' + encodeURIComponent(currentIndex), {
+                    target: '#index-info',
+                    swap: 'innerHTML'
+                });
+            } else {
+                htmx.ajax('GET', '/set-index', {
+                    target: '#index-info',
+                    swap: 'innerHTML'
+                });
+            }
+        });
         """),
+    )
+
+
+@app.get("/set-index")
+async def set_index(request):
+    index = request.query_params.get("index")
+    if not index:
+        indexes = get_sorted_indexes()
+        index = indexes[0] if indexes else None
+
+    if index:
+        os.makedirs(os.path.join(LANCE_DIR, index), exist_ok=True)
+        global lance_db
+        lance_db = lancedb.connect(os.path.join(LANCE_DIR, index))
+        existing_tables = list(lance_db.table_names())
+        return Div(
+            P(f"Selected/Created index: {index}"),
+            P(f"Existing tables: {len(existing_tables)}"),
+            Ul(*[Li(table) for table in existing_tables[:5]]),
+            P("..." if len(existing_tables) > 5 else ""),
+        )
+    else:
+        return Div("No index available. Please create a new one.")
+
+
+@app.post("/select-index")
+async def select_index(request):
+    form_data = await request.form()
+    selected_index = form_data.get("index")
+    new_index = form_data.get("new_index")
+
+    if not selected_index or selected_index == "new":
+        selected_index = new_index
+
+    if not selected_index:
+        return Div("No index selected or created.", _="on load wait 2s then remove me")
+
+    os.makedirs(os.path.join(LANCE_DIR, selected_index), exist_ok=True)
+
+    global lance_db
+    lance_db = lancedb.connect(os.path.join(LANCE_DIR, selected_index))
+
+    existing_tables = list(lance_db.table_names())
+
+    return Div(
+        P(f"Selected/Created index: {selected_index}"),
+        P(f"Existing tables: {len(existing_tables)}"),
+        Ul(*[Li(table) for table in existing_tables[:5]]),
+        P("..." if len(existing_tables) > 5 else ""),
     )
 
 
 @app.post("/upload")
 async def upload(request):
     global table_descriptions
-    global added_files
     form = await request.form()
     files = form.getlist("documents")
     if not files:
         return Li("No files were uploaded.", _="on load wait 2s then remove me")
+
     uploaded_files = []
     with tempfile.TemporaryDirectory() as temp_dir:
         for file in files:
             file_name = file.filename
-            logger.info(f"ADDED FILES: {added_files}")
-            if file_name in added_files:
-                continue
             file_path = os.path.join(temp_dir, file_name)
             with open(file_path, "wb") as f:
                 f.write(file.file.read())
+
+            # Check if the file has already been added to the database
+            if lance_db.table_names() and file_name in lance_db.table_names():
+                uploaded_files.append(f"{file_name} (already exists)")
+                continue
+
             uploaded_files.append(file_name)
             add_data_with_descriptions(
                 model=MODEL,
@@ -202,8 +392,8 @@ async def upload(request):
                 data=file_path,
                 table_descriptions=table_descriptions,
             )
-            added_files.append(file_name)
-        logger.info(f"Uploaded {len(files)} files to {temp_dir}")
+
+        logger.info(f"Processed {len(files)} files")
 
     return Ul(*[Li(file) for file in uploaded_files])
 
@@ -241,7 +431,7 @@ async def upload_rfp(request):
     )
 
 
-async def process_questions(app, questions):
+async def process_questions(app: Application, questions: list[str]):
     global qna
     qna = {"questions": questions, "answers": [], "sources": []}
     for query in qna["questions"]:
@@ -292,36 +482,90 @@ async def process_rfp(request):
     )
 
 
+def create_hyperlink(
+    paragraph: Paragraph, text: str, anchor: str
+) -> BaseOxmlElement | etree._Element:
+    hyperlink = OxmlElement("w:hyperlink")
+    hyperlink.set(qn("w:anchor"), anchor)
+    new_run = OxmlElement("w:r")
+    rPr = OxmlElement("w:rPr")
+    new_run.append(rPr)
+    t = OxmlElement("w:t")
+    t.text = text  # type: ignore
+    new_run.append(t)
+    hyperlink.append(new_run)
+    paragraph._p.append(hyperlink)
+    return hyperlink
+
+
 @app.get("/download")
 async def download_results(request):
     logger.info(f"Downloading {len(qna['questions'])} questions")
     doc = Document()
-    doc.add_heading("RFP Answers", 0)
-    for i, question in enumerate(qna["questions"]):
-        doc.add_heading(f"Question {i+1}: {question}", level=1)
-        doc.add_paragraph(qna["answers"][i])
-        doc.add_heading("Sources:", level=2)
-        for source in qna["sources"][i]:
-            doc.add_heading(source["name"], level=4)
-            doc.add_paragraph(f"... {source['text'][:SOURCE_TEXT_SIZE]} ...")
-        doc.add_paragraph()
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
-        doc.save(tmp.name)
-        tmp_path = tmp.name
+
+    # Add title
+    title = doc.add_heading("RFP Answers", level=0)
+    title.alignment = 1  # type: ignore
+
+    # Create styles
+    styles = doc.styles
+    question_style = styles.add_style("Question", WD_STYLE_TYPE.PARAGRAPH)
+    question_style.font.bold = True  # type: ignore
+    question_style.font.size = Pt(14)  # type: ignore
+    answer_style = styles.add_style("Answer", WD_STYLE_TYPE.PARAGRAPH)
+    answer_style.font.size = Pt(12)  # type: ignore
+    source_style = styles.add_style("Source", WD_STYLE_TYPE.PARAGRAPH)
+    source_style.font.size = Pt(10)  # type: ignore
+    source_style.font.italic = True  # type: ignore
+
+    # Add questions and answers
+    for i, (question, answer, sources) in enumerate(
+        zip(qna["questions"], qna["answers"], qna["sources"]), 1
+    ):
+        doc.add_paragraph(f"Question {i}: {question}", style="Question")
+        answer_para = doc.add_paragraph(answer + "\n", style="Answer")
+        # Add source references
+        for j, source in enumerate(sources, 1):
+            create_hyperlink(answer_para, f"[{j}]", f"source_{i}_{j}")
+            if j < len(sources):
+                answer_para.add_run(", ")
+        doc.add_paragraph()  # Add a blank line
+
+    # Add sources section
+    doc.add_page_break()
+    sources_heading = doc.add_heading("Sources", level=1)
+    sources_heading.runs[0].underline = True
+
+    for i, question_sources in enumerate(qna["sources"], 1):
+        # Add subheading for each question's sources
+        doc.add_heading(f"Question {i}", level=2)
+
+        for j, source in enumerate(question_sources, 1):
+            bookmark_name = f"source_{i}_{j}"
+            source_para = doc.add_paragraph(style="Source")
+            source_run = source_para.add_run(f"{source['name']}")
+            source_run.bold = True
+            # Add bookmark
+            bookmark_start = OxmlElement("w:bookmarkStart")
+            bookmark_start.set(qn("w:id"), f"{i}{j}")
+            bookmark_start.set(qn("w:name"), bookmark_name)
+            source_para._p.insert(0, bookmark_start)
+            bookmark_end = OxmlElement("w:bookmarkEnd")
+            bookmark_end.set(qn("w:id"), f"{i}{j}")
+            bookmark_end.set(qn("w:name"), bookmark_name)
+            source_para._p.append(bookmark_end)
+            doc.add_paragraph(source["text"][:SOURCE_TEXT_SIZE], style="Source")
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_file:
+        doc.save(temp_file.name)
+        tmp_path = temp_file.name
+
     return FileResponse(
         tmp_path,
         filename="rfp_answers.docx",
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        background=BackgroundTask(lambda: os.unlink(tmp_path)),
     )
-
-
-@app.middleware("http")
-async def cleanup_temp_file(request, call_next):
-    response = await call_next(request)
-    if isinstance(response, FileResponse):
-        # await response.close()
-        os.unlink(response.path)
-    return response
 
 
 if __name__ == "__main__":

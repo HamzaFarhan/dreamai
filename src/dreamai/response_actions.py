@@ -28,7 +28,7 @@ def _query_to_response(
     template_data: dict | None = None,
     chat_history: list[MessageType] | None = None,
     validation_context: dict[str, Any] | None = None,
-) -> T:
+) -> T | Any:
     dialog = dialog or Dialog(task=str(Path(DIALOGS_FOLDER) / "assistant_task.txt"))
     dialog.chat_history = chat_history or dialog.chat_history
     creator, creator_kwargs = dialog.creator_with_kwargs(
