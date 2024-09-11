@@ -87,8 +87,8 @@ def application(
             search_lancedb.bind(reranker=reranker),
             create_search_response,
             evaluate_answer,
-            update_chat_history,
             ask_assistant,
+            update_chat_history,
             terminate,
         )
         .with_transitions(

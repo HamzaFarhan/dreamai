@@ -1,0 +1,31 @@
+# EXTRACT THIS
+
+## Credit Agreements
+
+There are two types of credit agreements:
+
+1. Investment Grid (IGR), The borrowing companies that have good credit ratings get IGR-type credit agreements. IGR agreement has less restrictions, low interest rates and fees, and less financial covenants.
+
+2. Leverage. When a borrowing company has average or low credit ratings faces restrictions to maintain the ratios in the financial covenant sections with higher interest rates and fees.
+
+## Information to be extracted
+
+### Deal/Loan General Information
+
+The main items for the high-level information about loan details are the parties that are involved in the credit agreement along with the signing date, loan amount, and all other parties involved like Banks and agents.
+
+### Tranche Information
+
+We need to look into the credit agreement if the loan has multiple tranches or a single-tranche loan. Each tranche has a minimum and maximum loan amount and the details of the repayment schedule.
+
+### Interest and Fees
+
+Each loan agreement is tied with multiple fees and we need to identify those information. We also look forward to the information about the Base rate type, spread, adjustment of spread, and floor information.
+
+### Financial Covenants
+
+This information is usually mentioned in the Covenant section of the credit agreement. Financial covenants are the ratio type and information regarding the level of the ratios applies to the agreement. 
+
+### Pricing grid information
+
+The pricing grid is usually the information of the interest applicable to the borrower. The interest rate applicable is tied to the financial covenants ratio. If the ratio level is maintained according to the table of the pricing grid then the applicable interest rate will be different.

@@ -38,7 +38,10 @@ def load_dialog_str(content: Any) -> Any:
     string_path = Path(str(content).strip())
     suffix = string_path.suffix.strip()
     if suffix == ".txt":
-        return (Path(DIALOGS_FOLDER) / Path(string_path).name).read_text()
+        try:
+            return (Path(DIALOGS_FOLDER) / string_path.name).read_text()
+        except Exception:
+            return string_path.read_text()
     if suffix in [".json", ".py", ".yaml", ".yml"]:
         raise ValueError(
             f"String must be a .txt file or a plain string. Suffix received: {suffix}"
@@ -337,6 +340,8 @@ class Dialog(BaseModel):
                 template_data=template_data,
                 chat_history_limit=chat_history_limit,
             )
+            creator_kwargs["temperature"] = TEMPERATURE
+            creator_kwargs["max_tokens"] = MAX_TOKENS
         elif isinstance(creator.client, Anthropic):
             creator_kwargs = self.claude_kwargs(
                 model=model,
@@ -344,16 +349,20 @@ class Dialog(BaseModel):
                 template_data=template_data,
                 chat_history_limit=chat_history_limit,
             )
+            creator_kwargs["temperature"] = TEMPERATURE
+            creator_kwargs["max_tokens"] = MAX_TOKENS
         elif isinstance(creator.client, GenerativeModel):
             creator_kwargs = self.gemini_kwargs(
                 user=user,
                 template_data=template_data,
                 chat_history_limit=chat_history_limit,
             )
+            creator_kwargs["generation_config"] = {
+                "temperature": TEMPERATURE,
+                "max_tokens": MAX_TOKENS,
+            }
         else:
             raise ValueError(f"Unsupported model: {model}")
-        creator_kwargs["temperature"] = TEMPERATURE
-        creator_kwargs["max_tokens"] = MAX_TOKENS
         creator_kwargs["max_retries"] = ATTEMPTS
         return creator, creator_kwargs
 
@@ -419,4 +428,3 @@ class Dialog(BaseModel):
             )
             self.description = description
             self.save(name=name)
-

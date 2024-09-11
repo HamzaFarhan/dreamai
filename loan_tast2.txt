@@ -1,0 +1,83 @@
+# EXTRACT THIS FROM THE DOCUMENT
+
+## BLUES Sections and Information
+
+### Deal Main
+
+- Borrower Name
+- Commitment Amount (Minimum and Maximum)
+- Signing Date
+- Purpose
+
+### Tranche Bank List
+    
+- Lender Name
+- Primary role
+- Agent Only
+- Lead Arranger
+- Agent/Co-Agent
+- Role
+- Commitment (Minimum / Maximum)
+- Percent Share
+
+### Tranche Options/Bbase/Repays
+
+- Period
+- Number of Periods
+- Amount
+- Percent
+- Begin Date
+
+### Interest and Fees
+
+- Base Rate
+- Spread
+- CSA
+- Floor (BR) %
+- Fee Type
+- Max Fee
+
+### Tranche Main Page
+
+- Tranche Type
+- Distribution Method
+- Maturity Date
+- Currency
+- Amount (Minimum / Maximum)
+- LT Amount and Date
+
+### Covenants and Amendment Voting
+
+- Prepayment Type
+- Prepayment Percent
+- Prepayment Comment
+
+### Performance Pricing
+
+- Split Rated?
+- Split By > 1 Lev?
+- Performance Types - Performance Price Code
+- Performance Types - Column Number
+- Grid - Min Op
+- Grid - xyz Min
+- Grid - Max Op
+- Grid - xyz Max
+- Base Rates
+- Fees
+
+### Financial Covenants
+
+- Ratio Type
+- Level
+- Start Date
+- End Date
+- Dividend Restriction
+- Covenant Type
+- Level
+- Start Date
+- End Date
+- Capex Carryover
+- Net Worth Type
+- Base Amount
+- % of Net Income
+- Build Up

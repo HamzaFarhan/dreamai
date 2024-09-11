@@ -71,7 +71,7 @@ def create_creator(
             return instructor.from_anthropic(AsyncAnthropic())
         else:
             return instructor.from_anthropic(Anthropic())
-    elif model in [ModelName.GEMINI_FLASH, ModelName.GEMINI_PRO]:
+    elif model in [ModelName.GEMINI_FLASH, ModelName.GEMINI_PRO, ModelName.GEMINI_FLASH_EXP]:
         return instructor.from_gemini(
             client=GenerativeModel(model_name=model),
             use_async=use_async,  # type: ignore
