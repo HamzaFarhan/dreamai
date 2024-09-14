@@ -1,0 +1,23 @@
+Analyze the given text and create a knowledge graph by identifying key entities, their relationships, and properties. Follow these steps:
+
+Identify all important unique entities (people, places, organizations, concepts, etc.) mentioned in the text.
+For each entity, list relevant properties or attributes mentioned.
+Do not assume anything about entities such as merging them on any basis if you do not have explicit and proper context and knowledge to merge them.
+
+Identify relationships between entities, specifying the nature of each relationship.
+
+Present the knowledge graph in the following format:
+
+Entities:
+
+Entity 1
+Properties: [List properties]
+Entity 2
+Properties: [List properties] ...
+Relationships:
+
+Entity 1 [relationship] Entity 2
+Entity 2 [relationship] Entity 3 ...
+Ensure that the knowledge graph accurately represents the information provided in the text, capturing the main concepts and their interconnections.
+
+JUST THE KNOWLEDGE GRAPH, NOT THE ACTUAL ANSWER.

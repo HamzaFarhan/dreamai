@@ -119,13 +119,13 @@ class Mode(StrEnum):
     SECURITY = "security"
 
 
-# @app.get("/")
-# async def root(request):
-#     return await home(request, Mode.RFP)
-
-
 @app.get("/")
-async def home(request: Request):
+async def root(request):
+    return await home(request, Mode.RFP)
+
+
+@app.get("/{mode}")
+async def home(request: Request, mode: Mode):
     current_index = request.query_params.get("index")
     indexes = get_sorted_indexes()
     if not current_index and indexes:
@@ -151,7 +151,7 @@ async def home(request: Request):
     )
 
     return Container(
-        H1("Corporate Questionnaire Tool"),
+        H1(f"{mode.upper() if len(mode) <= 3 else mode.title()} Questionnaire Tool"),
         Div(
             Form(
                 index_selection,
@@ -207,11 +207,11 @@ async def home(request: Request):
         Div(cls="divider"),
         Div(
             Div(
-                P("Upload your RFP CSV file", cls="section-title"),
+                P("Upload your questions CSV file", cls="section-title"),
                 Form(
                     Input(type="file", name="rfp", accept=".csv", id="rfp-input"),
                     Button(
-                        "Upload RFP",
+                        "Upload Questions",
                         type="submit",
                         id="rfp-upload-button",
                         style="display: none;",
@@ -228,13 +228,13 @@ async def home(request: Request):
         ),
         Div(
             Button(
-                "Process RFP",
+                "Answer Questions",
                 id="process-button",
                 hx_post="/process",
                 hx_target="#processing-status",
                 style="display: none;",
             ),
-            Spinner("Processing RFP Questions..."),
+            Spinner("Answering Questions..."),
             Div(id="processing-status"),
             id="processing-section",
         ),

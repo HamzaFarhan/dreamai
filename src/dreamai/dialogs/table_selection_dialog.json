@@ -21,12 +21,14 @@
     {
       "user": "<database_list>\n  <database>\n    <name>environmental_issues</name>\n    <description>Covers various environmental problems, their causes, and potential solutions. Includes topics such as climate change, pollution, deforestation, and biodiversity loss.</description>\n  </database>\n  <database>\n    <name>south_american_geography</name>\n    <description>Focuses on the physical and human geography of South America, including information about countries, landscapes, and major geographical features.</description>\n  </database>\n</database_list>\n<user_query>What are the main causes of deforestation in the Amazon rainforest?</user_query>",
       "assistant": "{ \"response\": \"south_american_geography\", \"confidence\": 0.8 }",
-      "feedback": "Incorrect selection. The 'environmental_issues' database is more relevant to the query about deforestation causes in the Amazon rainforest."
+      "feedback": "Incorrect selection. The 'environmental_issues' database is more relevant to the query about deforestation causes in the Amazon rainforest.",
+      "correction": "{ \"response\": \"environmental_issues\", \"confidence\": 0.95 }"
     },
     {
       "user": "<database_list>\n  <database>\n    <name>chess_fundamentals</name>\n    <description>Covers all aspects of chess, including rules, strategies, famous games, and player profiles. Suitable for beginners and advanced players alike.</description>\n  </database>\n  <database>\n    <name>board_games</name>\n    <description>General information about various board games, their history, and cultural significance.</description>\n  </database>\n</database_list>\n<user_query>What are the basic rules of chess?</user_query>",
       "assistant": "{ \"response\": \"chess_fundamentals\", \"confidence\": 0.6 }",
-      "feedback": "While the correct database was selected, the confidence score is inappropriately low. Given the perfect match between the query and the 'chess_fundamentals' database description, the confidence should be much higher (close to 1.0)."
+      "feedback": "While the correct database was selected, the confidence score is inappropriately low. Given the perfect match between the query and the 'chess_fundamentals' database description, the confidence should be much higher (close to 1.0).",
+      "correction": "{ \"response\": \"chess_fundamentals\", \"confidence\": 0.98 }"
     }
   ]
 }

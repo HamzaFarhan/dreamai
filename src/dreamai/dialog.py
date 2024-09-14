@@ -111,23 +111,29 @@ class Example(BaseModel):
 
 class BadExample(Example):
     feedback: ExampleContent
+    correction: ExampleContent
 
     @property
     def messages(self) -> list[MessageType]:
-        return super().messages + [user_message(content=self.feedback)]
+        return super().messages + [
+            user_message(content=self.feedback),
+            assistant_message(content=self.correction),
+        ]
 
     @classmethod
     def from_messages(cls, messages: list[MessageType]) -> Self:
-        assert len(messages) == 3, "BadExample must have exactly 3 messages"
+        assert len(messages) == 4, "BadExample must have exactly 4 messages"
         assert (
             messages[0]["role"] == "user"
             and messages[1]["role"] == "assistant"
             and messages[2]["role"] == "user"
-        ), "BadExample must have a user, assistant, and user message"
+            and messages[3]["role"] == "assistant"
+        ), "BadExample must have a user, assistant, user, and assistant message"
         return cls(
             user=messages[0]["content"],
             assistant=messages[1]["content"],
             feedback=messages[2]["content"],
+            correction=messages[3]["content"],
         )
 
 
