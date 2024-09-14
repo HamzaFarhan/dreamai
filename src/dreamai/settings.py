@@ -36,6 +36,7 @@ class DialogModelsSettings(Settings):
         default=0.5,
         description="The maximum percentage of the sentences that can be non-sourced.",
     )
+    max_thoughts: int = Field(default=6, title="For ThoughtProcess")
 
 
 class RAGSettings(Settings):
@@ -81,4 +82,4 @@ class RAGAppSettings(Settings):
 
 class ModalSettings(Settings):
     lance_dir: str = f"{DEV_DIR}/lance/"
-    model: ModelName = ModelName.GPT_MINI
+    model: ModelName = ModelName.GEMINI_FLASH

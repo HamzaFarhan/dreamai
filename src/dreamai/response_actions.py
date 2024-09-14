@@ -59,9 +59,9 @@ def ask_assistant(state: State) -> tuple[dict, State]:
     except Exception:
         logger.exception("Error in ask_assistant")
         response = "I'm sorry, but I encountered an error while processing your request. Could you please try again?"
-    return {"assistant_response": response}, state.update(assistant_response=response).update(
-        bad_interaction=bad_interaction
-    ).update(action_attempts=0)
+    return {"assistant_response": str(response)}, state.update(
+        assistant_response=response
+    ).update(bad_interaction=bad_interaction).update(action_attempts=0)
 
 
 @action(
@@ -102,7 +102,10 @@ def create_search_response(state: State) -> tuple[dict, State]:
         response = SourcedResponse(
             sentences=[
                 SourcedSentence(
-                    text="Sorry, I couldn't find an answer to your question. Please try again."
+                    text="Sorry, I couldn't find an answer to your question. Please try again.",
+                    # thought_process=ThoughtProcess(
+                    #     task="Answer", steps=[ThoughtStep(title="Trying", content="Oh no")]
+                    # ),
                 )
             ]
         )

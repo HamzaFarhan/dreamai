@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 from enum import StrEnum
+from time import sleep
 
 import lancedb
 import pandas as pd
@@ -50,6 +51,7 @@ SOURCE_TEXT_SIZE = 100_000
 LANCE_DIR = modal_settings.lance_dir
 MODEL = modal_settings.model
 
+
 logger.info(f"LANCE_DIR: {LANCE_DIR}")
 logger.info(f"MODEL: {MODEL}")
 
@@ -96,9 +98,14 @@ style = """
 """
 
 table_descriptions = []
-rfp_questions = []
+questions = []
 qna = {}
 app = fast_app(live=True, hdrs=(Style(style), Html(data_theme="light")))[0]
+
+
+class Mode(StrEnum):
+    RFP = "rfp"
+    SECURITY = "security"
 
 
 def Spinner(message):
@@ -114,18 +121,14 @@ def get_sorted_indexes():
     )
 
 
-class Mode(StrEnum):
-    RFP = "rfp"
-    SECURITY = "security"
-
-
-# @app.get("/")
-# async def root(request):
-#     return await home(request, Mode.RFP)
-
-
 @app.get("/")
-async def home(request: Request):
+async def root(request: Request):
+    return await home(request, Mode.RFP)
+
+
+@app.get("/{mode}")
+async def home(request: Request, mode: Mode = Mode.RFP):
+    logger.info(f"Mode: {mode}")
     current_index = request.query_params.get("index")
     indexes = get_sorted_indexes()
     if not current_index and indexes:
@@ -151,7 +154,7 @@ async def home(request: Request):
     )
 
     return Container(
-        H1("Corporate Questionnaire Tool"),
+        H1(f"{mode.upper() if len(mode) <= 3 else mode.title()} Questionnaire Tool"),
         Div(
             Form(
                 index_selection,
@@ -207,36 +210,36 @@ async def home(request: Request):
         Div(cls="divider"),
         Div(
             Div(
-                P("Upload your RFP CSV file", cls="section-title"),
+                P("Upload your Questions CSV file", cls="section-title"),
                 Form(
-                    Input(type="file", name="rfp", accept=".csv", id="rfp-input"),
+                    Input(type="file", name="questions", accept=".csv", id="questions-input"),
                     Button(
-                        "Upload RFP",
+                        "Upload Questions",
                         type="submit",
-                        id="rfp-upload-button",
+                        id="questions-upload-button",
                         style="display: none;",
                     ),
-                    hx_post="/upload-rfp",
-                    hx_target="#rfp-info",
+                    hx_post="/upload-questions",
+                    hx_target="#questions-info",
                     hx_swap="innerHTML",
                     enctype="multipart/form-data",
                 ),
-                Div(id="rfp-info"),
-                id="rfp-upload-section",
+                Div(id="questions-info"),
+                id="questions-upload-section",
             ),
             cls="section",
         ),
         Div(
             Button(
-                "Process RFP",
-                id="process-button",
-                hx_post="/process",
-                hx_target="#processing-status",
+                "Answer Questions",
+                id="answer-button",
+                hx_post="/answer",
+                hx_target="#answering-status",
                 style="display: none;",
             ),
-            Spinner("Processing RFP Questions..."),
-            Div(id="processing-status"),
-            id="processing-section",
+            Spinner("Answering Questions..."),
+            Div(id="answering-status"),
+            id="answering-section",
         ),
         Script("""
         var indexSelect = document.getElementById('index-select');
@@ -253,8 +256,8 @@ async def home(request: Request):
         document.body.addEventListener('htmx:beforeRequest', function(evt) {
             if (evt.detail.pathInfo.requestPath === '/upload') {
                 document.querySelector('#document-upload-section .spinner-container').style.display = 'block';
-            } else if (evt.detail.pathInfo.requestPath === '/process') {
-                document.querySelector('#processing-section .spinner-container').style.display = 'block';
+            } else if (evt.detail.pathInfo.requestPath === '/answer') {
+                document.querySelector('#answering-section .spinner-container').style.display = 'block';
             }
         });
 
@@ -264,11 +267,11 @@ async def home(request: Request):
                     document.getElementById('document-input').value = '';
                     document.getElementById('upload-button').style.display = 'none';
                     document.querySelector('#document-upload-section .spinner-container').style.display = 'none';
-                } else if (evt.detail.pathInfo.requestPath === '/upload-rfp') {
-                    document.getElementById('rfp-input').value = '';
-                    document.getElementById('rfp-upload-button').style.display = 'none';
-                } else if (evt.detail.pathInfo.requestPath === '/process') {
-                    document.querySelector('#processing-section .spinner-container').style.display = 'none';
+                } else if (evt.detail.pathInfo.requestPath === '/upload-questions') {
+                    document.getElementById('questions-input').value = '';
+                    document.getElementById('questions-upload-button').style.display = 'none';
+                } else if (evt.detail.pathInfo.requestPath === '/answer') {
+                    document.querySelector('#answering-section .spinner-container').style.display = 'none';
                 }
                 updateProcessButton();
             }
@@ -279,35 +282,37 @@ async def home(request: Request):
             uploadButton.style.display = this.files.length > 0 ? 'inline-block' : 'none';
         });
 
-        document.getElementById('rfp-input').addEventListener('change', function(evt) {
-            var uploadButton = document.getElementById('rfp-upload-button');
+        document.getElementById('questions-input').addEventListener('change', function(evt) {
+            var uploadButton = document.getElementById('questions-upload-button');
             uploadButton.style.display = this.files.length > 0 ? 'inline-block' : 'none';
         });
 
         function updateProcessButton() {
-            var rfpInfoEmpty = document.getElementById('rfp-info').children.length === 0;
-            var processButton = document.getElementById('process-button');
-            processButton.style.display = !rfpInfoEmpty ? 'inline-block' : 'none';
+            var questionsInfoEmpty = document.getElementById('questions-info').children.length === 0;
+            var processButton = document.getElementById('answer-button');
+            processButton.style.display = !questionsInfoEmpty ? 'inline-block' : 'none';
         }
 
         updateProcessButton();
 
-        document.body.addEventListener('click', function(evt) {
-            if (evt.target.id === 'download-button') {
-                setTimeout(function() {
-                    var currentIndex = document.getElementById('index-select').value;
-                    var indexInfo = document.getElementById('index-info').innerHTML;
-                    htmx.ajax('GET', '/?index=' + encodeURIComponent(currentIndex), {
-                        target: 'body',
-                        swap: 'innerHTML',
-                        complete: function() {
-                            document.getElementById('index-info').innerHTML = indexInfo;
-                            document.getElementById('index-select').value = currentIndex;
-                        }
-                    });
-                }, 1000);
-            }
-        });
+        // document.body.addEventListener('click', function(evt) {
+        //     if (evt.target.id === 'download-button') {
+        //         setTimeout(function() {
+        //             var currentIndex = document.getElementById('index-select').value;
+        //             var indexInfo = document.getElementById('index-info').innerHTML;
+        //             var currentPath = window.location.pathname;
+        //             htmx.ajax('GET', currentPath + '?index=' + encodeURIComponent(currentIndex), {
+        //                 target: 'body',
+        //                 swap: 'innerHTML',
+        //                 complete: function() {
+        //                     document.getElementById('index-info').innerHTML = indexInfo;
+        //                     document.getElementById('index-select').value = currentIndex;
+        //                 }
+        //             });
+        //         }, 1000);  // Wait for 1 second to ensure the download has started
+        //     }
+        // });
+        
         document.addEventListener('DOMContentLoaded', function() {
             var indexSelect = document.getElementById('index-select');
             if (indexSelect) {
@@ -354,7 +359,6 @@ async def select_index(request):
     form_data = await request.form()
     selected_index = form_data.get("index")
     new_index = form_data.get("new_index")
-    new_index = new_index.strip().replace(" ", "_")
 
     if not selected_index or selected_index == "new":
         selected_index = new_index
@@ -411,40 +415,42 @@ async def upload(request):
     return Ul(*[Li(file) for file in uploaded_files])
 
 
-@app.post("/upload-rfp")
-async def upload_rfp(request):
-    global rfp_questions
+@app.post("/upload-questions")
+async def upload_questions(request):
+    global questions
     form = await request.form()
-    rfp_file = form.get("rfp")
-    if not rfp_file:
-        return Div("No RFP file was uploaded.", _="on load wait 2s then remove me")
+    questions_file = form.get("questions")
+    if not questions_file:
+        return Div("No questions file was uploaded.", _="on load wait 2s then remove me")
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        file_path = os.path.join(temp_dir, rfp_file.filename)
+        file_path = os.path.join(temp_dir, questions_file.filename)
         with open(file_path, "wb") as f:
-            f.write(rfp_file.file.read())
+            f.write(questions_file.file.read())
 
         df = pd.read_csv(file_path)
-        rfp_questions = df.iloc[:, 0].tolist()
-        question_count = len(rfp_questions)
+        questions = df.iloc[:, 0].tolist()
+        question_count = len(questions)
 
-        logger.info(f"Uploaded RFP file: {rfp_file.filename} with {question_count} questions")
+        logger.info(
+            f"Uploaded questions file: {questions_file.filename} with {question_count} questions"
+        )
         logger.info(f"Stored {question_count} questions in global variable")
 
     return Div(
-        P(f"RFP file '{rfp_file.filename}' uploaded successfully."),
+        P(f"Questions file '{questions_file.filename}' uploaded successfully."),
         P(f"Number of questions: {question_count}"),
         Ol(
             *[
                 Li(question[:100] + "..." if len(question) > 100 else question)
-                for question in rfp_questions[:5]
+                for question in questions[:5]
             ]
         ),
         P("..." if question_count > 5 else ""),
     )
 
 
-async def process_questions(app: Application, questions: list[str]):
+async def answer_questions(app: Application, questions: list[str]):
     global qna
     qna = {"questions": questions, "answers": [], "sources": []}
     for query in qna["questions"]:
@@ -476,17 +482,17 @@ async def process_questions(app: Application, questions: list[str]):
                 break
 
 
-@app.post("/process")
-async def process_rfp(request):
+@app.post("/answer")
+async def answer(request):
     app = application(db=lance_db, model=MODEL, has_web=False, only_data=True)
-    await process_questions(app=app, questions=rfp_questions)
+    await answer_questions(app=app, questions=questions)
     logger.info(f"\n\nQNA: {qna}\n\n")
     return Div(
-        P("Processing complete!"),
+        Div(cls="divider"),
         A(
-            "Download Results",
+            "Download Answers",
             href="/download",
-            download="rfp_answers.docx",
+            download="answers.docx",
             id="download-button",
             cls="button",
             style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 4px; border: none; cursor: pointer;",
@@ -511,13 +517,18 @@ def create_hyperlink(
     return hyperlink
 
 
+def remove_temp_file(path: str):
+    sleep(5)
+    os.unlink(path)
+
+
 @app.get("/download")
 async def download_results(request):
-    logger.info(f"Downloading {len(qna['questions'])} questions")
+    logger.info(f"Downloading {len(qna['questions'])} answers")
     doc = Document()
 
     # Add title
-    title = doc.add_heading("RFP Answers", level=0)
+    title = doc.add_heading("Answers", level=0)
     title.alignment = 1  # type: ignore
 
     # Create styles
@@ -575,9 +586,9 @@ async def download_results(request):
 
     return FileResponse(
         tmp_path,
-        filename="rfp_answers.docx",
+        filename="answers.docx",
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        background=BackgroundTask(lambda: os.unlink(tmp_path)),
+        background=BackgroundTask(lambda: remove_temp_file(tmp_path)),
     )
 
 
