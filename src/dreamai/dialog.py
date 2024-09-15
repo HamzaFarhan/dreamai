@@ -111,30 +111,34 @@ class Example(BaseModel):
 
 class BadExample(Example):
     feedback: ExampleContent
-    correction: ExampleContent
+    correction: ExampleContent = ""
 
     @property
     def messages(self) -> list[MessageType]:
-        return super().messages + [
-            user_message(content=self.feedback),
-            assistant_message(content=self.correction),
-        ]
+        messages = super().messages + [user_message(content=self.feedback)]
+        if self.correction:
+            messages.append(assistant_message(content=self.correction))
+        return messages
 
     @classmethod
     def from_messages(cls, messages: list[MessageType]) -> Self:
-        assert len(messages) == 4, "BadExample must have exactly 4 messages"
         assert (
-            messages[0]["role"] == "user"
-            and messages[1]["role"] == "assistant"
-            and messages[2]["role"] == "user"
-            and messages[3]["role"] == "assistant"
-        ), "BadExample must have a user, assistant, user, and assistant message"
-        return cls(
-            user=messages[0]["content"],
-            assistant=messages[1]["content"],
-            feedback=messages[2]["content"],
-            correction=messages[3]["content"],
-        )
+            len(messages) == 3 or len(messages) == 4
+        ), "BadExample must have exactly 3 or 4 messages"
+        # assert (
+        #     messages[0]["role"] == "user"
+        #     and messages[1]["role"] == "assistant"
+        #     and messages[2]["role"] == "user"
+        #     and messages[3]["role"] == "assistant"
+        # ), "BadExample must have a user, assistant, user, and assistant message"
+        args = {
+            "user": messages[0]["content"],
+            "assistant": messages[1]["content"],
+            "feedback": messages[2]["content"],
+        }
+        if len(messages) == 4:
+            args["correction"] = messages[3]["content"]
+        return cls(**args)
 
 
 class ChangeRecord(BaseModel):
