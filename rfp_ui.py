@@ -550,6 +550,8 @@ async def download_results(request):
     sources_heading.runs[0].underline = True
 
     for i, question_sources in enumerate(qna["sources"], 1):
+        if not question_sources:
+            continue
         # Add subheading for each question's sources
         doc.add_heading(f"Question {i}", level=2)
 
