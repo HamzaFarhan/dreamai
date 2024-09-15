@@ -119,13 +119,13 @@ class Mode(StrEnum):
     SECURITY = "security"
 
 
+# @app.get("/")
+# async def root(request):
+#     return await home(request, Mode.RFP)
+
+
 @app.get("/")
-async def root(request):
-    return await home(request, Mode.RFP)
-
-
-@app.get("/{mode}")
-async def home(request: Request, mode: Mode):
+async def home(request: Request):
     current_index = request.query_params.get("index")
     indexes = get_sorted_indexes()
     if not current_index and indexes:
@@ -151,7 +151,7 @@ async def home(request: Request, mode: Mode):
     )
 
     return Container(
-        H1(f"{mode.upper() if len(mode) <= 3 else mode.title()} Questionnaire Tool"),
+        H1("Business Questionnaire Tool"),
         Div(
             Form(
                 index_selection,
@@ -207,11 +207,11 @@ async def home(request: Request, mode: Mode):
         Div(cls="divider"),
         Div(
             Div(
-                P("Upload your questions CSV file", cls="section-title"),
+                P("Upload your questionnaire CSV file", cls="section-title"),
                 Form(
                     Input(type="file", name="rfp", accept=".csv", id="rfp-input"),
                     Button(
-                        "Upload Questions",
+                        "Upload Questionnaire",
                         type="submit",
                         id="rfp-upload-button",
                         style="display: none;",
@@ -417,7 +417,7 @@ async def upload_rfp(request):
     form = await request.form()
     rfp_file = form.get("rfp")
     if not rfp_file:
-        return Div("No RFP file was uploaded.", _="on load wait 2s then remove me")
+        return Div("No questionnaire file was uploaded.", _="on load wait 2s then remove me")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         file_path = os.path.join(temp_dir, rfp_file.filename)
@@ -428,11 +428,11 @@ async def upload_rfp(request):
         rfp_questions = df.iloc[:, 0].tolist()
         question_count = len(rfp_questions)
 
-        logger.info(f"Uploaded RFP file: {rfp_file.filename} with {question_count} questions")
+        logger.info(f"Uploaded CSV file: {rfp_file.filename} with {question_count} questions")
         logger.info(f"Stored {question_count} questions in global variable")
 
     return Div(
-        P(f"RFP file '{rfp_file.filename}' uploaded successfully."),
+        P(f"Questionnaire file '{rfp_file.filename}' uploaded successfully."),
         P(f"Number of questions: {question_count}"),
         Ol(
             *[
@@ -486,7 +486,7 @@ async def process_rfp(request):
         A(
             "Download Results",
             href="/download",
-            download="rfp_answers.docx",
+            download="answers.docx",
             id="download-button",
             cls="button",
             style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 4px; border: none; cursor: pointer;",
@@ -517,7 +517,7 @@ async def download_results(request):
     doc = Document()
 
     # Add title
-    title = doc.add_heading("RFP Answers", level=0)
+    title = doc.add_heading("Questionnaire Answers", level=0)
     title.alignment = 1  # type: ignore
 
     # Create styles
@@ -575,7 +575,7 @@ async def download_results(request):
 
     return FileResponse(
         tmp_path,
-        filename="rfp_answers.docx",
+        filename="answers.docx",
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         background=BackgroundTask(lambda: os.unlink(tmp_path)),
     )
