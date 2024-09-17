@@ -1,0 +1,11 @@
+.ui-indicator{
+    display: none;
+}
+.htmx-request .ui-indicator{
+    display: inline;
+    color: #007bff;  /* Blue color */
+}
+.htmx-request.ui-indicator{
+    display: inline;
+    color: #007bff;  /* Blue color */
+}
