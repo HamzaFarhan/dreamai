@@ -108,7 +108,10 @@ async def home():
             Form(
                 Input(type="file", name="questions", accept=".csv", id="questions-input"),
                 Button(
-                    "Upload Security Questionnaire", type="submit", id="questions-upload-button", style="display: none;"
+                    "Upload Security Questionnaire",
+                    type="submit",
+                    id="questions-upload-button",
+                    style="display: none;",
                 ),
                 hx_post="/upload-questions",
                 hx_target="#questions-info",
@@ -225,7 +228,9 @@ async def upload_questions(request):
         questions = df.iloc[:, 0].tolist()
         question_count = len(questions)
 
-        logger.info(f"Uploaded questions file: {questions_file.filename} with {question_count} questions")
+        logger.info(
+            f"Uploaded questions file: {questions_file.filename} with {question_count} questions"
+        )
         logger.info(f"Stored {question_count} questions in global variable")
 
     return Div(

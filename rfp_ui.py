@@ -34,7 +34,7 @@ from fasthtml.common import (
     serve,
 )
 from loguru import logger
-from lxml import etree
+from lxml import etree # type: ignore
 from starlette.background import BackgroundTask
 from starlette.requests import Request
 from starlette.responses import FileResponse

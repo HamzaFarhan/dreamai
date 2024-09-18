@@ -1,12 +1,11 @@
-import json
 import os
+import random
 import tempfile
 from enum import StrEnum
 from pathlib import Path
+from time import sleep
 
-import lancedb
 import pandas as pd
-from burr.core import Application
 from docx import Document
 from docx.enum.style import WD_STYLE_TYPE
 from docx.oxml.ns import qn
@@ -41,10 +40,8 @@ from loguru import logger
 from lxml import etree  # type: ignore
 from starlette.background import BackgroundTask
 
-from dreamai.rag import application
-from dreamai.rag_utils import add_data_with_descriptions
+from dreamai.md_utils import docs_to_md
 from dreamai.settings import ModalSettings
-from dreamai.utils import flatten_list
 
 modal_settings = ModalSettings()
 
@@ -150,7 +147,7 @@ def questionnaire_upload(mode: Mode, current_index: str, hx_swap_oob: str | None
 
 
 def questionnaire_answers(
-    mode: Mode, questions: list[str] | None = None, hx_swap_oob: str | None = None
+    mode: Mode = Mode.RFP, questions: list[str] | None = None, hx_swap_oob: str | None = None
 ):
     if not questions:
         return Div(id="questionnaire-answers", hx_swap_oob=hx_swap_oob)
@@ -173,7 +170,7 @@ async def root():
 
 
 @app.get("/{mode}")
-async def home(mode: Mode, index: str = ""):
+async def home(mode: Mode = Mode.RFP, index: str = ""):
     indexes = get_sorted_indexes()
     current_index = index or indexes[0] if indexes else index
     container_components = [
@@ -217,10 +214,8 @@ async def home(mode: Mode, index: str = ""):
 
 @app.get("/{mode}/index-info")
 def index_info(mode: Mode, index: str, index_folder: str | Path = LANCE_DIR):
-    global lance_db
     index = index.strip().replace(" ", "_")
-    lance_db = lancedb.connect(Path(index_folder) / index)
-    existing_tables = list(lance_db.table_names())
+    existing_tables = get_sorted_indexes(Path(index_folder) / index)
     div = [H5(f"Index: {index}")]
     if existing_tables:
         div.append(P(f"{len(existing_tables)} Existing Data Sources:"))
@@ -236,7 +231,7 @@ def index_info(mode: Mode, index: str, index_folder: str | Path = LANCE_DIR):
 
 
 @app.post("/{mode}/select-index")
-def select_index(mode: Mode, index: str = ""):
+def select_index(mode: Mode = Mode.RFP, index: str = ""):
     return (
         index_info(mode=mode, index=index),
         documents_upload(mode=mode, current_index=index, hx_swap_oob="outerHTML"),
@@ -251,6 +246,7 @@ async def upload_documents(mode: Mode, request):
     documents = form.getlist("documents")
     logger.info(documents)
     uploaded_files = []
+    sleep(1)
     with tempfile.TemporaryDirectory() as temp_dir:
         for file in documents:
             logger.info(file)
@@ -258,16 +254,8 @@ async def upload_documents(mode: Mode, request):
             file_path = Path(temp_dir) / file_name
             with open(file_path, "wb") as f:
                 f.write(file.file.read())
-            if lance_db.table_names() and file_name in lance_db.table_names():
-                uploaded_files.append(f"{file_name} (already exists)")
-                continue
+            logger.success(f"{file_name} MD:\n\n{docs_to_md(file_path)[0].markdown}")
             uploaded_files.append(file_name)
-            add_data_with_descriptions(
-                model=MODEL,
-                lance_db=lance_db,
-                data=file_path,
-                table_descriptions=table_descriptions,
-            )
         logger.info(f"Processed {len(uploaded_files)} files")
     return Div(
         H6(f"Uploaded {len(uploaded_files)} files"),
@@ -307,39 +295,22 @@ async def upload_questionnaire(mode: Mode, request):
             ],
             style="overflow-y: auto; max-height: 250px;",
         ),
-    ), questionnaire_answers(mode=mode, questions=questions, hx_swap_oob="outerHTML")
+    ), questionnaire_answers(questions=questions, hx_swap_oob="outerHTML")
 
 
-async def _answer_questions(rag_app: Application, questions: list[str]):
+async def _answer_questions(questions: list[str]):
+    sleep(1)
     global qna
     qna = {"questions": questions, "answers": [], "sources": []}
-    for query in qna["questions"]:
-        inputs = {"query": query}
-        logger.info(f"\nProcessing query: {query}")
-        while True:
-            step_result = rag_app.step(inputs=inputs)
-            if step_result is None:
-                logger.error("Error: rag_app.step() returned None")
-                break
-            action, result, _ = step_result
-            logger.info(f"\nAction: {action.name}\n")
-            logger.success(f"RESULT: {result}\n")
-            if action.name == "terminate":
-                break
-            elif action.name in ["update_chat_history"]:
-                qna["answers"].append(result["chat_history"][-1]["content"])
-                qna["sources"].append(
-                    [
-                        {k: v for k, v in json.loads(d).items() if k != "index"}
-                        for d in set(
-                            [
-                                json.dumps(s, sort_keys=True)
-                                for s in flatten_list(rag_app.state.get("source_docs", []))
-                            ]
-                        )
-                    ]
-                )
-                break
+    for i, question in enumerate(questions, 1):
+        logger.info(f"\nAnswering question: {question}")
+        qna["answers"].append(f"Answer to question {i}: ...")
+        qna["sources"].append(
+            [
+                {"name": "filename", "text": f"source {s} ..."}
+                for s in range(random.randint(1, 3))
+            ]
+        )
 
 
 def create_hyperlink(
@@ -360,8 +331,7 @@ def create_hyperlink(
 
 @app.get("/{mode}/answer-questions")
 async def answer_questions(mode: Mode):
-    rag_app = application(db=lance_db, model=MODEL, has_web=False, only_data=True)
-    await _answer_questions(rag_app=rag_app, questions=questions)
+    await _answer_questions(questions=questions)
     return A("Download Answers", href=f"/{mode}/download", cls="download-button")
 
 
@@ -371,9 +341,7 @@ async def download_file(mode: Mode):
     doc = Document()
 
     # Add title
-    title = doc.add_heading(
-        f"{mode.upper() if len(mode) <= 3 else mode.title()} Questionnaire Answers", level=0
-    )
+    title = doc.add_heading("Questionnaire Answers", level=0)
     title.alignment = 1  # type: ignore
 
     # Create styles

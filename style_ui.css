@@ -1,11 +1,21 @@
 .ui-indicator{
     display: none;
 }
-.htmx-request .ui-indicator{
+.htmx-request .ui-indicator {
     display: inline;
-    color: #007bff;  /* Blue color */
+    color: #007bff;
 }
-.htmx-request.ui-indicator{
+.htmx-request.ui-indicator {
     display: inline;
-    color: #007bff;  /* Blue color */
+    color: #007bff;
+}
+.download-button {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
 }

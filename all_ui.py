@@ -35,7 +35,7 @@ from fasthtml.common import (
     serve,
 )
 from loguru import logger
-from lxml import etree
+from lxml import etree # type: ignore
 from starlette.background import BackgroundTask
 from starlette.requests import Request
 from starlette.responses import FileResponse
@@ -244,7 +244,7 @@ async def home(request: Request, mode: Mode = Mode.RFP):
         Script("""
         var indexSelect = document.getElementById('index-select');
         var newIndexInput = document.getElementById('new-index-input');
-        
+
         if (indexSelect) {
             indexSelect.addEventListener('change', function() {
                 if (newIndexInput) {
@@ -252,7 +252,7 @@ async def home(request: Request, mode: Mode = Mode.RFP):
                 }
             });
         }
-        
+
         document.body.addEventListener('htmx:beforeRequest', function(evt) {
             if (evt.detail.pathInfo.requestPath === '/upload') {
                 document.querySelector('#document-upload-section .spinner-container').style.display = 'block';
@@ -312,7 +312,7 @@ async def home(request: Request, mode: Mode = Mode.RFP):
         //         }, 1000);  // Wait for 1 second to ensure the download has started
         //     }
         // });
-        
+
         document.addEventListener('DOMContentLoaded', function() {
             var indexSelect = document.getElementById('index-select');
             if (indexSelect) {
