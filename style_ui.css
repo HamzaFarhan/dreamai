@@ -1,4 +1,4 @@
-.ui-indicator{
+.ui-indicator {
     display: none;
 }
 .htmx-request .ui-indicator {
@@ -12,7 +12,7 @@
 .download-button {
     display: inline-block;
     padding: 10px 20px;
-    background-color: #4CAF50;
+    background-color: #4caf50;
     color: white;
     text-decoration: none;
     border-radius: 4px;

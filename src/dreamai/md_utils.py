@@ -177,6 +177,7 @@ def docx_to_md(docx_path: str | Path) -> str:
     try:
         with open(docx_path, "rb") as docx_file:
             html = mammoth.convert_to_html(docx_file).value
+            mammoth.convert
     except Exception:
         logger.exception(f"Could not convert {docx_path} to html.")
     md = html

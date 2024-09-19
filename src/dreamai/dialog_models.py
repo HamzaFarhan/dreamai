@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Annotated, Any, Literal, Self
 from uuid import uuid4
 
@@ -72,6 +73,7 @@ class TableDescription(BaseModel):
     def validate_name(cls, v: str, info: ValidationInfo) -> str:
         v = to_camel(to_camel(v.strip(), sep="_"), sep=" ")
         v = "".join(c for c in v if c.isalnum() or c in ["_", "-", "."])
+        v = Path(v).stem
         context = info.context
         if context is None:
             return v

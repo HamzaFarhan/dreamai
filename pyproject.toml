@@ -42,6 +42,7 @@ dependencies = [
     "mammoth>=1.8.0",
     "modal>=0.64.90",
     "jsonref>=1.1.0",
+    "matplotlib>=3.9.2",
 ]
 
 [tool.ruff]

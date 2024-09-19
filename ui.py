@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import tempfile
 from enum import StrEnum
 from pathlib import Path
@@ -173,7 +174,7 @@ async def root():
 
 
 @app.get("/{mode}")
-async def home(mode: Mode, index: str = ""):
+async def home(mode: Mode, index: str = "", hx_swap_oob: str | None = None):
     indexes = get_sorted_indexes()
     current_index = index or indexes[0] if indexes else index
     container_components = [
@@ -212,7 +213,7 @@ async def home(mode: Mode, index: str = ""):
         questionnaire_upload(mode=mode, current_index=current_index),
         questionnaire_answers(mode=mode),
     ]
-    return Main(*container_components, cls="container")
+    return Main(*container_components, cls="container", id="home", hx_swap_oob=hx_swap_oob)
 
 
 @app.get("/{mode}/index-info")
@@ -232,11 +233,28 @@ def index_info(mode: Mode, index: str, index_folder: str | Path = LANCE_DIR):
         )
     else:
         div.append(P("No data sources found. Upload documents to create data sources."))
+    div.append(
+        A(
+            "Delete Index",
+            hx_delete=f"/{mode}/delete-index?index={index}",
+            hx_confirm=f"Are you sure you want to delete {index}?",
+            hx_target="#home",
+            style="display: inline-block; padding: 10px 20px; background-color: white; color: red; text-decoration: none; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;",
+        )
+    )
     return Div(*div, id="index-info")
 
 
+@app.delete("/{mode}/delete-index")
+async def delete_index(mode: Mode, index: str, index_folder: str | Path = LANCE_DIR):
+    index_path = Path(index_folder) / index
+    if index_path.exists():
+        shutil.rmtree(index_path)
+    return await home(mode=mode)
+
+
 @app.post("/{mode}/select-index")
-def select_index(mode: Mode, index: str = ""):
+def select_index(mode: Mode, index: str):
     return (
         index_info(mode=mode, index=index),
         documents_upload(mode=mode, current_index=index, hx_swap_oob="outerHTML"),
@@ -253,7 +271,7 @@ async def upload_documents(mode: Mode, request):
     uploaded_files = []
     with tempfile.TemporaryDirectory() as temp_dir:
         for file in documents:
-            logger.info(file)
+            # logger.info(file)
             file_name = file.filename
             file_path = Path(temp_dir) / file_name
             with open(file_path, "wb") as f:
@@ -269,13 +287,13 @@ async def upload_documents(mode: Mode, request):
                 table_descriptions=table_descriptions,
             )
         logger.info(f"Processed {len(uploaded_files)} files")
+    index = Path(lance_db.uri).name
     return Div(
         H6(f"Uploaded {len(uploaded_files)} files"),
         Ul(*[Li(file) for file in uploaded_files]),
-        hx_get=f"/{mode}/index-info",
+        hx_get=f"/{mode}/index-info?index={index}",
         hx_trigger="load",
         hx_target="#index-info",
-        hx_include="#index-select",
     )
 
 
