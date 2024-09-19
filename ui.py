@@ -49,7 +49,7 @@ from dreamai.utils import flatten_list
 
 modal_settings = ModalSettings()
 
-LANCE_DIR = Path("/home/hamza/dev/lance")
+LANCE_DIR = modal_settings.lance_dir
 # LANCE_DIR = Path("/home/hamza/dev/empty_lance")
 SOURCE_TEXT_SIZE = 100_000
 MODEL = modal_settings.model
