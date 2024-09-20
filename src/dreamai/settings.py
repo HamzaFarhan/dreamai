@@ -9,7 +9,7 @@ DEV_DIR = "/home/hamza/dev"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file="sai_settings.env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file="dai_settings.env", env_file_encoding="utf-8")
 
 
 class CreatorSettings(Settings):
