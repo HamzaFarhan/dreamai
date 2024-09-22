@@ -75,14 +75,15 @@ def chunk_text(
         else:
             if current_chunk:
                 end_index = start_index + len(current_chunk)
-                result.append({"text": chunk, "start": start_index, "end": end_index})
+                result.append(
+                    {"text": current_chunk, "start": max(0, start_index), "end": end_index}
+                )
                 if chunk_overlap > 0 and len(current_chunk) > chunk_overlap:
-                    overlap_start = end_index - chunk_overlap
-                    current_chunk = text[overlap_start:end_index] + " " + chunk
-                    start_index = overlap_start
+                    chunk = current_chunk[-chunk_overlap:] + " " + chunk
+                    start_index = end_index - chunk_overlap
                 else:
-                    current_chunk = chunk
                     start_index = end_index
+            current_chunk = chunk
     if current_chunk:
         result.append(
             {
