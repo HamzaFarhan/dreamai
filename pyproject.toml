@@ -44,6 +44,7 @@ dependencies = [
     "jsonref>=1.1.0",
     "matplotlib>=3.9.2",
     "fuzzysearch>=0.7.3",
+    "markdown2[all]>=2.5.0",
 ]
 
 [tool.ruff]

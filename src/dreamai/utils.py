@@ -10,6 +10,13 @@ from typing import Final, Iterable
 
 import demoji
 
+from dreamai.settings import RAGSettings
+
+rag_settings = RAGSettings()
+
+CHUNK_SIZE = rag_settings.chunk_size
+CHUNK_OVERLAP = rag_settings.chunk_overlap
+SEPARATORS = rag_settings.separators
 UNICODE_BULLETS: Final[list[str]] = [
     "\u0095",
     "\u2022",
@@ -46,35 +53,44 @@ DOUBLE_PARAGRAPH_PATTERN_RE = re.compile("(" + PARAGRAPH_PATTERN + "){2}")
 
 def chunk_text(
     text: str,
-    chunk_size: int = 800,
-    chunk_overlap: int = 200,
+    chunk_size: int = CHUNK_SIZE,
+    chunk_overlap: int = CHUNK_OVERLAP,
     keep_separator: bool = True,
     separators: list[str] | None = None,
-) -> list[str]:
+) -> list[dict]:
     if chunk_size == 0 or len(text) <= chunk_size:
-        return [text]
+        return [{"text": text, "start": 0, "end": len(text)}]
     chunk_overlap = min(chunk_overlap, chunk_size // 2)
-    # assert chunk_size > chunk_overlap, "chunk_size must be greater than chunk_overlap"
     separators = separators or [r"#{1,6}\s+", r"\*\*.*?\*\*", r"---", r"\n\n", r"\n"]
     pattern = f'({"|".join(separators)})' if keep_separator else f'(?:{"|".join(separators)})'
 
     chunks = re.split(pattern, text)
     chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
-
     result = []
     current_chunk = ""
-
+    start_index = 0
     for chunk in chunks:
         if len(current_chunk) + len(chunk) <= chunk_size or not current_chunk:
             current_chunk += (" " if current_chunk else "") + chunk
         else:
             if current_chunk:
-                result.append(current_chunk)
+                end_index = start_index + len(current_chunk)
+                result.append({"text": chunk, "start": start_index, "end": end_index})
                 if chunk_overlap > 0 and len(current_chunk) > chunk_overlap:
-                    chunk = current_chunk[-chunk_overlap:] + " " + chunk
-            current_chunk = chunk
+                    overlap_start = end_index - chunk_overlap
+                    current_chunk = text[overlap_start:end_index] + " " + chunk
+                    start_index = overlap_start
+                else:
+                    current_chunk = chunk
+                    start_index = end_index
     if current_chunk:
-        result.append(current_chunk)
+        result.append(
+            {
+                "text": current_chunk,
+                "start": start_index,
+                "end": start_index + len(current_chunk),
+            }
+        )
     return result
 
 
@@ -161,6 +177,12 @@ def dict_to_xml(d: dict) -> str:
     for key, value in d.items():
         xml_str += f"<{key}>\n{value}\n</{key}>\n"
     return xml_str.strip()
+
+
+def insert_xml_tag(text: str, tag: str, start: int, end: int) -> str:
+    if not tag.startswith("<"):
+        tag = f"<{tag}>"
+    return text[:start] + tag + text[start:end] + f"</{tag[1:]}" + text[end:]
 
 
 def _txt_to_content(content_file: str | Path) -> str:

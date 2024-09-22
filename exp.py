@@ -1,78 +1,63 @@
 # %%
-import concurrent.futures
+
 import json
-import re
+from pathlib import Path
 
-from fuzzysearch import find_near_matches
+import markdown2
+from dotenv import load_dotenv
 
+from dreamai.md_utils import data_to_md
+from dreamai.utils import insert_xml_tag
 
-def count_markdown_formatters(text: str) -> tuple[dict, int]:
-    formatters = {
-        "headers": (r"^#{1,6}\s", lambda m: len(m.strip())),
-        "bold_italic": (r"\*{3}.*?\*{3}", lambda _: 6),
-        "bold": (r"\*{2}.*?\*{2}", lambda _: 4),
-        "italic": (r"\*.*?\*", lambda _: 2),
-        "strikethrough": (r"~~.*?~~", lambda _: 4),
-        "code_block": (r"```[\s\S]*?```", lambda _: 6),
-        "inline_code": (r"`[^`\n]+`", lambda _: 2),
-        "blockquote": (r"^>\s", lambda m: len(m.strip())),
-        "unordered_list": (r"^\s*[-*+]\s", lambda m: len(m.strip())),
-        "ordered_list": (r"^\s*\d+\.\s", lambda m: len(m.strip())),
-        "horizontal_rule": (r"^---|\*\*\*|___\s*$", lambda m: len(m.strip())),
-        "link": (r"\[.*?\]\(.*?\)", len),
-        "image": (r"!\[.*?\]\(.*?\)", len),
-    }
-    counts = {f: len(re.findall(p, text, re.MULTILINE)) for f, (p, _) in formatters.items()}
-    total = sum(
-        sum(c(m) for m in re.findall(p, text, re.MULTILINE))
-        for _, (p, c) in formatters.items()
-    )
-    return counts, total
+load_dotenv()
+# %%
 
-
-all_md = json.load(open("md_chunks.json"))
-page = 9
-md_chunk = [chunk for chunk in all_md if chunk["metadata"]["page"] == page][0]
-md = """
-**Applicable Margin**" shall mean 0% with respect to the portion of the Loan to which a # Base Rate
-Option applies, and *1.05%* with respect to the portion of the Loan to which a Term *SOFR* Rate Option applies.
-"""
+file_path = "/media/hamza/data2/loan2.pdf"
+pdf_md = data_to_md(data=file_path, chunk_size=800, chunk_overlap=200)[0]
+with open("pdf_md.json", "w") as f:
+    json.dump(pdf_md.model_dump(), f, indent=2)
 
 # %%
-max_deletions = count_markdown_formatters(md)
-print(max_deletions)
+
+file_path = "/media/hamza/data2/loan2.docx"
+docx_md = data_to_md(data=file_path, with_pages=False)[0]
+with open("docx_md.json", "w") as f:
+    json.dump(docx_md.model_dump(), f, indent=2)
+# %%
+[len(chunk.text) for chunk in pdf_md.chunks]
 
 
 # %%
 
+chunk = pdf_md.chunks[14]
+print(chunk)
+marked_md = insert_xml_tag(
+    pdf_md.markdown, "mark", chunk.metadata["start"], chunk.metadata["end"]
+)
+Path("marked_pdf_html.html").write_text(marked_md)
 
-def find(subsequence: str, sequence: str, max_l_dist: int) -> list:
-    return find_near_matches(subsequence, sequence, max_l_dist=max_l_dist)
+# %%
 
+url = "https://www.sec.gov/Archives/edgar/data/1645590/000164559024000119/ex-1039xcreditagreementame.htm"
+url_md = data_to_md(
+    data=url, headers={"User-Agent": "Mozilla/5.0 (Company info@company.com)"}
+)[0].markdown
+Path("url_md.md").write_text(url_md)
 
-def search_with_timeout(
-    subsequence: str, sequence: str, max_l_dist: int, timeout: int = 30
-) -> str:
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        future = executor.submit(find, subsequence, sequence, max_l_dist=max_l_dist)
-        try:
-            matches = future.result(timeout=timeout)
-        except concurrent.futures.TimeoutError:
-            print(f"Search operation timed out after {timeout} seconds.")
-            matches = []
-    if not matches:
-        return sequence
-    return sequence[matches[0].start : matches[0].end]
+# %%
 
+url_md = Path("url_md.md").read_text()
+url_md = insert_xml_tag(url_md, "mark", 15, 50)
+url_html = markdown2.markdown(url_md)
+Path("url_html.html").write_text(url_html)
 
-# Use the function
-try:
-    match = search_with_timeout(
-        subsequence=md, sequence=md_chunk["text"], max_l_dist=max_deletions[1] + 5, timeout=30
-    )
-except Exception as e:
-    print(f"An error occurred: {e}")
-    match = [md_chunk["text"]]  # Return the full sequence in case of any error
+# %%
 
-
-match
+pdf_md = Path("pdf_md.md").read_text()
+start = pdf_md.find(
+    "revolving and amortising loan and letter of credit facility for\n\nloans of up"
+)
+end = start + 111
+marked_pdf_md = insert_xml_tag(pdf_md, "mark", start, end)
+pdf_html = markdown2.markdown(marked_pdf_md)
+Path("pdf_html.html").write_text(pdf_html)

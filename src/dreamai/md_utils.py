@@ -45,6 +45,7 @@ class MarkdownData(BaseModel):
     name: str
     markdown: str
     chunks: list[MarkdownChunk] = Field(default_factory=list)
+    chunk_metadata: dict = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def create_chunks(self, info: ValidationInfo) -> Self:
@@ -54,8 +55,14 @@ class MarkdownData(BaseModel):
         chunk_size = context.get("chunk_size", CHUNK_SIZE)
         chunk_overlap = context.get("chunk_overlap", CHUNK_OVERLAP)
         separators = context.get("separators", SEPARATORS)
+        # logger.info(f"Chunk Metadata: {self.chunk_metadata}")
         self.chunks = [
-            MarkdownChunk(text=chunk, name=self.name, index=i)
+            MarkdownChunk(
+                text=chunk["text"],
+                name=self.name,
+                index=i,
+                metadata={**self.chunk_metadata, "start": chunk["start"], "end": chunk["end"]},
+            )
             for i, chunk in enumerate(
                 chunk_text(
                     text=self.markdown,
@@ -118,12 +125,12 @@ def clean_web_content(content: str, min_length: int = 3) -> str:
     )
 
 
-def web_search(query: str, max_results: int = MAX_SEARCH_RESULTS) -> list[dict]:
-    return DDGS().text(query, max_results=max_results)
+def web_search(query: str, max_search_results: int = MAX_SEARCH_RESULTS) -> list[dict]:
+    return DDGS().text(query, max_results=max_search_results)
 
 
-def get_url_body(url: str) -> str:
-    body = lxml.html.fromstring(httpx.get(url).text).xpath("//body")[0]  # type: ignore
+def get_url_body(url: str, headers: dict | None = None) -> str:
+    body = lxml.html.fromstring(httpx.get(url, headers=headers).text).xpath("//body")[0]  # type: ignore
     body = Cleaner(javascript=True, style=True).clean_html(body)
     return "".join(lxml.html.tostring(c, encoding="unicode") for c in body)  # type: ignore
 
@@ -177,7 +184,6 @@ def docx_to_md(docx_path: str | Path) -> str:
     try:
         with open(docx_path, "rb") as docx_file:
             html = mammoth.convert_to_html(docx_file).value
-            mammoth.convert
     except Exception:
         logger.exception(f"Could not convert {docx_path} to html.")
     md = html
@@ -192,20 +198,22 @@ def docx_to_md(docx_path: str | Path) -> str:
 def urls_to_md(
     urls: list[str] | str,
     extractor: str = "h2t",
+    headers: dict | None = None,
     clean_content: bool = True,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
     separators: list[str] = SEPARATORS,
+    chunk_metadata: dict | None = None,
 ) -> list[MarkdownData]:
     if isinstance(urls, str):
         urls = [urls]
     urls_md = []
     for url in urls:
-        md = url_body_to_md(body=get_url_body(url), extractor=extractor)
+        md = url_body_to_md(body=get_url_body(url, headers=headers), extractor=extractor)
         md = clean_web_content(content=md) if clean_content else md
         urls_md.append(
             MarkdownData.model_validate(
-                {"name": url, "markdown": md},
+                {"name": url, "markdown": md, "chunk_metadata": chunk_metadata or {}},
                 context={
                     "chunk_size": chunk_size,
                     "chunk_overlap": chunk_overlap,
@@ -220,17 +228,18 @@ def search_query_to_md(
     query: str,
     extractor: str = "h2t",
     clean_content: bool = True,
-    max_results: int = MAX_SEARCH_RESULTS,
+    max_search_results: int = MAX_SEARCH_RESULTS,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
     separators: list[str] = SEPARATORS,
+    chunk_metadata: dict | None = None,
 ) -> list[MarkdownData]:
     to_md_kwargs = {
         "chunk_size": chunk_size,
         "chunk_overlap": chunk_overlap,
         "separators": separators,
     }
-    search_results = web_search(query=query, max_results=max_results)
+    search_results = web_search(query=query, max_search_results=max_search_results)
     mds = []
     for search_result in search_results:
         md = urls_to_md(
@@ -243,6 +252,7 @@ def search_query_to_md(
                 {
                     "name": search_result["href"],
                     "markdown": "\n".join([search_result["title"], search_result["body"]]),
+                    "chunk_metadata": chunk_metadata or {},
                 },
                 context=to_md_kwargs,
             )
@@ -253,13 +263,16 @@ def search_query_to_md(
 
 def docs_to_md(
     docs: list[str | Path] | str | Path,
+    with_pages: bool = False,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
     separators: list[str] = SEPARATORS,
+    chunk_metadata: dict | None = None,
 ) -> list[MarkdownData]:
     docs_md = []
     for doc in resolve_data_path(data_path=docs):
         doc = Path(doc)
+        # md_chunks = []
         if not doc.exists():
             md = str(doc)
         elif doc.suffix in [".md", ".txt"]:
@@ -269,22 +282,52 @@ def docs_to_md(
         elif doc.suffix == ".docx":
             md = docx_to_md(docx_path=doc)
         elif doc.suffix == ".pdf":
-            # elif doc.suffix in [".pdf", ".doc", ".ppt", ".pptx", ".xls", ".xlsx"]:
             with tempfile.TemporaryDirectory() as image_folder:
-                md = replace_image_tags(
-                    md=pymupdf4llm.to_markdown(
-                        doc=str(doc),
-                        write_images=True,
-                        image_path=image_folder,
-                        table_strategy="lines",
-                    ),
-                    image_folder=image_folder,
+                md = pymupdf4llm.to_markdown(
+                    doc=str(doc),
+                    write_images=True,
+                    image_path=image_folder,
+                    table_strategy="lines",
+                    page_chunks=with_pages,
                 )
+                # if isinstance(pdf_md, str):
+                #     pdf_md = [{"metadata": {"page": 1}, "text": pdf_md}]
+                # md = ""
+                # for md_ in pdf_md:
+                #     md += md_["text"]
+                #     md_chunks.extend(
+                #         [
+                #             MarkdownChunk(
+                #                 text=chunk["text"],
+                #                 name=doc.name,
+                #                 index=i + len(md_chunks),
+                #                 metadata={
+                #                     **md_["metadata"],
+                #                     "start": chunk["start"],
+                #                     "end": chunk["end"],
+                #                 },
+                #             )
+                #             for i, chunk in enumerate(
+                #                 chunk_text(
+                #                     text=md_["text"],
+                #                     chunk_size=chunk_size,
+                #                     chunk_overlap=chunk_overlap,
+                #                     separators=separators,
+                #                 )
+                #             )
+                #         ]
+                #     )
         else:
             md = str(doc)
+        # logger.info(f"MD: {md}")
         docs_md.append(
             MarkdownData.model_validate(
-                {"name": doc.name, "markdown": md},
+                {
+                    "name": doc.name,
+                    "markdown": md,
+                    # "chunks": md_chunks,
+                    "chunk_metadata": chunk_metadata or {},
+                },
                 context={
                     "chunk_size": chunk_size,
                     "chunk_overlap": chunk_overlap,
@@ -298,10 +341,13 @@ def docs_to_md(
 def data_to_md(
     data: list[str | Path] | str | Path | None = None,
     search_queries: list[str] | str | None = None,
-    max_results: int = MAX_SEARCH_RESULTS,
+    max_search_results: int = MAX_SEARCH_RESULTS,
+    with_pages: bool = False,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
     separators: list[str] = SEPARATORS,
+    chunk_metadata: dict | None = None,
+    headers: dict | None = {"User-Agent": "Mozilla/5.0 (Company info@company.com)"},
 ) -> list[MarkdownData]:
     data = data or []
     search_queries = search_queries or []
@@ -310,20 +356,23 @@ def data_to_md(
         "chunk_size": chunk_size,
         "chunk_overlap": chunk_overlap,
         "separators": separators,
+        "chunk_metadata": chunk_metadata or {},
     }
     data_md = []
     if not isinstance(search_queries, list):
         search_queries = [search_queries]
     for search_query in search_queries:
         data_md.extend(
-            search_query_to_md(query=search_query, max_results=max_results, **to_md_kwargs)
+            search_query_to_md(
+                query=search_query, max_search_results=max_search_results, **to_md_kwargs
+            )
         )
     if not isinstance(data, list):
         data = [data]
     for item in data:
         item = str(item)
         if is_url(item):
-            data_md.extend(urls_to_md(urls=item, **to_md_kwargs))
+            data_md.extend(urls_to_md(urls=item, headers=headers, **to_md_kwargs))
         else:
-            data_md.extend(docs_to_md(docs=item, **to_md_kwargs))
+            data_md.extend(docs_to_md(docs=item, with_pages=with_pages, **to_md_kwargs))
     return data_md

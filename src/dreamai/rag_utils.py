@@ -34,7 +34,7 @@ def add_data_with_descriptions(
     lance_db: LanceDBConnection,
     data: list[str | Path] | str | Path | None = None,
     search_queries: list[str] | str | None = None,
-    max_results: int = MAX_SEARCH_RESULTS,
+    max_search_results: int = MAX_SEARCH_RESULTS,
     table_descriptions: list[TableDescription] | None = None,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
@@ -45,7 +45,7 @@ def add_data_with_descriptions(
     md_data_list = data_to_md(
         data=data,
         search_queries=search_queries,
-        max_results=max_results,
+        max_search_results=max_search_results,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
     )

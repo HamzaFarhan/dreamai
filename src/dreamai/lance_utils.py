@@ -76,7 +76,7 @@ def search_lancedb(
     table_name: str,
     query: list[str] | str,
     reranker: Reranker | None = None,
-    max_results: int = MAX_SEARCH_RESULTS,
+    max_search_results: int = MAX_SEARCH_RESULTS,
 ) -> list[dict]:
     table = db.open_table(name=table_name)
     queries = [query] if isinstance(query, str) else query
@@ -86,7 +86,7 @@ def search_lancedb(
             return table.search(query=q, query_type="hybrid")
         return table.search(query=q, query_type="hybrid").rerank(reranker=reranker)  # type:ignore
 
-    search_results = [_searcher(q).limit(max_results).to_pandas() for q in queries]
+    search_results = [_searcher(q).limit(max_search_results).to_pandas() for q in queries]
     if len(search_results) == 0:
         return []
     results = (

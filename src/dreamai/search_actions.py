@@ -23,7 +23,7 @@ DIALOGS_FOLDER = dialog_settings.dialogs_folder
 def search_web(state: State) -> tuple[dict[str, list[dict] | BadExample | None], State]:
     try:
         results = search_query_to_md(
-            query=state["query"], max_results=MAX_SEARCH_RESULTS, chunk_size=0
+            query=state["query"], max_search_results=MAX_SEARCH_RESULTS, chunk_size=0
         )
         results = [result.model_dump(exclude={"chunks"}) for result in results]
     except Exception:
@@ -75,7 +75,7 @@ def search_lancedb(
             table_name=state["steps"][-1].step,
             query=state["query"],
             reranker=reranker,
-            max_results=MAX_SEARCH_RESULTS,
+            max_search_results=MAX_SEARCH_RESULTS,
         )
     except Exception:
         logger.exception("Error in search_lancedb")
