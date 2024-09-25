@@ -10,8 +10,9 @@ from dreamai.ai import ModelName
 from dreamai.dialog import BadExample, Dialog, MessageType, assistant_message, user_message
 from dreamai.dialog_models import (
     EvalWithReasoning,
+    ResponseWithConfidence,
     TableDescription,
-    create_response_with_confidence_model,
+    model_with_typed_response,
 )
 from dreamai.response_actions import _query_to_response
 from dreamai.settings import CreatorSettings, DialogSettings, RAGAppSettings, RAGRoute
@@ -50,7 +51,9 @@ def _query_to_route(
     routes: list[Any],
     chat_history: list[MessageType] | None = None,
 ) -> StepWithConfidence:
-    response_model = create_response_with_confidence_model(response_type=routes)
+    response_model = model_with_typed_response(
+        model_name="RouteWithConfidence", response_type=routes, base=ResponseWithConfidence
+    )
     dialog = Dialog(
         task=str(Path(DIALOGS_FOLDER) / "router_task.txt"), chat_history=chat_history or []
     )
@@ -100,9 +103,11 @@ def _tables_menu(
 
 @action(
     reads=["only_ai", "only_data", "only_web", "steps"],
-    writes=["query", "steps", "source_docs"],
+    writes=["query", "response_type", "steps", "source_docs"],
 )
-def get_query(state: State, query: str) -> tuple[dict[str, str | StepWithConfidence], State]:
+def get_query(
+    state: State, query: str, response_type: list | type = str
+) -> tuple[dict[str, str | StepWithConfidence], State]:
     if state["only_ai"]:
         route = RAGRoute.ASSISTANT
     elif state["only_data"]:
@@ -112,9 +117,9 @@ def get_query(state: State, query: str) -> tuple[dict[str, str | StepWithConfide
     else:
         route, query = _get_route(query=query)
     step = StepWithConfidence(step=route, confidence=DEFAULT_CONFIDENCE)
-    return {"query": query, "step": step}, state.update(query=query).append(steps=step).update(
-        source_docs=[]
-    )
+    return {"query": query, "step": step}, state.update(
+        query=query, response_type=response_type, source_docs=[]
+    ).append(steps=step)
 
 
 @action(reads=["model", "query", "chat_history"], writes=["steps"])
@@ -176,7 +181,7 @@ def web_or_not(state: State) -> tuple[dict[str, StepWithConfidence], State]:
 
 @action(
     reads=["db", "model", "query", "chat_history", "only_data", "has_web"],
-    writes=["steps", "menu"],
+    writes=["table_name", "steps", "menu"],
 )
 def router(
     state: State, table_descriptions: list[TableDescription] = []
@@ -194,8 +199,10 @@ def router(
                     dialog=Dialog.load(
                         path=str(Path(DIALOGS_FOLDER) / "table_selection_dialog.json")
                     ),
-                    response_model=create_response_with_confidence_model(
-                        response_type=table_names
+                    response_model=model_with_typed_response(
+                        model_name="TableWithConfidence",
+                        response_type=table_names,
+                        base=ResponseWithConfidence,
                     ),
                     template_data={
                         "user_query": state["query"],
@@ -228,7 +235,9 @@ def router(
         route = RAGRoute.WEB_OR_NOT
         confidence = DEFAULT_CONFIDENCE
     step = StepWithConfidence(step=route, confidence=confidence)
-    return {"step": step, "menu": menu}, state.append(steps=step).update(menu=menu)
+    return {"step": step, "menu": menu}, state.update(table_name=route).append(
+        steps=step
+    ).update(menu=menu)
 
 
 @action(
@@ -278,6 +287,8 @@ def evaluate_answer(
         "answer_evaluation": evaluation,
         "action_attempts": action_attempts,
         "bad_interaction": bad_interaction,
-    }, state.update(answer_evaluation=evaluation).update(
-        action_attempts=action_attempts
-    ).update(bad_interaction=bad_interaction)
+    }, state.update(
+        answer_evaluation=evaluation,
+        action_attempts=action_attempts,
+        bad_interaction=bad_interaction,
+    )

@@ -9,7 +9,7 @@ from loguru import logger
 
 from dreamai.ai import ModelName
 from dreamai.dialog import Dialog, MessageType, assistant_message, user_message
-from dreamai.dialog_models import SourcedResponse, SourcedSentence
+from dreamai.dialog_models import SourcedResponse, SourcedSentence, model_with_typed_response
 from dreamai.settings import CreatorSettings, DialogSettings
 
 creator_settings = CreatorSettings()
@@ -28,15 +28,26 @@ def _query_to_response(
     template_data: dict | None = None,
     chat_history: list[MessageType] | None = None,
     validation_context: dict[str, Any] | None = None,
+    alt_model: ModelName = ModelName.GEMINI_FLASH,
 ) -> T | Any:
-    dialog = dialog or Dialog(task=str(Path(DIALOGS_FOLDER) / "assistant_task.txt"))
-    dialog.chat_history = chat_history or dialog.chat_history
-    creator, creator_kwargs = dialog.creator_with_kwargs(
-        model=model, user=query, template_data=template_data
-    )
-    response = creator.create(
-        response_model=response_model, validation_context=validation_context, **creator_kwargs
-    )
+    try:
+        dialog = dialog or Dialog(task=str(Path(DIALOGS_FOLDER) / "assistant_task.txt"))
+        dialog.chat_history = chat_history or dialog.chat_history
+        creator, creator_kwargs = dialog.creator_with_kwargs(
+            model=model, user=query, template_data=template_data
+        )
+        response = creator.create(
+            response_model=response_model, validation_context=validation_context, **creator_kwargs
+        )
+    except Exception:
+        dialog = Dialog(task=str(Path(DIALOGS_FOLDER) / "assistant_task.txt"))
+        dialog.chat_history = chat_history or dialog.chat_history
+        creator, creator_kwargs = dialog.creator_with_kwargs(
+            model=alt_model, user=query, template_data=template_data
+        )
+        response = creator.create(
+            response_model=response_model, validation_context=validation_context, **creator_kwargs
+        )
     return response
 
 
@@ -60,12 +71,19 @@ def ask_assistant(state: State) -> tuple[dict, State]:
         logger.exception("Error in ask_assistant")
         response = "I'm sorry, but I encountered an error while processing your request. Could you please try again?"
     return {"assistant_response": str(response)}, state.update(
-        assistant_response=response
-    ).update(bad_interaction=bad_interaction).update(action_attempts=0)
+        assistant_response=response, bad_interaction=bad_interaction, action_attempts=0
+    )
 
 
 @action(
-    reads=["model", "query", "search_results", "chat_history", "bad_interaction"],
+    reads=[
+        "model",
+        "query",
+        "response_type",
+        "search_results",
+        "chat_history",
+        "bad_interaction",
+    ],
     writes=["assistant_response", "source_docs", "bad_interaction"],
 )
 def create_search_response(state: State) -> tuple[dict, State]:
@@ -80,11 +98,20 @@ def create_search_response(state: State) -> tuple[dict, State]:
     ]
     user = dialog.template.format(documents=documents, user_query=state["query"])
     try:
+        response_type = state["response_type"]
+        if isinstance(response_type, str):
+            response_model = SourcedResponse
+        else:
+            response_model = model_with_typed_response(
+                model_name="TypedSourcedResponse",
+                response_type=response_type,
+                base=SourcedResponse,
+            )
         response = _query_to_response(
             query=user,
             model=state["model"],
             dialog=dialog,
-            response_model=SourcedResponse,
+            response_model=response_model,
             chat_history=state.get("chat_history", None),
             validation_context={
                 "documents": [
@@ -110,11 +137,13 @@ def create_search_response(state: State) -> tuple[dict, State]:
             ]
         )
     return {
-        "assistant_response": str(response),
-        "source_docs": response._source_docs,
-    }, state.update(assistant_response=str(response)).update(
-        source_docs=response._source_docs
-    ).update(bad_interaction=bad_interaction)
+        "assistant_response": response,
+        "source_docs": response._source_docs,  # type: ignore
+    }, state.update(
+        assistant_response=str(response),
+        source_docs=response._source_docs,  # type: ignore
+        bad_interaction=bad_interaction,
+    )
 
 
 @action(reads=["query", "assistant_response", "chat_history"], writes=["chat_history"])

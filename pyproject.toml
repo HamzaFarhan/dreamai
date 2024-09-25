@@ -45,6 +45,7 @@ dependencies = [
     "matplotlib>=3.9.2",
     "fuzzysearch>=0.7.3",
     "markdown2[all]>=2.5.0",
+    "rerankers[transformers]>=0.5.3",
 ]
 
 [tool.ruff]

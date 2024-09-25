@@ -37,8 +37,8 @@ def search_web(state: State) -> tuple[dict[str, list[dict] | BadExample | None],
             feedback="Yes, please answer using your existing knowledge. Begin your response with '[Answering from internal knowledge due to lack of web results]' to help us track these instances. Also, suggest some alternative search terms or approaches that might yield better web results for this query.",
         )
     return {"search_results": results, "bad_interaction": bad_interaction}, state.update(
-        search_results=results
-    ).update(bad_interaction=bad_interaction)
+        search_results=results, bad_interaction=bad_interaction
+    )
 
 
 @action(reads=["model", "query", "chat_history"], writes=["step_back_questions"])
@@ -63,19 +63,20 @@ def create_step_back_questions(state: State) -> tuple[dict[str, list[str]], Stat
 
 
 @action(
-    reads=["db", "query", "steps", "step_back_questions"],
+    reads=["db", "table_name", "query", "steps", "step_back_questions"],
     writes=["search_results", "bad_interaction"],
 )
 def search_lancedb(
-    state: State, reranker: Reranker
+    state: State, reranker: Reranker, max_search_results: int = MAX_SEARCH_RESULTS
 ) -> tuple[dict[str, list[dict] | BadExample | None], State]:
     try:
         results = _search_lancedb(
             db=state["db"],
-            table_name=state["steps"][-1].step,
+            # table_name=state["steps"][-1].step,
+            table_name=state["table_name"],
             query=state["query"],
             reranker=reranker,
-            max_search_results=MAX_SEARCH_RESULTS,
+            max_search_results=max_search_results,
         )
     except Exception:
         logger.exception("Error in search_lancedb")
@@ -88,5 +89,5 @@ def search_lancedb(
             feedback="Yes, please answer using your general knowledge. Start your response with '[Answering from general knowledge due to lack of database results]' to help us track these instances.",
         )
     return {"search_results": results, "bad_interaction": bad_interaction}, state.update(
-        search_results=results
-    ).update(bad_interaction=bad_interaction)
+        search_results=results, bad_interaction=bad_interaction
+    )

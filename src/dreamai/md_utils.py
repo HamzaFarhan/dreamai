@@ -76,12 +76,7 @@ class MarkdownData(BaseModel):
 
 
 def is_url(text: str) -> bool:
-    return (
-        re.match(
-            r"^(https?:\/\/)?" r"(www\.)?[\da-z\.-]+\.[a-z]{2,}" r"([\/\w \.-]*)*\/?$", text
-        )
-        is not None
-    )
+    return re.match(r"^https?:\/\/[\da-z\.-]+\.[a-z]{2,}([\/\w \.-]*)*\/?$", text) is not None
 
 
 def extract_text_from_image(image_path: str, min_len: int = 2) -> str:

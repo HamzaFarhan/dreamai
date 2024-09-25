@@ -223,14 +223,21 @@ class ThoughtfulResponse(BaseModel):
         return f"{self.thought_process}\n\n<response>\n{self.response}\n</response>"
 
 
-def create_response_with_confidence_model(
-    response_type: list | type, response_value: Any | None = None
+class ResponseWithConfidence(BaseModel):
+    response: str
+    confidence: float
+
+
+def model_with_typed_response(
+    model_name: str,
+    response_type: list | type,
+    response_value: Any | None = None,
+    base: type[BaseModel] = BaseModel,
 ) -> type[BaseModel]:
     if isinstance(response_type, list):
         response_type = Literal[*response_type]  # type: ignore
-    return create_model(
-        "ResponseWithConfidence",
-        response=(response_type, response_value or ...),
-        confidence=(float, Field(ge=0.0, le=1.0)),
-        __base__=BaseModel,
+    model = create_model(
+        model_name, response=(response_type, response_value or ...), __base__=base
     )
+    setattr(model, "__str__", lambda self: str(self.response))
+    return model
