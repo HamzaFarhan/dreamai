@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import tempfile
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
@@ -21,10 +22,12 @@ from fasthtml.common import (
     H5,
     H6,
     A,
+    Beforeware,
     Button,
     Div,
     FileResponse,
     Form,
+    Grid,
     Img,
     Input,
     Li,
@@ -33,7 +36,9 @@ from fasthtml.common import (
     Ol,
     Option,
     P,
+    RedirectResponse,
     Select,
+    Titled,
     Ul,
     fast_app,
     serve,
@@ -60,11 +65,6 @@ logger.info(f"MODEL: {MODEL}")
 table_descriptions = []
 questions = []
 qna = {}
-
-headers = (Link(rel="stylesheet", href="style_ui.css"),)
-
-
-app = fast_app(live=True, hdrs=headers)[0]
 
 
 class Mode(StrEnum):
@@ -168,6 +168,58 @@ def questionnaire_answers(
     )
 
 
+login_redir = RedirectResponse("/login", status_code=303)
+
+
+def _not_found(req, exc):
+    return Titled("Oh no!", Div("We could not find that page :("))
+
+
+def before(req, sess):
+    auth = req.scope["auth"] = sess.get("auth", None)
+    if not auth:
+        return login_redir
+
+
+bware = Beforeware(before, skip=[r"/favicon\.ico", r"/static/.*", r".*\.css", "/login"])
+headers = (Link(rel="stylesheet", href="style_ui.css"),)
+app = fast_app(before=bware, exception_handlers={404: _not_found}, live=True, hdrs=headers)[0]
+
+
+@app.get("/login")
+def get_login():
+    frm = Form(
+        Input(id="name", placeholder="Name"),
+        Input(id="pwd", type="password", placeholder="Password"),
+        Button("login"),
+        action="/login",
+        method="post",
+    )
+    return Titled("Login", frm)
+
+
+@dataclass
+class Login:
+    name: str
+    pwd: str
+
+
+@app.post("/login")
+def post_login(login: Login, sess):
+    if not login.name or not login.pwd:
+        return login_redir
+    if login.name != "dreamai" and login.pwd != "<<Dai>?7":
+        return login_redir
+    sess["auth"] = login.name
+    return RedirectResponse("/", status_code=303)
+
+
+@app.get("/logout")
+def logout(sess):
+    del sess["auth"]
+    return login_redir
+
+
 @app.get("/")
 async def root():
     return await home(mode=Mode.RFP)
@@ -178,7 +230,10 @@ async def home(mode: Mode, index: str = "", hx_swap_oob: str | None = None):
     indexes = get_sorted_indexes()
     current_index = index or indexes[0] if indexes else index
     container_components = [
-        H1(f"{mode.upper() if len(mode) <= 3 else mode.title()} Questionnaire Tool"),
+        Grid(
+            H1(f"{mode.upper() if len(mode) <= 3 else mode.title()} Questionnaire Tool"),
+            Div(A("logout", href="/logout"), style="text-align: right"),
+        ),
         divider(),
         Div(
             Div(

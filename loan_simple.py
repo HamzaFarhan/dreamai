@@ -1,301 +1,177 @@
 import json
 from pathlib import Path
-from time import sleep
 
+from instructor.client import T
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationInfo, field_validator
 
 from dreamai.ai import ModelName
 from dreamai.dialog import Dialog, user_message
-from dreamai.dialog_models import SourcedResponse, model_with_typed_response
-from dreamai.md_utils import MarkdownData, data_to_md
-from dreamai.utils import to_camel
+from dreamai.md_utils import MarkdownChunk, MarkdownData, data_to_md
+from dreamai.utils import to_snake
+from loan_models import DealMain
 
 MODEL = ModelName.GEMINI_FLASH
 CHUNKS_LIMIT = 1.0
+CHUNK_SIZE = 800
+CHUNK_OVERLAP = 200
 
 
 DATA_FILE = "hp.md"
 DATA_JSON = "hp.json"
-DIALOG_JSON = "hp_dialog.json"
 RES_JSON = "hp_res.json"
+TASK = "You are a world-class AI financial advisor. Your task is to provide a detailed analysis of a loan application and extract the entities that I want. With sources if you can."
+
+
+class ShortlistChunk(BaseModel):
+    index: int
+    context: str
+
+    def __hash__(self):
+        return hash(self.index)
+
+    def __eq__(self, other):
+        if isinstance(other, ShortlistChunk):
+            return self.index == other.index
+        return False
+
+
+class Shortlist(BaseModel):
+    chunks: list[ShortlistChunk]
+
+    @field_validator("chunks")
+    @classmethod
+    def validate_indexes(
+        cls, v: list[ShortlistChunk], info: ValidationInfo
+    ) -> list[ShortlistChunk]:
+        v = list(set(v))
+        context = info.context
+        if context is None:
+            return v
+        context_indexes = set(context["indexes"])
+        min_context_index = min(context_indexes)
+        max_context_index = max(context_indexes)
+        new_chunks = []
+        for chunk in v:
+            new_indexes = [c.index for c in new_chunks]
+            index = chunk.index
+            if index in new_indexes:
+                continue
+            if index not in context_indexes:
+                index = min_context_index
+                while (
+                    index in new_indexes
+                    and index not in context_indexes
+                    and index <= max_context_index
+                ):
+                    index = min(max_context_index, index + 1)
+            if index not in new_indexes:
+                index = min(max_context_index, max(min_context_index, index))
+                new_chunks.append(ShortlistChunk(index=index, context=chunk.context))
+                if index > min_context_index:
+                    new_chunks.append(ShortlistChunk(index=index - 1, context=chunk.context))
+                if index < max_context_index:
+                    new_chunks.append(ShortlistChunk(index=index + 1, context=chunk.context))
+        return list(sorted(new_chunks, key=lambda x: x.index))
+
+
+class RetrievedChunk(MarkdownChunk):
+    context: str
 
 
 if not Path(DATA_JSON).exists():
-    data = data_to_md(data=DATA_FILE, chunk_size=450, chunk_overlap=50)[0]
+    data = data_to_md(data=DATA_FILE, chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)[0]
     with open(DATA_JSON, "w") as f:
         json.dump(data.model_dump(), f, indent=2)  # type: ignore
 else:
     with open(DATA_JSON, "r") as f:
         data = MarkdownData(**json.load(f))
 
-chunks = data.chunks[: int(len(data.chunks) * CHUNKS_LIMIT)]
+# prompt_chunks = {
+#     chunk.index: chunk.model_dump(exclude={"metadata"})
+#     for chunk in data.chunks[: int(len(data.chunks) * CHUNKS_LIMIT)]
+# }
 
 
-def extract(user: str, response_type: list | type, name: str, model: ModelName = MODEL):
+def make_shortlist(user: str, chunks: list[dict], model: ModelName = MODEL):
+    indexes = [chunk["index"] for chunk in chunks]
     dialog = Dialog(
-        task="You are a world-class AI financial advisor. Your task is to provide a detailed analysis of a loan application and extract the entities that I want. With sources if you can.",
+        task=TASK,
         chat_history=[
+            user_message(json.dumps(chunks)),
             user_message(
-                json.dumps([chunk.model_dump(exclude={"metadata"}) for chunk in data.chunks])
-            )
+                "You have a list of chunks that make up the whole document. Each chunk has an index and may have some overlap with other chunks. Please give me the indexes of the chunks that have the relevant information. For each chunk, also give a short succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk."
+            ),
         ],
     )
     creator, kwargs = dialog.creator_with_kwargs(model=model, user=user)
-    response_model = model_with_typed_response(
-        to_camel(f"Sourced{name.title()}"), response_type, base=SourcedResponse
-    )
     res = creator.create(
         **kwargs,
-        response_model=response_model,
-        validation_context={
-            "documents": [chunk.model_dump(exclude={"metadata"}) for chunk in data.chunks]
-        },
+        response_model=Shortlist,
+        validation_context={"indexes": indexes},
     )
-    # dialog.add_messages([assistant_message(str(res))])
-    # dialog.save(name=DIALOG_JSON)
+    return res
+
+
+def extract(
+    user: str,
+    chunks: list[dict],
+    name: str = "",
+    response_model: type[T] = str,
+    model: ModelName = MODEL,
+    res_json: str = RES_JSON,
+):
+    dialog = Dialog(task=TASK, chat_history=[user_message(json.dumps(chunks))])
+    creator, kwargs = dialog.creator_with_kwargs(model=model, user=user)
+    res = creator.create(**kwargs, response_model=response_model)
+    if isinstance(res, list):
+        dumped_res = [r.model_dump() for r in res]  # type: ignore
+    else:
+        dumped_res = res.model_dump()  # type: ignore
+    name = name or to_snake(response_model.__name__)
     res_so_far = {}
-    if Path(RES_JSON).exists():
-        with open(RES_JSON, "r") as f:
-            res_so_far = json.load(f)
-    res_so_far[name.lower()] = res.model_dump()  # type: ignore
-    with open(RES_JSON, "w") as f:
+    if Path(res_json).exists():
+        try:
+            with open(res_json, "r") as f:
+                res_so_far = json.load(f)
+        except Exception as e:
+            logger.warning(f"Error loading {res_json}: {e}")
+    res_so_far[name] = dumped_res
+    with open(res_json, "w") as f:
         json.dump(res_so_far, f, indent=2)
     return res
 
 
-class DealMain(BaseModel):
-    borrower_name: str
-    purpose: str
-    min_commitment: float
-    max_commitment: float
-    signing_date: str
-    refinancing: bool
+response_model = DealMain
+logger.info("Shortlisting chunks...")
+no_metadata_chunks = [chunk.model_dump(exclude={"metadata"}) for chunk in data.chunks]
+shortlist = make_shortlist(user=response_model.shortlist_prompt(), chunks=no_metadata_chunks)
 
-    @classmethod
-    def prompt(cls) -> str:
-        return """
-Extract the main deal information:
-- Borrower name (look for "HEWLETT PACKARD ENTERPRISE COMPANY" or similar)
-- Purpose (e.g., "General Corporate Purposes")
-- Commitment amounts (min and max, look for numbers around 5,250,000,000)
-- Signing date (format: MM/DD/YYYY)
-- Refinancing status (Y/N)
-- Commitment currencies (look for USD, GBP, EUR)
-"""
+logger.success(shortlist)
+retrieved_chunks = []
+for chunk in shortlist.chunks:  # type: ignore
+    prompt_chunk = data.chunks.get(chunk.index)
+    if prompt_chunk is None:
+        continue
+    retrieved_chunks.append(
+        RetrievedChunk(**prompt_chunks[chunk.index], context=chunk.context)
+    )
 
-
-class TrancheBankList(BaseModel):
-    lender_name: str
-    primary_role: str
-    lead_arranger: bool = False
-    agent_only: bool = False
-    agent_co_agent: bool = False
-    role: str
-    share_percent: float = 0.0
-    min_bank_commitment: float = 0.0
-    max_bank_commitment: float = 0.0
-
-    @classmethod
-    def prompt(cls) -> str:
-        return """
-List all lenders and their roles:
-- Lender names (e.g., "JPMORGAN CHASE BANK, N.A.", "CITIBANK, N.A.")
-- Primary roles (e.g., Admin Agent, Co-Administrative Agent)
-- Lead Arranger status (Y/N)
-- Agent Only status (Y/N)
-- Agent/Co-Agent status (Y/N)
-- Specific role (e.g., Bookrunner, Participant)
-- Share percentages and commitment amounts if available
-"""
-
-
-class TrancheOptionsRepayment(BaseModel):
-    period: str
-    number_of_periods: int
-    amount: float
-    percent: float
-    begin_date: str
-
-    @classmethod
-    def prompt(cls) -> str:
-        return """
-Provide the repayment details:
-- Period type (e.g., Bullet)
-- Number of periods
-- Repayment amount
-- Repayment percentage
-- Begin date (format: MM/DD/YYYY)
-"""
-
-
-class InterestAndFees(BaseModel):
-    base_rate: list[str]
-    spread: list[float]
-    floor_br_percent: float
-    fee_type: str
-    max_fee: float
-    default_rate: float = 0.0
-
-    @classmethod
-    def prompt(cls) -> str:
-        return """
-Extract interest and fee information:
-- Base rates (e.g., Prime Rate, RFR)
-- Spreads for each base rate
-- Floor rate percentage
-- Fee types (e.g., Commitment fee)
-- Maximum fee amounts
-- Default rate if available
-"""
-
-
-class TrancheMain(BaseModel):
-    tranche_type: str
-    distribution_method: str
-    maturity_date: str
-    currency: list[str]
-    min_amount: float
-    max_amount: float
-    purpose: str
-    lt_amount: float = 0.0
-    lt_date: str = ""
-    repayment_type: str
-    swingline_loan: float
-
-    @classmethod
-    def prompt(cls) -> str:
-        return """
-Summarize the main tranche information:
-- Tranche type (e.g., Revolver)
-- Distribution method (e.g., Syndication)
-- Maturity date (format: MM/DD/YYYY)
-- Currencies (e.g., USD, GBP, EUR)
-- Minimum and maximum amounts
-- Purpose
-- LT amount and date if applicable
-- Repayment type (e.g., Bullet)
-- Swingline loan amount if available
-"""
-
-
-class CovenantsAndAmendmentVoting(BaseModel):
-    vote_100_percent: bool
-    margin_reduction: float
-    tenor_extension: float
-    amount_reduction: float
-    guarantor_release: float
-    required_lenders: float
-
-    @classmethod
-    def prompt(cls) -> str:
-        return """
-Extract voting percentages for amendments:
-- 100% vote requirements (Y/N)
-- Percentages for margin reduction, tenor extension, amount reduction, and guarantor release
-- Required lenders percentage
-"""
-
-
-class PerformancePricing(BaseModel):
-    split_rated: str
-    split_by_gt_1_lev: str
-    performance_price_code: str
-    column_number: int
-    grid_min_op: str
-    grid_xyz_min: str
-    grid_max_op: str
-    grid_xyz_max: str
-
-    @classmethod
-    def prompt(cls) -> str:
-        return """
-Provide details on performance-based pricing:
-- Split rating policy (e.g., "Higher Rating Applies")
-- Policy for splits greater than 1 level
-- Performance price code (e.g., S&P)
-- Column number
-- Grid minimum and maximum operators and values
-"""
-
-
-class PerformancePricingGrid(BaseModel):
-    operator: str
-    sp_rating: str
-    abr_spread: float
-    term_benchmark_rfr_spread: float
-    commitment_fee_rate: float
-
-    @classmethod
-    def prompt(cls) -> str:
-        return """
-List the pricing tiers based on ratings:
-- S&P ratings (e.g., A-, BBB+, BBB)
-- ABR spreads in basis points
-- Term Benchmark and RFR spreads in basis points
-- Commitment fee rates in basis points
-"""
-
-
-class FinancialCovenant(BaseModel):
-    ratio_type: str
-    level: float
-    start_date: str
-    end_date: str
-    dividend_restriction: bool
-    covenant_type: str = ""
-    capex_carryover: str = ""
-    net_worth_type: str = ""
-    base_amount: float = 0.0
-    net_income_percent: float = 0.0
-    build_up: str = ""
-
-    @classmethod
-    def prompt(cls) -> str:
-        return """
-Extract financial covenant details:
-- Ratio types (e.g., Total Leverage Ratio)
-- Covenant levels (e.g., 4.00 to 1.0)
-- Start and end dates (format: MM/DD/YYYY)
-- Dividend restrictions (Y/N)
-- Additional covenant types and levels
-- Capex carryover information
-- Net worth details if applicable
-"""
-
-
-class LoanAgreement(BaseModel):
-    deal_main: DealMain
-    tranche_bank_list: list[TrancheBankList]
-    tranche_options_repayment: TrancheOptionsRepayment
-    interest_and_fees: InterestAndFees
-    tranche_main: TrancheMain
-    covenants_and_amendment_voting: CovenantsAndAmendmentVoting
-    performance_pricing: PerformancePricing
-    performance_pricing_grid: list[PerformancePricingGrid]
-    financial_covenant: FinancialCovenant
-
-    @classmethod
-    def prompt(cls) -> str:
-        return """
-Compile a comprehensive summary of the entire loan agreement:
-- Include all information from the above sections
-- Ensure all key loan terms, parties, amounts, dates, and conditions are captured
-- Pay attention to any additional comments or special provisions mentioned throughout the document
-"""
-
-
-for model in [
-    DealMain,
-    TrancheBankList,
-    TrancheOptionsRepayment,
-    InterestAndFees,
-    TrancheMain,
-    CovenantsAndAmendmentVoting,
-    PerformancePricing,
-    FinancialCovenant,
-]:
-    res = extract(user=model.prompt(), response_type=model, name=model.__name__)
-    logger.success(model.__name__)
-    sleep(3)
-
+# sleep(5)
+logger.info("Extracting...")
+res = extract(
+    user=response_model.prompt(),
+    chunks=[chunk.model_dump() for chunk in retrieved_chunks],
+    response_model=response_model,
+    model=ModelName.SONNET,
+)
+logger.success(res)
+logger.info(chunk.text)
+start = chunk.metadata["start"]
+end = chunk.metadata["end"]
+logger.info(f"start: {start}, end: {end}")
+# logger.info(pdf_md.markdown[start:end])
+marked_md = insert_xml_tag(text=pdf_md.markdown, tag="mark", start=start, end=end)
+# marked_html = markdown(marked_md)
+marked_html = markdown_to_html(marked_md)
+Path("marked_html.html").write_text(marked_html.replace("\n", "<br>"))
