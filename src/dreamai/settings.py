@@ -42,6 +42,7 @@ class DialogModelsSettings(Settings):
 class RAGSettings(Settings):
     chunk_size: int = 800
     chunk_overlap: int = 200
+    min_chunk_size: int = 100
     min_full_text_size: int = 10_000
     separators: list[str] = [r"#{1,6}\s+", r"\*\*.*?\*\*", r"---", r"\n\n", r"\.\s+", r"\n"]
     lance_uri: str = "lance/rag/"

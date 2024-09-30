@@ -28,6 +28,7 @@ rag_settings = RAGSettings()
 
 CHUNK_SIZE = rag_settings.chunk_size
 CHUNK_OVERLAP = rag_settings.chunk_overlap
+MIN_CHUNK_SIZE = rag_settings.min_chunk_size
 SEPARATORS = rag_settings.separators
 MIN_FULL_TEXT_SIZE = rag_settings.min_full_text_size
 TEXT_FIELD_NAME = rag_settings.text_field_name
@@ -54,6 +55,7 @@ class MarkdownData(BaseModel):
         context = info.context or {}
         chunk_size = context.get("chunk_size", CHUNK_SIZE)
         chunk_overlap = context.get("chunk_overlap", CHUNK_OVERLAP)
+        min_chunk_size = context.get("min_chunk_size", MIN_CHUNK_SIZE)
         separators = context.get("separators", SEPARATORS)
         # logger.info(f"Chunk Metadata: {self.chunk_metadata}")
         self.chunks = [
@@ -68,6 +70,7 @@ class MarkdownData(BaseModel):
                     text=self.markdown,
                     chunk_size=chunk_size,
                     chunk_overlap=chunk_overlap,
+                    min_chunk_size=min_chunk_size,
                     separators=separators,
                 )
             )
@@ -197,6 +200,7 @@ def urls_to_md(
     clean_content: bool = True,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
+    min_chunk_size: int = MIN_CHUNK_SIZE,
     separators: list[str] = SEPARATORS,
     chunk_metadata: dict | None = None,
 ) -> list[MarkdownData]:
@@ -212,6 +216,7 @@ def urls_to_md(
                 context={
                     "chunk_size": chunk_size,
                     "chunk_overlap": chunk_overlap,
+                    "min_chunk_size": min_chunk_size,
                     "separators": separators,
                 },
             )
@@ -226,12 +231,14 @@ def search_query_to_md(
     max_search_results: int = MAX_SEARCH_RESULTS,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
+    min_chunk_size: int = MIN_CHUNK_SIZE,
     separators: list[str] = SEPARATORS,
     chunk_metadata: dict | None = None,
 ) -> list[MarkdownData]:
     to_md_kwargs = {
         "chunk_size": chunk_size,
         "chunk_overlap": chunk_overlap,
+        "min_chunk_size": min_chunk_size,
         "separators": separators,
     }
     search_results = web_search(query=query, max_search_results=max_search_results)
@@ -261,6 +268,7 @@ def docs_to_md(
     with_pages: bool = False,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
+    min_chunk_size: int = MIN_CHUNK_SIZE,
     separators: list[str] = SEPARATORS,
     chunk_metadata: dict | None = None,
 ) -> list[MarkdownData]:
@@ -285,47 +293,15 @@ def docs_to_md(
                     table_strategy="lines",
                     page_chunks=with_pages,
                 )
-                # if isinstance(pdf_md, str):
-                #     pdf_md = [{"metadata": {"page": 1}, "text": pdf_md}]
-                # md = ""
-                # for md_ in pdf_md:
-                #     md += md_["text"]
-                #     md_chunks.extend(
-                #         [
-                #             MarkdownChunk(
-                #                 text=chunk["text"],
-                #                 name=doc.name,
-                #                 index=i + len(md_chunks),
-                #                 metadata={
-                #                     **md_["metadata"],
-                #                     "start": chunk["start"],
-                #                     "end": chunk["end"],
-                #                 },
-                #             )
-                #             for i, chunk in enumerate(
-                #                 chunk_text(
-                #                     text=md_["text"],
-                #                     chunk_size=chunk_size,
-                #                     chunk_overlap=chunk_overlap,
-                #                     separators=separators,
-                #                 )
-                #             )
-                #         ]
-                #     )
         else:
             md = str(doc)
-        # logger.info(f"MD: {md}")
         docs_md.append(
             MarkdownData.model_validate(
-                {
-                    "name": doc.name,
-                    "markdown": md,
-                    # "chunks": md_chunks,
-                    "chunk_metadata": chunk_metadata or {},
-                },
+                {"name": doc.name, "markdown": md, "chunk_metadata": chunk_metadata or {}},
                 context={
                     "chunk_size": chunk_size,
                     "chunk_overlap": chunk_overlap,
+                    "min_chunk_size": min_chunk_size,
                     "separators": separators,
                 },
             )
@@ -340,6 +316,7 @@ def data_to_md(
     with_pages: bool = False,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
+    min_chunk_size: int = MIN_CHUNK_SIZE,
     separators: list[str] = SEPARATORS,
     chunk_metadata: dict | None = None,
     headers: dict | None = {"User-Agent": "Mozilla/5.0 (Company info@company.com)"},
@@ -350,6 +327,7 @@ def data_to_md(
     to_md_kwargs = {
         "chunk_size": chunk_size,
         "chunk_overlap": chunk_overlap,
+        "min_chunk_size": min_chunk_size,
         "separators": separators,
         "chunk_metadata": chunk_metadata or {},
     }

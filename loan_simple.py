@@ -3,23 +3,27 @@ from pathlib import Path
 
 from instructor.client import T
 from loguru import logger
+from markdown2 import markdown
 from pydantic import BaseModel, ValidationInfo, field_validator
 
 from dreamai.ai import ModelName
 from dreamai.dialog import Dialog, user_message
 from dreamai.md_utils import MarkdownChunk, MarkdownData, data_to_md
-from dreamai.utils import to_snake
+from dreamai.utils import insert_xml_tag, to_snake
 from loan_models import DealMain
 
 MODEL = ModelName.GEMINI_FLASH
 CHUNKS_LIMIT = 1.0
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 200
+MIN_CHUNK_SIZE = 100
 
 
 DATA_FILE = "hp.md"
 DATA_JSON = "hp.json"
+DATA_HTML = "hp_marked.html"
 RES_JSON = "hp_res.json"
+
 TASK = "You are a world-class AI financial advisor. Your task is to provide a detailed analysis of a loan application and extract the entities that I want. With sources if you can."
 
 
@@ -42,36 +46,29 @@ class Shortlist(BaseModel):
     @field_validator("chunks")
     @classmethod
     def validate_indexes(
-        cls, v: list[ShortlistChunk], info: ValidationInfo
+        cls, chunks: list[ShortlistChunk], info: ValidationInfo
     ) -> list[ShortlistChunk]:
-        v = list(set(v))
+        chunks = list(set(chunks))
         context = info.context
         if context is None:
-            return v
-        context_indexes = set(context["indexes"])
+            return chunks
+        context_indexes = context.get("indexes", [])
+        if not context_indexes:
+            return chunks
         min_context_index = min(context_indexes)
         max_context_index = max(context_indexes)
-        new_chunks = []
-        for chunk in v:
-            new_indexes = [c.index for c in new_chunks]
-            index = chunk.index
-            if index in new_indexes:
-                continue
-            if index not in context_indexes:
-                index = min_context_index
-                while (
-                    index in new_indexes
-                    and index not in context_indexes
-                    and index <= max_context_index
-                ):
-                    index = min(max_context_index, index + 1)
-            if index not in new_indexes:
-                index = min(max_context_index, max(min_context_index, index))
-                new_chunks.append(ShortlistChunk(index=index, context=chunk.context))
-                if index > min_context_index:
-                    new_chunks.append(ShortlistChunk(index=index - 1, context=chunk.context))
-                if index < max_context_index:
-                    new_chunks.append(ShortlistChunk(index=index + 1, context=chunk.context))
+        new_chunks = set()
+        for chunk in chunks:
+            if chunk.index in context_indexes:
+                new_chunks.add(chunk)
+            if chunk.index > min_context_index:
+                prev_index = chunk.index - 1
+                if prev_index in context_indexes:
+                    new_chunks.add(ShortlistChunk(index=prev_index, context=chunk.context))
+            if chunk.index < max_context_index:
+                next_index = chunk.index + 1
+                if next_index in context_indexes:
+                    new_chunks.add(ShortlistChunk(index=next_index, context=chunk.context))
         return list(sorted(new_chunks, key=lambda x: x.index))
 
 
@@ -80,7 +77,12 @@ class RetrievedChunk(MarkdownChunk):
 
 
 if not Path(DATA_JSON).exists():
-    data = data_to_md(data=DATA_FILE, chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)[0]
+    data = data_to_md(
+        data=DATA_FILE,
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
+        min_chunk_size=MIN_CHUNK_SIZE,
+    )[0]
     with open(DATA_JSON, "w") as f:
         json.dump(data.model_dump(), f, indent=2)  # type: ignore
 else:
@@ -143,35 +145,38 @@ def extract(
 
 
 response_model = DealMain
-logger.info("Shortlisting chunks...")
-no_metadata_chunks = [chunk.model_dump(exclude={"metadata"}) for chunk in data.chunks]
-shortlist = make_shortlist(user=response_model.shortlist_prompt(), chunks=no_metadata_chunks)
 
-logger.success(shortlist)
+logger.info("Shortlisting chunks...")
+with_metadata_chunks = {}
+no_metadata_chunks = {}
+for chunk in data.chunks:
+    with_metadata_chunks[chunk.index] = chunk
+    no_metadata_chunks[chunk.index] = chunk.model_dump(exclude={"metadata"})
+shortlist = make_shortlist(
+    user=response_model.shortlist_prompt(), chunks=list(no_metadata_chunks.values())
+)
+logger.success([chunk.index for chunk in shortlist.chunks])  # type: ignore
+logger.info("Highlighting chunks...")
 retrieved_chunks = []
 for chunk in shortlist.chunks:  # type: ignore
-    prompt_chunk = data.chunks.get(chunk.index)
-    if prompt_chunk is None:
-        continue
     retrieved_chunks.append(
-        RetrievedChunk(**prompt_chunks[chunk.index], context=chunk.context)
+        RetrievedChunk(**no_metadata_chunks[chunk.index], context=chunk.context).model_dump()
     )
-
-# sleep(5)
+    with_metadata_chunk = with_metadata_chunks[chunk.index]
+    start = with_metadata_chunk.metadata["start"]
+    end = with_metadata_chunk.metadata["end"]
+    logger.info(f"start: {start}, end: {end}")
+    logger.warning(f"START: {data.markdown[start:start+10]}, END: {data.markdown[end-10:end]}")
+    data.markdown = insert_xml_tag(text=data.markdown, tag="mark", start=start, end=end)
+    marked_html = markdown(data.markdown)
+    Path(DATA_HTML).write_text(marked_html.replace("\n", "<br>"))
 logger.info("Extracting...")
 res = extract(
     user=response_model.prompt(),
-    chunks=[chunk.model_dump() for chunk in retrieved_chunks],
+    chunks=retrieved_chunks,
     response_model=response_model,
-    model=ModelName.SONNET,
+    model=ModelName.GPT_MINI,
 )
 logger.success(res)
-logger.info(chunk.text)
-start = chunk.metadata["start"]
-end = chunk.metadata["end"]
-logger.info(f"start: {start}, end: {end}")
-# logger.info(pdf_md.markdown[start:end])
-marked_md = insert_xml_tag(text=pdf_md.markdown, tag="mark", start=start, end=end)
-# marked_html = markdown(marked_md)
-marked_html = markdown_to_html(marked_md)
-Path("marked_html.html").write_text(marked_html.replace("\n", "<br>"))
+
+

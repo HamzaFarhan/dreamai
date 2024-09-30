@@ -16,6 +16,7 @@ rag_settings = RAGSettings()
 
 CHUNK_SIZE = rag_settings.chunk_size
 CHUNK_OVERLAP = rag_settings.chunk_overlap
+MIN_CHUNK_SIZE = rag_settings.min_chunk_size
 SEPARATORS = rag_settings.separators
 UNICODE_BULLETS: Final[list[str]] = [
     "\u0095",
@@ -55,6 +56,7 @@ def chunk_text(
     text: str,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
+    min_chunk_size: int = MIN_CHUNK_SIZE,
     keep_separator: bool = True,
     separators: list[str] | None = None,
 ) -> list[dict]:
@@ -63,14 +65,19 @@ def chunk_text(
     chunk_overlap = min(chunk_overlap, chunk_size // 2)
     separators = separators or [r"#{1,6}\s+", r"\*\*.*?\*\*", r"---", r"\n\n", r"\n"]
     pattern = f'({"|".join(separators)})' if keep_separator else f'(?:{"|".join(separators)})'
-
-    chunks = re.split(pattern, text)
-    chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
+    chunks = [chunk.strip() for chunk in re.split(pattern, text) if chunk.strip()]
     result = []
     current_chunk = ""
     start_index = 0
     for chunk in chunks:
-        if len(current_chunk) + len(chunk) <= chunk_size or not current_chunk:
+        if (
+            not current_chunk
+            or len(current_chunk) + len(chunk) <= chunk_size
+            or (
+                (len(chunk) < min_chunk_size)
+                and (len(current_chunk) + len(chunk) <= chunk_size * 2)
+            )
+        ):
             current_chunk += (" " if current_chunk else "") + chunk
         else:
             if current_chunk:
