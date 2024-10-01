@@ -89,11 +89,6 @@ else:
     with open(DATA_JSON, "r") as f:
         data = MarkdownData(**json.load(f))
 
-# prompt_chunks = {
-#     chunk.index: chunk.model_dump(exclude={"metadata"})
-#     for chunk in data.chunks[: int(len(data.chunks) * CHUNKS_LIMIT)]
-# }
-
 
 def make_shortlist(user: str, chunks: list[dict], model: ModelName = MODEL):
     indexes = [chunk["index"] for chunk in chunks]
@@ -144,6 +139,8 @@ def extract(
     return res
 
 
+marked_chunk_indexes = []
+
 response_model = DealMain
 
 logger.info("Shortlisting chunks...")
@@ -162,6 +159,8 @@ for chunk in shortlist.chunks:  # type: ignore
     retrieved_chunks.append(
         RetrievedChunk(**no_metadata_chunks[chunk.index], context=chunk.context).model_dump()
     )
+    if chunk.index in marked_chunk_indexes:
+        continue
     with_metadata_chunk = with_metadata_chunks[chunk.index]
     start = with_metadata_chunk.metadata["start"]
     end = with_metadata_chunk.metadata["end"]
@@ -170,6 +169,7 @@ for chunk in shortlist.chunks:  # type: ignore
     data.markdown = insert_xml_tag(text=data.markdown, tag="mark", start=start, end=end)
     marked_html = markdown(data.markdown)
     Path(DATA_HTML).write_text(marked_html.replace("\n", "<br>"))
+    marked_chunk_indexes.append(chunk.index)
 logger.info("Extracting...")
 res = extract(
     user=response_model.prompt(),
@@ -178,5 +178,3 @@ res = extract(
     model=ModelName.GPT_MINI,
 )
 logger.success(res)
-
-
