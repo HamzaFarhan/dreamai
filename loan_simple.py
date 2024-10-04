@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from time import sleep
 
 from instructor.client import T
 from loguru import logger
@@ -10,19 +11,26 @@ from dreamai.ai import ModelName
 from dreamai.dialog import Dialog, user_message
 from dreamai.md_utils import MarkdownChunk, MarkdownData, data_to_md
 from dreamai.utils import insert_xml_tag, to_snake
-from loan_models import DealMain
-
+from loan_models import (
+    AllInterestAndFees,
+    DealMain,
+    FinancialCovenant,
+    PerformancePricing,
+    TrancheBankList,
+    TrancheOptionsRepayment,
+    TrancheMain,
+)
 MODEL = ModelName.GEMINI_FLASH
 CHUNKS_LIMIT = 1.0
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 200
 MIN_CHUNK_SIZE = 100
 
-
-DATA_FILE = "hp.md"
-DATA_JSON = "hp.json"
-DATA_HTML = "hp_marked.html"
-RES_JSON = "hp_res.json"
+DATA_NAME = "kosmos"
+DATA_FILE = f"{DATA_NAME}.pdf"
+DATA_JSON = f"{DATA_NAME}.json"
+DATA_HTML = f"{DATA_NAME}_marked.html"
+RES_JSON = f"{DATA_NAME}_res.json"
 
 TASK = "You are a world-class AI financial advisor. Your task is to provide a detailed analysis of a loan application and extract the entities that I want. With sources if you can."
 
@@ -140,41 +148,58 @@ def extract(
 
 
 marked_chunk_indexes = []
-
-response_model = DealMain
-
-logger.info("Shortlisting chunks...")
-with_metadata_chunks = {}
-no_metadata_chunks = {}
-for chunk in data.chunks:
-    with_metadata_chunks[chunk.index] = chunk
-    no_metadata_chunks[chunk.index] = chunk.model_dump(exclude={"metadata"})
-shortlist = make_shortlist(
-    user=response_model.shortlist_prompt(), chunks=list(no_metadata_chunks.values())
-)
-logger.success([chunk.index for chunk in shortlist.chunks])  # type: ignore
-logger.info("Highlighting chunks...")
-retrieved_chunks = []
-for chunk in shortlist.chunks:  # type: ignore
-    retrieved_chunks.append(
-        RetrievedChunk(**no_metadata_chunks[chunk.index], context=chunk.context).model_dump()
-    )
-    if chunk.index in marked_chunk_indexes:
-        continue
-    with_metadata_chunk = with_metadata_chunks[chunk.index]
-    start = with_metadata_chunk.metadata["start"]
-    end = with_metadata_chunk.metadata["end"]
-    logger.info(f"start: {start}, end: {end}")
-    logger.warning(f"START: {data.markdown[start:start+10]}, END: {data.markdown[end-10:end]}")
-    data.markdown = insert_xml_tag(text=data.markdown, tag="mark", start=start, end=end)
-    marked_html = markdown(data.markdown)
-    Path(DATA_HTML).write_text(marked_html.replace("\n", "<br>"))
-    marked_chunk_indexes.append(chunk.index)
-logger.info("Extracting...")
-res = extract(
-    user=response_model.prompt(),
-    chunks=retrieved_chunks,
-    response_model=response_model,
-    model=ModelName.GPT_MINI,
-)
-logger.success(res)
+for response_model in [
+    DealMain,
+    TrancheMain,
+    TrancheBankList,
+    AllInterestAndFees,
+    FinancialCovenant,
+    PerformancePricing,
+]:
+    logger.info(f"RESPONSE MODEL: {response_model.__name__}")
+    try:
+        logger.info("Shortlisting chunks...")
+        with_metadata_chunks = {}
+        no_metadata_chunks = {}
+        for chunk in data.chunks:
+            with_metadata_chunks[chunk.index] = chunk
+            no_metadata_chunks[chunk.index] = chunk.model_dump(exclude={"metadata"})
+        shortlist = make_shortlist(
+            user=response_model.shortlist_prompt(), chunks=list(no_metadata_chunks.values())
+        )
+        logger.success([chunk.index for chunk in shortlist.chunks])  # type: ignore
+        sleep(2)
+        logger.info("Highlighting chunks...")
+        retrieved_chunks = []
+        for chunk in shortlist.chunks:  # type: ignore
+            retrieved_chunks.append(
+                RetrievedChunk(
+                    **no_metadata_chunks[chunk.index], context=chunk.context
+                ).model_dump()
+            )
+            if chunk.index in marked_chunk_indexes:
+                continue
+            with_metadata_chunk = with_metadata_chunks[chunk.index]
+            start = with_metadata_chunk.metadata["start"]
+            end = with_metadata_chunk.metadata["end"]
+            # logger.info(f"start: {start}, end: {end}")
+            # logger.warning(
+            #     f"START: {data.markdown[start:start+10]}, END: {data.markdown[end-10:end]}"
+            # )
+            data.markdown = insert_xml_tag(
+                text=data.markdown, tag="mark", start=start, end=end
+            )
+            marked_html = markdown(data.markdown)
+            Path(DATA_HTML).write_text(marked_html.replace("\n", "<br>"))
+            marked_chunk_indexes.append(chunk.index)
+        logger.info("Extracting...")
+        res = extract(
+            user=response_model.prompt(),
+            chunks=retrieved_chunks,
+            response_model=response_model,
+            model=ModelName.SONNET,
+        )
+        logger.success(res)
+        sleep(2)
+    except Exception:
+        logger.exception(f"Oh no {response_model.__name__} failed!")

@@ -84,3 +84,10 @@ Path("marked_html.html").write_text(marked_html.replace("\n", "<br>"))
 data = "https://www.sec.gov/Archives/edgar/data/1645590/000164559024000119/ex-1039xcreditagreementame.htm"
 data_md = data_to_md(data=data, chunk_size=800, chunk_overlap=200)[0]
 Path("hp.md").write_text(data_md.markdown)
+
+
+print(
+    len("""The pricing grid is usually the information of the interest applicable to the borrower. The interest rate applicable is tied to the financial covenants ratio. If the ratio level is maintained according to the table of the pricing grid then the applicable interest rate will be different.
+
+""")
+)
