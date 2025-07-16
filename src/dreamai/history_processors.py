@@ -19,7 +19,6 @@ def remove_retries(message_history: list[ModelMessage]) -> list[ModelMessage]:
     retry_tool_call_ids: list[str] = []
     successful_tools: set[str] = set()
     filtered_message_history: list[ModelMessage] = []
-    num_skipped_messages = 0
     for message in message_history[::-1]:
         filtered_parts: list[ModelRequestPart | ModelResponsePart] = []
         for part in message.parts:
@@ -27,15 +26,13 @@ def remove_retries(message_history: list[ModelMessage]) -> list[ModelMessage]:
                 successful_tools.add(part.tool_name)
             if isinstance(part, RetryPromptPart) and part.tool_name in successful_tools:
                 retry_tool_call_ids.append(part.tool_call_id)
-                num_skipped_messages += 1
                 continue
             if isinstance(part, ToolCallPart) and part.tool_call_id in retry_tool_call_ids:
-                num_skipped_messages += 1
                 continue
             filtered_parts.append(part)
         if filtered_parts:
             filtered_message_history.append(replace(message, parts=filtered_parts))
-    logger.info(f"Skipped {num_skipped_messages} messages")
+    logger.info(f"Skipped {len(retry_tool_call_ids)} retries")
     return filtered_message_history[::-1]
 
 

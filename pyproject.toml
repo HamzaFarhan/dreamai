@@ -1,6 +1,6 @@
 [project]
 name = "dreamai"
-version = "0.1.0"
+version = "4.1.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [
@@ -9,7 +9,7 @@ authors = [
 requires-python = ">=3.13"
 dependencies = [
     "ipykernel>=6.29.5",
-    "logfire>=3.24.2",
+    "logfire[httpx]>=3.24.2",
     "loguru>=0.7.3",
     "pydantic-ai>=0.4.2",
     "python-dotenv>=1.1.1",
