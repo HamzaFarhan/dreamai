@@ -1,0 +1,20 @@
+[project]
+name = "dreamai"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "HamzaFarhan", email = "thehamza96@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "ipykernel>=6.29.5",
+    "logfire>=3.24.2",
+    "loguru>=0.7.3",
+    "pydantic-ai>=0.4.2",
+    "python-dotenv>=1.1.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
