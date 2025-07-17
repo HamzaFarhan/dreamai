@@ -48,7 +48,7 @@ def guess_number(number: int) -> str:
 numerical_ops_tools = [add_numbers, calculate_average, guess_number]
 
 
-model = OpenAIModel("openai/gpt-4.1-nano", provider=OpenRouterProvider())
+model = OpenAIModel("deepseek/deepseek-chat-v3-0324", provider=OpenRouterProvider())
 agent = Agent(
     model=model,
     instructions=[
