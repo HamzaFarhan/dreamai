@@ -1,5 +1,7 @@
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import replace
+from typing import Concatenate, ParamSpec
 
 from loguru import logger
 from pydantic_ai.messages import (
@@ -11,6 +13,9 @@ from pydantic_ai.messages import (
     ToolCallPart,
     ToolReturnPart,
 )
+
+EditFuncParams = ParamSpec("EditFuncParams")
+EditFunc = Callable[Concatenate[ToolCallPart, EditFuncParams], ToolCallPart]
 
 
 def remove_retries(message_history: list[ModelMessage]) -> list[ModelMessage]:
@@ -36,14 +41,14 @@ def remove_retries(message_history: list[ModelMessage]) -> list[ModelMessage]:
     return filtered_message_history[::-1]
 
 
-def remove_used_tool_calls(
+def remove_used_tools(
     message_history: list[ModelMessage], tool_names: list[str], lifespan: int | float = 3
 ) -> list[ModelMessage]:
     tools_to_remove: set[str] = set()
     filtered_message_history: list[ModelMessage] = []
     if isinstance(lifespan, float):
         lifespan = len(message_history) * lifespan
-    num_skipped_messages: defaultdict[str, int] = defaultdict(int)
+    num_skipped_parts: defaultdict[str, int] = defaultdict(int)
     for i, message in enumerate(message_history[::-1]):
         filtered_parts: list[ModelRequestPart | ModelResponsePart] = []
         for part in message.parts:
@@ -53,10 +58,35 @@ def remove_used_tool_calls(
                 isinstance(part, (ToolCallPart, ToolReturnPart, RetryPromptPart))
                 and part.tool_name in tools_to_remove
             ):
-                num_skipped_messages[part.tool_name] += 1
+                num_skipped_parts[part.tool_name] += 1
                 continue
             filtered_parts.append(part)
         if filtered_parts:
             filtered_message_history.append(replace(message, parts=filtered_parts))
-    logger.info(f"Skipped messages: {dict(num_skipped_messages)}")
+    logger.info(f"Skipped parts: {dict(num_skipped_parts)}")
+    return filtered_message_history[::-1]
+
+
+def edit_used_tool_calls(
+    message_history: list[ModelMessage],
+    tool_names: list[str],
+    edit_func: EditFunc[...],
+    lifespan: int | float = 3,
+) -> list[ModelMessage]:
+    tools_to_edit: set[str] = set()
+    filtered_message_history: list[ModelMessage] = []
+    if isinstance(lifespan, float):
+        lifespan = len(message_history) * lifespan
+    num_edited_parts: defaultdict[str, int] = defaultdict(int)
+    for i, message in enumerate(message_history[::-1]):
+        filtered_parts: list[ModelRequestPart | ModelResponsePart] = []
+        for part in message.parts:
+            if isinstance(part, ToolReturnPart) and part.tool_name in tool_names and i >= lifespan:
+                tools_to_edit.add(part.tool_name)
+            if isinstance(part, ToolCallPart) and part.tool_name in tools_to_edit:
+                num_edited_parts[part.tool_name] += 1
+                part = edit_func(part)
+            filtered_parts.append(part)
+        filtered_message_history.append(replace(message, parts=filtered_parts))
+    logger.info(f"Edited parts: {dict(num_edited_parts)}")
     return filtered_message_history[::-1]

@@ -22,9 +22,10 @@ class Step(BaseModel):
         )
     )
     toolset_name: str = Field(
-        description="The name of the toolset to fetch for the step. Set to 'none' if no toolset is needed."
+        default="none",
+        description="The name of the toolset to fetch for the step. Set to 'none' if no toolset is needed.",
     )
-    recommended_tools: list[str] = Field(description="The tool(s) to use for the step.")
+    # recommended_tools: list[str] = Field(default_factory=list, description="The tool(s) to use for the step.")
 
 
 class PlanStepStatus(StrEnum):
@@ -35,10 +36,13 @@ class PlanStepStatus(StrEnum):
 
 class PlanStep(Step):
     status: PlanStepStatus = Field(default=PlanStepStatus.PENDING)
-    result: Any | None = None
+    # result: Any | None = None
 
     def __str__(self) -> str:
-        res = f"<plan_step>\n<step_number>{self.step_number}</step_number>\n<instructions>{self.instructions}</instructions>\n<toolset_name>{self.toolset_name}</toolset_name>\n<recommended_tools>{self.recommended_tools}</recommended_tools>\n<status>{self.status.value}</status>\n<result>{self.result}</result>\n</plan_step>\n"
+        res = f"<plan_step>\n<step_number>{self.step_number}</step_number>\n<instructions>{self.instructions}</instructions>\n<toolset_name>{self.toolset_name}</toolset_name>\n</plan_step>\n"
+        # TODO: ADD RECOMMENDED TOOLS BACK LATER
+        # TODO: ADD STATUS BACK LATER
+        # TODO: ADD RESULT BACK LATER
         return res.strip()
 
 
@@ -50,9 +54,9 @@ class Plan(BaseModel):
         for step in sorted(steps if isinstance(steps, list) else [steps], key=lambda x: x.step_number):
             self.steps[step.step_number] = PlanStep(**step.model_dump())
 
-    def mark_step_completed(self, step_number: int, result: Any | None = None):
-        self.steps[step_number].status = PlanStepStatus.COMPLETED
-        self.steps[step_number].result = result
+    # def mark_step_completed(self, step_number: int, result: Any | None = None):
+    #     self.steps[step_number].status = PlanStepStatus.COMPLETED
+    #     self.steps[step_number].result = result
 
     def get_step(self, step_number: int) -> PlanStep | None:
         return self.steps.get(step_number)

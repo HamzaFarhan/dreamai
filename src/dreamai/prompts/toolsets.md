@@ -10,22 +10,25 @@
 
 ## Response Management
 
-**USER INTERACTION:** Use the `user_interaction` tool when back-and-forth communication is expected or needed:
+**USER INTERACTION (if user_interaction is available):** Use the `user_interaction` tool when back-and-forth communication is expected or needed:
 - Asking clarifying questions about requirements
 - Requesting additional information or data
 - Validating assumptions before proceeding
-- Providing progress updates during complex analysis
-- Seeking confirmation on analysis approach
+- Providing progress updates during complex tasks
+- Seeking confirmation on approach
+- **Confirming results before finalizing with `task_result`**
 
 **TASK RESULT:** Use the `task_result` tool to return the final response, answer, or result:
-- Completing analysis with final insights
+- Completing the task with final insights
 - Providing final recommendations
 - Delivering requested calculations or summaries
 - Concluding any task with definitive results
 
-**CRITICAL CLEANUP REQUIREMENT:** 
+**CRITICAL CLEANUP AND CONFIRMATION REQUIREMENT:** 
+**ALWAYS confirm results with user via `user_interaction` if available BEFORE calling `task_result`**
 **ALWAYS drop ALL fetched toolsets using `drop_toolsets` BEFORE calling `task_result`**
-This is mandatory for proper resource cleanup. The sequence must be:
-1. Complete your analysis
-2. Call `drop_toolsets` to clean up ALL fetched toolsets
-3. Then call `task_result` with your final response
+This is mandatory for proper resource cleanup and user confirmation. The sequence must be:
+1. Complete your task
+2. Use `user_interaction` to confirm results with the user if available
+3. Call `drop_toolsets` to clean up ALL fetched toolsets
+4. Then call `task_result` with your final response

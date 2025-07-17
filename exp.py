@@ -10,7 +10,7 @@ from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 from dreamai.basic_toolset import add_current_time_instructions, task_result, user_interaction
-from dreamai.history_processors import remove_retries, remove_used_tool_calls
+from dreamai.history_processors import remove_retries, remove_used_tools
 from dreamai.toolsets import (
     AgentDeps,
     Toolset,
@@ -52,7 +52,7 @@ model = OpenAIModel("openai/gpt-4.1-nano", provider=OpenRouterProvider())
 agent = Agent(
     model=model,
     instructions=[
-        files("dreamai.prompts").joinpath("toolsets.md").read_text(),
+        (files("dreamai.prompts") / "toolsets.md").read_text(),
         add_current_time_instructions,
         list_available_toolsets,
         list_fetched_toolsets,
@@ -63,8 +63,8 @@ agent = Agent(
     prepare_tools=prepare_toolsets,
     history_processors=[
         remove_retries,
-        partial(remove_used_tool_calls, tool_names=["guess_number"], lifespan=2),
-        partial(remove_used_tool_calls, tool_names=["fetch_toolset", "drop_toolsets"], lifespan=1),
+        partial(remove_used_tools, tool_names=["guess_number"], lifespan=2),
+        partial(remove_used_tools, tool_names=["fetch_toolset", "drop_toolsets"], lifespan=1),
     ],
     retries=10,
 )
