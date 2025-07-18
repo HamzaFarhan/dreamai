@@ -18,7 +18,8 @@ class Step(BaseModel):
         description=(
             "Clear, specific instructions for this step. Write these for a smaller AI model that "
             "needs explicit guidance and cannot infer context or handle ambiguity well. "
-            "Be concrete, avoid complex reasoning, and include all necessary details."
+            "Be concrete, avoid complex reasoning, and include all necessary details. "
+            "And give the full file paths when possible."
         )
     )
     toolset_name: str = Field(
