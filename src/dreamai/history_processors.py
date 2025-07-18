@@ -20,6 +20,7 @@ EditFunc = Callable[
     Concatenate[ToolCallPart | ToolReturnPart, EditFuncParams], ToolCallPart | ToolReturnPart | None
 ]
 
+
 def remove_retries(message_history: list[ModelMessage], keep_last_n: int = 1) -> list[ModelMessage]:
     if not isinstance(message_history[-1], ModelRequest):
         return message_history
@@ -111,14 +112,14 @@ def edit_used_tools(
 
 
 def edit_tool_call_part(
-    part: ToolCallPart | ToolReturnPart, content: str | None, thresh: int = 200
+    part: ToolCallPart | ToolReturnPart, content: str | None, thresh: int | None = 200
 ) -> ToolCallPart | ToolReturnPart | None:
     if isinstance(part, ToolReturnPart):
         return part
     if content is None:
         return None
     tool_args = part.args_as_json_str()
-    if not tool_args or len(tool_args) < thresh:
+    if not tool_args or (thresh is not None and len(tool_args) < thresh):
         return part
     return ToolCallPart(
         tool_name=part.tool_name, args=content, tool_call_id=part.tool_call_id, part_kind=part.part_kind
@@ -126,14 +127,14 @@ def edit_tool_call_part(
 
 
 def edit_tool_result_part(
-    part: ToolCallPart | ToolReturnPart, content: str | None, thresh: int = 200
+    part: ToolCallPart | ToolReturnPart, content: str | None, thresh: int | None = 200
 ) -> ToolCallPart | ToolReturnPart | None:
     if isinstance(part, ToolCallPart):
         return part
     if content is None:
         return None
     result_content = part.model_response_str()
-    if len(result_content) < thresh:
+    if thresh is not None and len(result_content) < thresh:
         return part
     return ToolReturnPart(
         tool_name=part.tool_name,
