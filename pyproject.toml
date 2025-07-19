@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "docstring-parser>=0.16",
     "ipykernel>=6.29.5",
     "logfire[httpx]>=3.24.2",
     "loguru>=0.7.3",
