@@ -384,6 +384,7 @@ class Tool:
     name: str
     description: str
     parameters: Mapping[str, Any]
+    strict: bool = False
     _callable: Callable[..., Any]  # private, still invokable
 
     @classmethod
@@ -431,6 +432,7 @@ class Tool:
             name=tool_name,
             description=tool_description,
             parameters=schema,
+            strict=strict,
             _callable=cast(Callable[..., Any], fn),  # satisfy the type checker
         )
 
@@ -441,7 +443,7 @@ class Tool:
         if inspect.isawaitable(result):
             raise RuntimeError(f"Tool {self.name!r} is async; use 'await tool.run(**kwargs)' instead.")
         return result
-    
+
     async def run(self, **kwargs: Any) -> Any:
         """Invoke the tool asynchronously."""
         result = self._callable(**kwargs)
@@ -455,4 +457,5 @@ class Tool:
             "name": self.name,
             "description": self.description,
             "parameters": dict(self.parameters),
+            "strict": self.strict,
         }

@@ -318,10 +318,11 @@ wheels = [
 
 [[package]]
 name = "dreamai"
-version = "4.2.3"
+version = "4.2.5"
 source = { editable = "." }
 dependencies = [
     { name = "docstring-parser" },
+    { name = "httpx" },
     { name = "ipykernel" },
     { name = "logfire", extra = ["httpx"] },
     { name = "loguru" },
@@ -332,6 +333,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "docstring-parser", specifier = ">=0.16" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "logfire", extras = ["httpx"], specifier = ">=3.24.2" },
     { name = "loguru", specifier = ">=0.7.3" },
