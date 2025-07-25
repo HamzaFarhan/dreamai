@@ -49,10 +49,12 @@ class PlanStep(Step):
 
 class Plan(BaseModel):
     task: str = Field(description="The user's task to be executed.")
-    steps: dict[int, PlanStep] = Field(default_factory=dict)
+    steps: dict[int, PlanStep] = Field(default_factory=dict)  # type: ignore
 
     def add_steps(self, steps: list[Step | PlanStep] | Step | PlanStep):
-        for step in sorted(steps if isinstance(steps, list) else [steps], key=lambda x: x.step_number):
+        for step in sorted(
+            steps if isinstance(steps, list) else [steps], key=lambda x: x.step_number
+        ):
             self.steps[step.step_number] = PlanStep(**step.model_dump())
 
     # def mark_step_completed(self, step_number: int, result: Any | None = None):
@@ -63,7 +65,9 @@ class Plan(BaseModel):
         return self.steps.get(step_number)
 
     def get_completed_steps(self) -> list[PlanStep]:
-        return [step for step in self.steps.values() if step.status == PlanStepStatus.COMPLETED]
+        return [
+            step for step in self.steps.values() if step.status == PlanStepStatus.COMPLETED
+        ]
 
     def completed_steps_str(self) -> str:
         return (
@@ -79,7 +83,9 @@ class Plan(BaseModel):
         return None
 
     def next_pending_step_str(self) -> str:
-        return f"<next_pending_step>\n{str(self.get_next_pending_step())}\n</next_pending_step>\n"
+        return (
+            f"<next_pending_step>\n{str(self.get_next_pending_step())}\n</next_pending_step>\n"
+        )
 
     def __str__(self) -> str:
         return (
