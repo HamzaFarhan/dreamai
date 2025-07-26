@@ -16,12 +16,18 @@ class Step(BaseModel):
     )
     instructions: str = Field(
         description=(
-            "Clear, specific instructions for this step. Write these for a smaller AI model that "
-            "needs explicit guidance and cannot infer context or handle ambiguity well. "
-            "Be concrete, avoid complex reasoning, and include all necessary details. "
-            "And give the full file paths when possible."
+            "Atomic, execution‑ready instructions for this single step. "
+            "Assume a smaller AI model with no context; spell out everything. "
+            "Produce exactly one result table or artifact per step. "
+            "If reading data, specify full file paths. "
+            "If the task involves time‑based metrics, include the approved as‑of date "
+            "and build a point‑in‑time snapshot "
+            "(for example, one row per subscription active as of that date). "
+            "Never sum multiple periods then annualize unless the step explicitly says so. "
+            "End with 1–2 acceptance criteria and a quick QA check."
         )
     )
+
     toolset_name: str = Field(
         default="none",
         description="The name of the toolset to fetch for the step. Set to 'none' if no toolset is needed.",
@@ -83,9 +89,7 @@ class Plan(BaseModel):
         return None
 
     def next_pending_step_str(self) -> str:
-        return (
-            f"<next_pending_step>\n{str(self.get_next_pending_step())}\n</next_pending_step>\n"
-        )
+        return f"<next_pending_step>\n{str(self.get_next_pending_step())}\n</next_pending_step>\n"
 
     def __str__(self) -> str:
         return (
@@ -99,14 +103,20 @@ class Plan(BaseModel):
 
 def present_plan(plan: str) -> str:
     """
-    Present the complete plan to the user.
-    This will not mention the tools/toolsets because the user is not technical.
+    Present the complete plan to the user in non‑technical language.
+    Must include: the as‑of date, assumptions/questions, explicit deliverables, and consent gates for optional artifacts (e.g., Excel workbooks).
+    Do not mention internal tools or toolsets.
+    Ask the user to confirm: (a) the as‑of date, (b) assumptions, and (c) whether to create optional artifacts.
     """
     return plan
 
 
 def create_plan(task: str, steps: list[Step | PlanStep]) -> Plan:
-    """Create the actual plan."""
+    """
+    Create the internal, execution‑ready plan only after the user approves `present_plan`.
+    Steps must be minimal and atomic, with one output per step and explicit filenames/locations.
+    Each step should include acceptance criteria and a brief QA check.
+    """
     if not steps:
         raise ModelRetry("No steps provided. Please provide a list of steps.")
     plan = Plan(task=task)
