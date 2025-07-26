@@ -1,5 +1,6 @@
 import inspect
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -60,11 +61,16 @@ class Toolset:
         return res
 
 
+@dataclass(init=False)
 class AgentDeps:
+    toolset_registry: dict[str, Toolset]
+    fetched_toolsets: set[str]
+    presented_plan: str | None
+
     def __init__(self, toolset_registry: dict[str, Toolset] | None = None):
-        self.toolset_registry: dict[str, Toolset] = toolset_registry or {}
-        self.fetched_toolsets: set[str] = set()
-        self.presented_plan: str | None = None
+        self.toolset_registry = toolset_registry or {}
+        self.fetched_toolsets = set()
+        self.presented_plan = None
 
     def add_toolsets(self, toolsets: list[Toolset] | Toolset):
         for toolset in toolsets if isinstance(toolsets, list) else [toolsets]:
