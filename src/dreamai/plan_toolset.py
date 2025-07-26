@@ -97,7 +97,6 @@ class Plan(BaseModel):
             f"<plan>\n"
             f"{'\n'.join(str(step) for step in self.steps.values())}\n"
             f"</plan>\n"
-            "You may complete multiple steps in one go if you think it's appropriate."
         )
 
 
