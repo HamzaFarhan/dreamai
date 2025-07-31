@@ -35,9 +35,7 @@ class Toolset:
         self.tools = tools
         self.depends_on = depends_on or []
 
-    def describe(
-        self, with_instructions: bool = False, with_tools: bool = True, full_doc: bool = True
-    ) -> str:
+    def describe(self, with_instructions: bool = False, with_tools: bool = True, full_doc: bool = True) -> str:
         res = f"<{self.name}>\n"
         if self.depends_on:
             res += f"Can't be fetched until the following toolsets are fetched: {self.depends_on}\n"
@@ -51,9 +49,7 @@ class Toolset:
                 if full_doc:
                     doc = tool.__doc__ or "No description"
                 else:
-                    doc = (tool.__doc__ or "No description").split("\n\n")[
-                        0
-                    ]  # Just summary before Args
+                    doc = (tool.__doc__ or "No description").split("\n\n")[0]  # Just summary before Args
                 sig = inspect.signature(tool)
                 res += f"{tool.__name__}{sig}: {doc.strip()}\n"
             res += "</tools>\n"
@@ -77,15 +73,12 @@ class AgentDeps:
             self.toolset_registry[toolset.name] = toolset
 
 
-async def prepare_toolsets(
-    ctx: RunContext[AgentDeps], tool_defs: list[ToolDefinition]
-) -> list[ToolDefinition]:
+async def prepare_toolsets(ctx: RunContext[AgentDeps], tool_defs: list[ToolDefinition]) -> list[ToolDefinition]:
     """Prepare the toolsets: automatically skip tools from unfetched toolsets"""
     tools_to_skip: set[str] = set()
     for toolset_name, toolset in ctx.deps.toolset_registry.items():
         if toolset_name not in ctx.deps.fetched_toolsets or (
-            toolset.depends_on
-            and not all(dep in ctx.deps.fetched_toolsets for dep in toolset.depends_on)
+            toolset.depends_on and not all(dep in ctx.deps.fetched_toolsets for dep in toolset.depends_on)
         ):
             tools_to_skip.update(tool.__name__ for tool in toolset.tools)
     return [tool_def for tool_def in tool_defs if tool_def.name not in tools_to_skip]
@@ -117,19 +110,13 @@ async def list_fetched_toolsets(ctx: RunContext[AgentDeps]) -> str:
 
 async def fetch_toolset(ctx: RunContext[AgentDeps], toolset_name: str) -> str:
     """Fetch a toolset"""
-    logger.info(
-        f"Fetching `{toolset_name}` toolset from {list(ctx.deps.toolset_registry.keys())}"
-    )
+    logger.info(f"Fetching `{toolset_name}` toolset from {list(ctx.deps.toolset_registry.keys())}")
     if ctx.deps.toolset_registry.get(toolset_name, None) is None:
-        raise ModelRetry(
-            f"The `{toolset_name}` toolset is not available.\n{await list_available_toolsets(ctx)}"
-        )
+        raise ModelRetry(f"The `{toolset_name}` toolset is not available.\n{await list_available_toolsets(ctx)}")
     if toolset_name in ctx.deps.fetched_toolsets:
         return f"You can already use tools from the `{toolset_name}` toolset."
     toolset = ctx.deps.toolset_registry[toolset_name]
-    if toolset.depends_on and not all(
-        dep in ctx.deps.fetched_toolsets for dep in toolset.depends_on
-    ):
+    if toolset.depends_on and not all(dep in ctx.deps.fetched_toolsets for dep in toolset.depends_on):
         raise ModelRetry(
             f"The `{toolset_name}` toolset depends on the following toolsets: {toolset.depends_on}.\n"
             f"You need to fetch them first."
@@ -142,13 +129,9 @@ async def _drop_toolset(ctx: RunContext[AgentDeps], toolset_name: str):
     """Drop a toolset"""
     logger.info(f"Dropping `{toolset_name}` toolset from {ctx.deps.fetched_toolsets}")
     if ctx.deps.toolset_registry.get(toolset_name, None) is None:
-        raise ModelRetry(
-            f"The `{toolset_name}` toolset is not available.\n{await list_available_toolsets(ctx)}"
-        )
+        raise ModelRetry(f"The `{toolset_name}` toolset is not available.\n{await list_available_toolsets(ctx)}")
     if toolset_name not in ctx.deps.fetched_toolsets:
-        raise ModelRetry(
-            f"You can't drop a toolset that you haven't fetched.\n{await list_fetched_toolsets(ctx)}"
-        )
+        raise ModelRetry(f"You can't drop a toolset that you haven't fetched.\n{await list_fetched_toolsets(ctx)}")
     ctx.deps.fetched_toolsets.discard(toolset_name)
 
 
