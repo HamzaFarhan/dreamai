@@ -79,7 +79,7 @@ class AgentDeps:
     user_info: UserInfo
     toolsets: list[AbstractToolset[Any]] = field(default_factory=list)  # type: ignore
     plan: Plan | None = None
-    plan_approved: bool = False
+    act_mode: bool = False
     artifacts: dict[str, Any] = field(default_factory=dict)  # type: ignore
     current_step: int = 0
 
@@ -88,7 +88,7 @@ class AgentDeps:
 
 
 async def get_tool_defs(ctx: RunContext[AgentDeps]) -> dict[str, str] | None:
-    if ctx.deps.plan_approved:
+    if ctx.deps.act_mode:
         return None
     return {
         tool_name: str(tool.tool_def)
@@ -107,7 +107,7 @@ async def get_tool_def_instructions(ctx: RunContext[AgentDeps]) -> str:
 
 
 async def step_instructions(ctx: RunContext[AgentDeps]) -> str:
-    if ctx.deps.plan is None or not ctx.deps.plan_approved or ctx.deps.current_step == 0:
+    if ctx.deps.plan is None or not ctx.deps.act_mode or ctx.deps.current_step == 0:
         return ""
     step = ctx.deps.plan.steps[ctx.deps.current_step]
     step_str_list = [f"<step number={step.step_number}>", f"<instructions>\n{step.instructions}\n</instructions>"]
@@ -123,7 +123,7 @@ async def step_instructions(ctx: RunContext[AgentDeps]) -> str:
 
 
 async def planner_instructions(ctx: RunContext[AgentDeps]) -> str:
-    if ctx.deps.plan is not None and ctx.deps.plan_approved and ctx.deps.current_step > 0:
+    if ctx.deps.plan is not None and ctx.deps.act_mode and ctx.deps.current_step > 0:
         return ""
     tool_defs = await get_tool_def_instructions(ctx)
     return (
@@ -162,7 +162,7 @@ def mark_plan_approved(ctx: RunContext[AgentDeps]) -> Plan:
     """Use this AFTER the user approves the plan."""
     if ctx.deps.plan is None:
         raise ModelRetry("No plan has been created. Please create a plan first.")
-    ctx.deps.plan_approved = True
+    ctx.deps.act_mode = True
     ctx.deps.current_step = 1
     return ctx.deps.plan
 
@@ -170,14 +170,18 @@ def mark_plan_approved(ctx: RunContext[AgentDeps]) -> Plan:
 async def prepare_output_tools(ctx: RunContext[AgentDeps], tool_defs: list[ToolDefinition]) -> list[ToolDefinition]:
     if ctx.deps.plan is None:
         return [tool_def for tool_def in tool_defs if tool_def.name in ["user_interaction", "create_plan"]]
-    if not ctx.deps.plan_approved:
+    if not ctx.deps.act_mode:
         return [
             tool_def
             for tool_def in tool_defs
             if tool_def.name in ["user_interaction", "create_plan", "mark_plan_approved"]
         ]
-    if ctx.deps.plan_approved:
-        return [tool_def for tool_def in tool_defs if tool_def.name not in ["create_plan", "mark_plan_approved"]]
+    if ctx.deps.act_mode and ctx.deps.current_step > 0:
+        return [
+            tool_def
+            for tool_def in tool_defs
+            if tool_def.name not in ["user_interaction", "create_plan", "mark_plan_approved"]
+        ]
     return tool_defs
 
 
@@ -245,7 +249,7 @@ def step_result(ctx: RunContext[AgentDeps], message: str) -> StepResult | TaskRe
 
 
 def toolset_filter(ctx: RunContext[AgentDeps], tooldef: ToolDefinition) -> bool:
-    if ctx.deps.plan_approved and ctx.deps.plan is not None and ctx.deps.current_step > 0:
+    if ctx.deps.act_mode and ctx.deps.plan is not None and ctx.deps.current_step > 0:
         return tooldef.name == ctx.deps.plan.steps[ctx.deps.current_step].tool_name
     return True
 
@@ -268,7 +272,7 @@ async def run_agent(user_prompt: str, agent_deps: AgentDeps) -> TaskResult:
             user_prompt,
             deps=agent_deps,
             message_history=message_history,
-            toolsets=agent_deps.toolsets if agent_deps.plan_approved else None,
+            toolsets=agent_deps.toolsets if agent_deps.act_mode else None,
             output_type=[
                 ToolOutput(user_interaction, name="user_interaction"),
                 ToolOutput(create_plan, name="create_plan"),
@@ -277,7 +281,7 @@ async def run_agent(user_prompt: str, agent_deps: AgentDeps) -> TaskResult:
             ],
         )
         message_history = res.all_messages()
-        if isinstance(res.output, Plan) and agent_deps.plan_approved:
+        if isinstance(res.output, Plan) and agent_deps.act_mode:
             message_history = None
             continue
         if isinstance(res.output, StepResult):
