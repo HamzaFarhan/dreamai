@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import logfire
 from dotenv import load_dotenv
@@ -79,17 +79,18 @@ class AgentDeps:
     user_info: UserInfo
     toolsets: list[AbstractToolset[Any]] = field(default_factory=list)  # type: ignore
     plan: Plan | None = None
-    act_mode: bool = False
+    mode: Literal["plan", "act"] = "plan"
     artifacts: dict[str, Any] = field(default_factory=dict)  # type: ignore
     current_step: int = 0
 
     def add_toolsets(self, toolsets: list[AbstractToolset] | AbstractToolset):
         self.toolsets += toolsets if isinstance(toolsets, list) else [toolsets]
 
+    def toggle_mode(self):
+        self.mode = "act" if self.mode == "plan" else "plan"
 
-async def get_tool_defs(ctx: RunContext[AgentDeps]) -> dict[str, str] | None:
-    if ctx.deps.act_mode:
-        return None
+
+async def get_tool_defs(ctx: RunContext[AgentDeps]) -> dict[str, str]:
     return {
         tool_name: str(tool.tool_def)
         for toolset in ctx.deps.toolsets
@@ -98,16 +99,16 @@ async def get_tool_defs(ctx: RunContext[AgentDeps]) -> dict[str, str] | None:
 
 
 async def get_tool_def_instructions(ctx: RunContext[AgentDeps]) -> str:
-    tool_defs = await get_tool_defs(ctx)
-    if not tool_defs:
+    if ctx.deps.mode == "act":
         return ""
+    tool_defs = await get_tool_defs(ctx)
     return (
         "<available_tools>\n" + "\n".join([f"{tool_def}" for tool_def in tool_defs.values()]) + "\n</available_tools>"
     )
 
 
 async def step_instructions(ctx: RunContext[AgentDeps]) -> str:
-    if ctx.deps.plan is None or not ctx.deps.act_mode or ctx.deps.current_step == 0:
+    if ctx.deps.mode == "plan" or ctx.deps.plan is None or ctx.deps.current_step == 0:
         return ""
     step = ctx.deps.plan.steps[ctx.deps.current_step]
     step_str_list = [f"<step number={step.step_number}>", f"<instructions>\n{step.instructions}\n</instructions>"]
@@ -123,7 +124,7 @@ async def step_instructions(ctx: RunContext[AgentDeps]) -> str:
 
 
 async def planner_instructions(ctx: RunContext[AgentDeps]) -> str:
-    if ctx.deps.plan is not None and ctx.deps.act_mode and ctx.deps.current_step > 0:
+    if ctx.deps.mode == "act":
         return ""
     tool_defs = await get_tool_def_instructions(ctx)
     return (
@@ -162,27 +163,19 @@ def mark_plan_approved(ctx: RunContext[AgentDeps]) -> Plan:
     """Use this AFTER the user approves the plan."""
     if ctx.deps.plan is None:
         raise ModelRetry("No plan has been created. Please create a plan first.")
-    ctx.deps.act_mode = True
+    ctx.deps.mode = "act"
     ctx.deps.current_step = 1
     return ctx.deps.plan
 
 
 async def prepare_output_tools(ctx: RunContext[AgentDeps], tool_defs: list[ToolDefinition]) -> list[ToolDefinition]:
+    plan_mode_tools = ["user_interaction", "create_plan"]
     if ctx.deps.plan is None:
-        return [tool_def for tool_def in tool_defs if tool_def.name in ["user_interaction", "create_plan"]]
-    if not ctx.deps.act_mode:
-        return [
-            tool_def
-            for tool_def in tool_defs
-            if tool_def.name in ["user_interaction", "create_plan", "mark_plan_approved"]
-        ]
-    if ctx.deps.act_mode and ctx.deps.current_step > 0:
-        return [
-            tool_def
-            for tool_def in tool_defs
-            if tool_def.name not in ["user_interaction", "create_plan", "mark_plan_approved"]
-        ]
-    return tool_defs
+        return [tool_def for tool_def in tool_defs if tool_def.name in plan_mode_tools]
+    plan_mode_tools.append("mark_plan_approved")
+    if ctx.deps.mode == "plan":
+        return [tool_def for tool_def in tool_defs if tool_def.name in plan_mode_tools]
+    return [tool_def for tool_def in tool_defs if tool_def.name not in plan_mode_tools]
 
 
 def get_user_city(ctx: RunContext[AgentDeps]) -> str:
@@ -227,7 +220,7 @@ class TaskResult(BaseModel):
     A task result.
     """
 
-    message: str = Field(description="The final response to the user.")
+    result: str = Field(description="The final response to the user.")
 
 
 class StepResult(BaseModel):
@@ -235,33 +228,35 @@ class StepResult(BaseModel):
     A step result.
     """
 
-    message: str = Field(description="The final response to the user for the current step.")
+    result: str = Field(description="The result of the current step.")
 
 
-def step_result(ctx: RunContext[AgentDeps], message: str) -> StepResult | TaskResult:
-    """Returns the final response to the user for the current step."""
+def step_result(ctx: RunContext[AgentDeps], result: str) -> StepResult | TaskResult:
+    """Process the result of the current step."""
     if ctx.deps.plan is not None and ctx.deps.current_step > 0:
-        ctx.deps.artifacts[ctx.deps.plan.steps[ctx.deps.current_step].artifact_name] = message
+        ctx.deps.artifacts[ctx.deps.plan.steps[ctx.deps.current_step].artifact_name] = result
         if ctx.deps.current_step == len(ctx.deps.plan.steps):
-            return TaskResult(message=message)
+            return TaskResult(result=result)
         ctx.deps.current_step += 1
-    return StepResult(message=message)
+    return StepResult(result=result)
 
 
 def toolset_filter(ctx: RunContext[AgentDeps], tooldef: ToolDefinition) -> bool:
-    if ctx.deps.act_mode and ctx.deps.plan is not None and ctx.deps.current_step > 0:
+    if ctx.deps.mode == "act" and ctx.deps.plan is not None:
         return tooldef.name == ctx.deps.plan.steps[ctx.deps.current_step].tool_name
-    return True
+    return False
 
 
-toolset = CombinedToolset([user_info_toolset, weather_toolset]).filtered(toolset_filter)
+toolset = CombinedToolset([user_info_toolset, weather_toolset])
 
 model = OpenAIModel("openrouter/horizon-alpha", provider=OpenRouterProvider())
 agent = Agent(
     model=model,
     instructions=[planner_instructions, step_instructions],
     deps_type=AgentDeps,
+    toolsets=[toolset.filtered(toolset_filter)],
     prepare_output_tools=prepare_output_tools,
+    retries=3,
 )
 
 
@@ -272,16 +267,14 @@ async def run_agent(user_prompt: str, agent_deps: AgentDeps) -> TaskResult:
             user_prompt,
             deps=agent_deps,
             message_history=message_history,
-            toolsets=agent_deps.toolsets if agent_deps.act_mode else None,
             output_type=[
-                ToolOutput(user_interaction, name="user_interaction"),
                 ToolOutput(create_plan, name="create_plan"),
                 ToolOutput(mark_plan_approved, name="mark_plan_approved"),
                 ToolOutput(step_result, name="step_result"),
             ],
         )
         message_history = res.all_messages()
-        if isinstance(res.output, Plan) and agent_deps.act_mode:
+        if isinstance(res.output, Plan) and agent_deps.mode == "act":
             message_history = None
             continue
         if isinstance(res.output, StepResult):
@@ -296,7 +289,9 @@ async def run_agent(user_prompt: str, agent_deps: AgentDeps) -> TaskResult:
 if __name__ == "__main__":
     import asyncio
 
-    agent_deps = AgentDeps(user_info=UserInfo(city="Paris"), toolsets=[toolset])
+    agent_deps = AgentDeps(
+        user_info=UserInfo(city="Paris"), toolsets=[toolset.filtered(lambda ctx, _: ctx.deps.mode == "plan")]
+    )
 
     res = asyncio.run(run_agent("What is the weather at my location?", agent_deps=agent_deps))
     print("\n---------------------------\n")
