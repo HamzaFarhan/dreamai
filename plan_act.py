@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Annotated, Any, Literal
 
 import logfire
@@ -10,7 +11,7 @@ from dotenv import load_dotenv
 from loguru import logger
 from pydantic import AfterValidator, BaseModel, Field
 from pydantic_ai import Agent, ModelRetry, RunContext, ToolOutput
-from pydantic_ai.messages import ModelMessage
+from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.tools import ToolDefinition
@@ -89,6 +90,14 @@ class AgentDeps:
     def toggle_mode(self):
         self.mode = "act" if self.mode == "plan" else "plan"
 
+    def incr_current_step(self):
+        if self.plan is None:
+            self.current_step = 0
+        elif self.current_step == len(self.plan.steps):
+            self.mode = "plan"
+        else:
+            self.current_step += 1
+
 
 async def get_tool_defs(ctx: RunContext[AgentDeps]) -> dict[str, str]:
     return {
@@ -103,7 +112,9 @@ async def get_tool_def_instructions(ctx: RunContext[AgentDeps]) -> str:
         return ""
     tool_defs = await get_tool_defs(ctx)
     return (
-        "<available_tools>\n" + "\n".join([f"{tool_def}" for tool_def in tool_defs.values()]) + "\n</available_tools>"
+        "<available_tools>\n"
+        + "\n".join([f"{tool_def}" for tool_def in tool_defs.values()])
+        + "\n</available_tools>"
     )
 
 
@@ -117,7 +128,7 @@ async def step_instructions(ctx: RunContext[AgentDeps]) -> str:
         for dep in step.depends_on_artifacts:
             if dep in ctx.deps.artifacts:
                 deps_str += f"<artifact name='{dep}'>{ctx.deps.artifacts[dep]}</artifact>\n"
-        deps_str += "</dependencies>\n"
+        deps_str += "</dependencies>"
         step_str_list.append(deps_str)
     step_str_list.append("</step>")
     return "\n".join(step_str_list)
@@ -128,9 +139,10 @@ async def planner_instructions(ctx: RunContext[AgentDeps]) -> str:
         return ""
     tool_defs = await get_tool_def_instructions(ctx)
     return (
-        "You are a planner agent. Your task is to create an execution-ready plan based on the user's task.\n"
+        "Your task is to interact with the user and create an execution-ready plan based on the user's task.\n"
         "Each step must be atomic, with one artifact per step and explicit filenames/locations.\n"
         "If you need to use tools, specify them in the steps.\n"
+        "Try to reuse any available information from previous steps.\n"
         f"{tool_defs}"
     ).strip() + "\nIf you need more information, ask the user."
 
@@ -156,6 +168,7 @@ async def create_plan(ctx: RunContext[AgentDeps], task: str, steps: list[Step]) 
     plan = Plan(task=task)
     plan.add_steps(steps)
     ctx.deps.plan = plan
+    ctx.deps.current_step = 0
     return plan
 
 
@@ -164,18 +177,8 @@ def mark_plan_approved(ctx: RunContext[AgentDeps]) -> Plan:
     if ctx.deps.plan is None:
         raise ModelRetry("No plan has been created. Please create a plan first.")
     ctx.deps.mode = "act"
-    ctx.deps.current_step = 1
+    ctx.deps.incr_current_step()
     return ctx.deps.plan
-
-
-async def prepare_output_tools(ctx: RunContext[AgentDeps], tool_defs: list[ToolDefinition]) -> list[ToolDefinition]:
-    plan_mode_tools = ["user_interaction", "create_plan"]
-    if ctx.deps.plan is None:
-        return [tool_def for tool_def in tool_defs if tool_def.name in plan_mode_tools]
-    plan_mode_tools.append("mark_plan_approved")
-    if ctx.deps.mode == "plan":
-        return [tool_def for tool_def in tool_defs if tool_def.name in plan_mode_tools]
-    return [tool_def for tool_def in tool_defs if tool_def.name not in plan_mode_tools]
 
 
 def get_user_city(ctx: RunContext[AgentDeps]) -> str:
@@ -197,7 +200,18 @@ def temperature_fahrenheit(city: str) -> float:
     return 69.8
 
 
-weather_toolset = FunctionToolset[Any](tools=[temperature_celsius, temperature_fahrenheit])
+def weather_forecast(city: str) -> str:
+    """Get the weather forecast for the specified city."""
+    logger.info(f"Getting weather forecast for {city}")
+    weather_map = {
+        "New York": "Sunny",
+        "Paris": "Cloudy with a chance of rain",
+        "Tokyo": "Clear skies and warm temperatures",
+    }
+    return weather_map.get(city, "Unknown")
+
+
+weather_toolset = FunctionToolset[Any](tools=[temperature_celsius, temperature_fahrenheit, weather_forecast])
 
 
 def user_interaction(message: str) -> str:
@@ -220,7 +234,12 @@ class TaskResult(BaseModel):
     A task result.
     """
 
-    result: str = Field(description="The final response to the user.")
+    message: str = Field(description="The final response to the user.")
+
+
+def task_result(message: str) -> TaskResult:
+    """Returns the final response to the user."""
+    return TaskResult(message=message)
 
 
 class StepResult(BaseModel):
@@ -228,17 +247,44 @@ class StepResult(BaseModel):
     A step result.
     """
 
-    result: str = Field(description="The result of the current step.")
+    step_number: int
+    result: str
 
 
-def step_result(ctx: RunContext[AgentDeps], result: str) -> StepResult | TaskResult:
+def step_result(ctx: RunContext[AgentDeps], result: str) -> StepResult:
     """Process the result of the current step."""
     if ctx.deps.plan is not None and ctx.deps.current_step > 0:
         ctx.deps.artifacts[ctx.deps.plan.steps[ctx.deps.current_step].artifact_name] = result
+    res = StepResult(step_number=ctx.deps.current_step, result=result)
+    ctx.deps.incr_current_step()
+    return res
+
+
+class NeedHelp:
+    pass
+
+
+def need_help(ctx: RunContext[AgentDeps]) -> NeedHelp:
+    """Use this when you need help to proceed."""
+    ctx.deps.mode = "plan"
+    return NeedHelp()
+
+
+async def prepare_output_tools(
+    ctx: RunContext[AgentDeps], tool_defs: list[ToolDefinition]
+) -> list[ToolDefinition] | None:
+    plan_mode_tools = ["user_interaction", "create_plan", "mark_plan_approved", "task_result"]
+    if ctx.deps.mode == "act":
+        return [tool_def for tool_def in tool_defs if tool_def.name not in plan_mode_tools]
+    plan_mode_tools = ["create_plan"]
+    if ctx.deps.plan is None:
+        return [tool_def for tool_def in tool_defs if tool_def.name in plan_mode_tools]
+    if ctx.deps.mode == "plan":
         if ctx.deps.current_step == len(ctx.deps.plan.steps):
-            return TaskResult(result=result)
-        ctx.deps.current_step += 1
-    return StepResult(result=result)
+            plan_mode_tools += ["user_interaction", "task_result"]
+        else:
+            plan_mode_tools.append("mark_plan_approved")
+        return [tool_def for tool_def in tool_defs if tool_def.name in plan_mode_tools]
 
 
 def toolset_filter(ctx: RunContext[AgentDeps], tooldef: ToolDefinition) -> bool:
@@ -260,30 +306,35 @@ agent = Agent(
 )
 
 
-async def run_agent(user_prompt: str, agent_deps: AgentDeps) -> TaskResult:
-    message_history: list[ModelMessage] | None = None
+async def run_agent(user_prompt: str, agent_deps: AgentDeps):
+    message_history: list[ModelMessage] = []
     while True:
         res = await agent.run(
-            user_prompt,
+            user_prompt=user_prompt if agent_deps.mode == "plan" else None,
+            message_history=message_history if agent_deps.mode == "plan" else None,
             deps=agent_deps,
-            message_history=message_history,
             output_type=[
+                ToolOutput(user_interaction, name="user_interaction"),
                 ToolOutput(create_plan, name="create_plan"),
                 ToolOutput(mark_plan_approved, name="mark_plan_approved"),
+                ToolOutput(task_result, name="task_result"),
                 ToolOutput(step_result, name="step_result"),
+                ToolOutput(need_help, name="need_help"),
             ],
         )
-        message_history = res.all_messages()
-        if isinstance(res.output, Plan) and agent_deps.mode == "act":
-            message_history = None
-            continue
-        if isinstance(res.output, StepResult):
-            message_history = None
-            continue
-        if isinstance(res.output, TaskResult):
-            return res.output
-        agent_message = res.output if isinstance(res.output, str) else res.output.model_dump_json(indent=2)
-        user_prompt = input(f"{agent_message}\n> ")
+        logger.info(f"Agent response: {res.output}")
+        logger.info(
+            f"Mode: {agent_deps.mode}, Current Step: {agent_deps.current_step}/{len(agent_deps.plan.steps) if agent_deps.plan else 0}"
+        )
+        message_history += res.new_messages()
+        if agent_deps.mode == "plan" and not isinstance(res.output, (StepResult, NeedHelp)):
+            agent_message = res.output if isinstance(res.output, str) else res.output.model_dump_json(indent=2)
+            user_prompt = input(f"{agent_message}\n> ")
+            if user_prompt.lower() in ["exit", "quit", "q"]:
+                Path("message_history.json").write_bytes(
+                    ModelMessagesTypeAdapter.dump_json(message_history, indent=2)
+                )
+                break
 
 
 if __name__ == "__main__":
@@ -292,9 +343,5 @@ if __name__ == "__main__":
     agent_deps = AgentDeps(
         user_info=UserInfo(city="Paris"), toolsets=[toolset.filtered(lambda ctx, _: ctx.deps.mode == "plan")]
     )
-
-    res = asyncio.run(run_agent("What is the weather at my location?", agent_deps=agent_deps))
-    print("\n---------------------------\n")
-    print(res.model_dump_json(indent=2))
-    print("\n---------------------------\n")
-    print(agent_deps)
+    asyncio.run(run_agent("What is the temp in celcius at my location?", agent_deps=agent_deps))
+    logger.success("Agent run completed successfully.")
