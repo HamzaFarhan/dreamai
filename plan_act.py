@@ -73,6 +73,7 @@ class Step(BaseModel):
 
 class Plan(BaseModel):
     task: str = Field(description="The user's task to be executed.")
+    task_result_name: str = Field(description="A relevant and descriptive name for the result of the task.")
     steps: dict[int, Step] = Field(default_factory=dict)  # type: ignore
 
     def add_steps(self, steps: list[Step] | Step):
@@ -146,7 +147,7 @@ async def step_instructions(ctx: RunContext[AgentDeps]) -> str:
             "<dependant_artifacts>"
             + "\n".join(
                 [
-                    f"<artifact name='{dep}'>{ctx.deps.artifacts[dep]}</artifact>\n"
+                    f"<artifact name={dep}>{ctx.deps.artifacts[dep]}</artifact>\n"
                     for dep in step.dependant_artifact_names
                 ]
             )
@@ -165,17 +166,22 @@ async def plan_mode_instructions(ctx: RunContext[AgentDeps]) -> str:
         plan_str_list.append(
             "<saved_artifacts>\n"
             + "\n".join(
-                [f"<artifact name='{name}'>{value}</artifact>" for name, value in ctx.deps.artifacts.items()]
+                [f"<artifact name={name}>{value}</artifact>" for name, value in ctx.deps.artifacts.items()]
             )
             + "\n</saved_artifacts>"
         )
     return "\n\n".join(plan_str_list).strip()
 
 
-async def create_plan(ctx: RunContext[AgentDeps], task: str, steps: list[Step]) -> Plan:
+async def create_plan(ctx: RunContext[AgentDeps], task: str, task_result_name: str, steps: list[Step]) -> Plan:
     """
     Create an execution-ready plan based on the user's task.
     Steps must be minimal and atomic, with one artifact per step and explicit filenames/locations.
+
+    Args:
+        task: The user's task to be executed.
+        task_result_name: A relevant and descriptive name for the result of the task.
+        steps: A list of steps to be executed in the plan.
     """
     if not steps:
         raise ModelRetry("No steps provided. Please provide a list of steps.")
@@ -190,7 +196,7 @@ async def create_plan(ctx: RunContext[AgentDeps], task: str, steps: list[Step]) 
                     f"Available tools: {list(tool_names)}"
                 )
             )
-    plan = Plan(task=task)
+    plan = Plan(task=task, task_result_name=task_result_name)
     plan.add_steps(steps)
     ctx.deps.plan = plan
     ctx.deps.current_step = 0
@@ -321,8 +327,10 @@ class TaskResult(BaseModel):
     message: str = Field(description="The final response to the user.")
 
 
-def task_result(message: str) -> TaskResult:
+def task_result(ctx: RunContext[AgentDeps], message: str) -> TaskResult:
     """Returns the final response to the user."""
+    if ctx.deps.plan:
+        ctx.deps.artifacts[ctx.deps.plan.task_result_name] = message
     return TaskResult(message=message)
 
 
