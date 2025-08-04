@@ -142,21 +142,34 @@ async def step_instructions(ctx: RunContext[AgentDeps]) -> str:
         f"<resultant_artifact_name>\n{step.resultant_artifact_name}\n</resultant_artifact_name>",
     ]
     if step.dependant_artifact_names:
-        deps_str = "<dependant_artifacts>\n"
-        for dep in step.dependant_artifact_names:
-            if dep in ctx.deps.artifacts:
-                deps_str += f"<artifact name='{dep}'>{ctx.deps.artifacts[dep]}</artifact>\n"
-        deps_str += "</dependant_artifacts>"
-        step_str_list.append(deps_str)
+        step_str_list.append(
+            "<dependant_artifacts>"
+            + "\n".join(
+                [
+                    f"<artifact name='{dep}'>{ctx.deps.artifacts[dep]}</artifact>\n"
+                    for dep in step.dependant_artifact_names
+                ]
+            )
+            + "</dependant_artifacts>"
+        )
     step_str_list.append("</step>")
-    return "\n".join(step_str_list)
+    return "\n".join(step_str_list).strip()
 
 
 async def plan_mode_instructions(ctx: RunContext[AgentDeps]) -> str:
     if ctx.deps.mode == "act":
         return ""
     tool_defs = await get_tool_def_instructions(ctx)
-    return ((files("dreamai.prompts") / "plan_mode.md").read_text() + tool_defs).strip()
+    plan_str_list = [(files("dreamai.prompts") / "plan_mode.md").read_text().strip(), tool_defs]
+    if ctx.deps.artifacts:
+        plan_str_list.append(
+            "<saved_artifacts>\n"
+            + "\n".join(
+                [f"<artifact name='{name}'>{value}</artifact>" for name, value in ctx.deps.artifacts.items()]
+            )
+            + "\n</saved_artifacts>"
+        )
+    return "\n\n".join(plan_str_list).strip()
 
 
 async def create_plan(ctx: RunContext[AgentDeps], task: str, steps: list[Step]) -> Plan:
