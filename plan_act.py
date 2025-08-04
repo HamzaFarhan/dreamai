@@ -143,6 +143,13 @@ async def planner_instructions(ctx: RunContext[AgentDeps]) -> str:
         "Each step must be atomic, with one artifact per step and explicit filenames/locations.\n"
         "If you need to use tools, specify them in the steps.\n"
         "Try to reuse any available information from previous steps.\n"
+        "If you think you need to use `user_interaction` while planning, "
+        "first confirm if that can be achieved with the available tools. "
+        "If yes, create a step using the tool and add instructions.\n"
+        "In the case where a step has failed or you receive a `NeedHelp` response, "
+        "or the user has some followups/critiques, you should use the current information "
+        "and message history to create a new plan. "
+        "But don't repeat the successful steps.\n"
         f"{tool_defs}"
     ).strip() + "\nIf you need more information, ask the user."
 
@@ -172,10 +179,42 @@ async def create_plan(ctx: RunContext[AgentDeps], task: str, steps: list[Step]) 
     return plan
 
 
-def mark_plan_approved(ctx: RunContext[AgentDeps]) -> Plan:
+class LooksGood(BaseModel): ...
+
+
+class NeedsRevision(BaseModel):
+    suggestions: str = Field(
+        description="Suggestions for revising the steps with respect to the task and the user approved plan. "
+    )
+
+
+async def review_plan(message_history: list[ModelMessage]) -> LooksGood | NeedsRevision:
+    reviewer_agent = Agent(
+        model="google-gla:gemini-2.5-flash",
+        instructions=(
+            "Given the task and the user approved plan, "
+            "you have to identify if the internal plan steps are correct "
+            "and execution-ready. So no steps need to be omitted and "
+            "no extra steps need to be added.\n"
+            "If they are correct, return a LooksGood response. "
+            "If not, return a NeedsRevision response with suggestions for revision."
+        ),
+        output_type=[LooksGood, NeedsRevision],
+    )
+    try:
+        return (await reviewer_agent.run(message_history=message_history)).output
+    except Exception as e:
+        logger.error(f"Error reviewing steps: {e}")
+        return LooksGood()
+
+
+async def mark_plan_approved(ctx: RunContext[AgentDeps]) -> Plan:
     """Use this AFTER the user approves the plan."""
     if ctx.deps.plan is None:
         raise ModelRetry("No plan has been created. Please create a plan first.")
+    review = await review_plan(message_history=ctx.messages)
+    if isinstance(review, NeedsRevision):
+        raise ModelRetry(f"Plan needs revision: {review.suggestions}")
     ctx.deps.mode = "act"
     ctx.deps.incr_current_step()
     return ctx.deps.plan
@@ -260,8 +299,7 @@ def step_result(ctx: RunContext[AgentDeps], result: str) -> StepResult:
     return res
 
 
-class NeedHelp:
-    pass
+class NeedHelp: ...
 
 
 def need_help(ctx: RunContext[AgentDeps]) -> NeedHelp:
@@ -276,12 +314,12 @@ async def prepare_output_tools(
     plan_mode_tools = ["user_interaction", "create_plan", "mark_plan_approved", "task_result"]
     if ctx.deps.mode == "act":
         return [tool_def for tool_def in tool_defs if tool_def.name not in plan_mode_tools]
-    plan_mode_tools = ["create_plan"]
+    plan_mode_tools = ["user_interaction", "create_plan"]
     if ctx.deps.plan is None:
         return [tool_def for tool_def in tool_defs if tool_def.name in plan_mode_tools]
     if ctx.deps.mode == "plan":
         if ctx.deps.current_step == len(ctx.deps.plan.steps):
-            plan_mode_tools += ["user_interaction", "task_result"]
+            plan_mode_tools.append("task_result")
         else:
             plan_mode_tools.append("mark_plan_approved")
         return [tool_def for tool_def in tool_defs if tool_def.name in plan_mode_tools]
