@@ -11,7 +11,15 @@ import logfire
 from dotenv import load_dotenv
 from loguru import logger
 from pydantic import AfterValidator, BaseModel, Field
-from pydantic_ai import Agent, ModelRetry, RunContext, ToolOutput
+from pydantic_ai import (
+    Agent,
+    ModelRetry,
+    RunContext,
+    ToolOutput,
+    UnexpectedModelBehavior,
+    capture_run_messages,
+    format_as_xml,
+)
 from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter, ModelRequest
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
@@ -90,9 +98,6 @@ class AgentDeps:
     def add_toolsets(self, toolsets: list[AbstractToolset] | AbstractToolset):
         self.toolsets += toolsets if isinstance(toolsets, list) else [toolsets]
 
-    def toggle_mode(self):
-        self.mode = "act" if self.mode == "plan" else "plan"
-
     def incr_current_step(self):
         if self.plan is None:
             self.current_step = 0
@@ -147,7 +152,7 @@ async def step_instructions(ctx: RunContext[AgentDeps]) -> str:
     return "\n".join(step_str_list)
 
 
-async def plan_mode(ctx: RunContext[AgentDeps]) -> str:
+async def plan_mode_instructions(ctx: RunContext[AgentDeps]) -> str:
     if ctx.deps.mode == "act":
         return ""
     tool_defs = await get_tool_def_instructions(ctx)
@@ -208,7 +213,10 @@ async def review_plan(message_history: list[ModelMessage]) -> LooksGood | NeedsR
         return LooksGood()
 
 
-async def mark_plan_approved(ctx: RunContext[AgentDeps]):
+class PlanApproved(BaseModel): ...
+
+
+async def mark_plan_approved(ctx: RunContext[AgentDeps]) -> PlanApproved:
     """Use this as soon as the user approves the plan to kickoff the execution."""
     if ctx.deps.plan is None:
         raise ModelRetry("No plan has been created. Please create a plan first.")
@@ -218,6 +226,7 @@ async def mark_plan_approved(ctx: RunContext[AgentDeps]):
         raise ModelRetry(f"Plan needs revision: {review.suggestions}")
     ctx.deps.mode = "act"
     ctx.deps.incr_current_step()
+    return PlanApproved()
 
 
 def get_user_city(ctx: RunContext[AgentDeps]) -> str:
@@ -243,8 +252,8 @@ def temperature_celsius(city: str) -> float:
     }
     try:
         return temp_map[city]
-    except Exception as e:
-        raise ModelRetry(str(e))
+    except KeyError as e:
+        raise ModelRetry(f"City '{city}' not found in temperature data: {str(e)}")
 
 
 def temperature_fahrenheit(city: str) -> float:
@@ -257,8 +266,8 @@ def temperature_fahrenheit(city: str) -> float:
     }
     try:
         return temp_map[city]
-    except Exception as e:
-        raise ModelRetry(str(e))
+    except KeyError as e:
+        raise ModelRetry(f"City '{city}' not found in temperature data: {str(e)}")
 
 
 def weather_forecast(city: str) -> str:
@@ -375,7 +384,7 @@ toolset = CombinedToolset([user_info_toolset, weather_toolset, FunctionToolset([
 model = OpenAIModel("openrouter/horizon-beta", provider=OpenRouterProvider())
 agent = Agent(
     model=model,
-    instructions=[plan_mode, step_instructions],
+    instructions=[plan_mode_instructions, step_instructions],
     deps_type=AgentDeps,
     toolsets=[toolset.filtered(toolset_filter)],
     output_type=[
@@ -398,29 +407,45 @@ async def run_agent(user_prompt: str, agent_deps: AgentDeps):
     act_message_history: list[ModelMessage] = []
 
     while True:
-        res = await agent.run(
-            user_prompt=plan_user_prompt if agent_deps.mode == "plan" else act_user_prompt,
-            message_history=plan_message_history if agent_deps.mode == "plan" else act_message_history,
-            deps=agent_deps,
-        )
-        if res.output:
+        with capture_run_messages() as run_messages:
+            try:
+                res = await agent.run(
+                    user_prompt=plan_user_prompt if agent_deps.mode == "plan" else act_user_prompt,
+                    message_history=plan_message_history if agent_deps.mode == "plan" else act_message_history,
+                    deps=agent_deps,
+                )
+                res_output = res.output
+                res_all_messages = res.all_messages()
+            except UnexpectedModelBehavior as e:
+                if agent_deps.mode == "plan":
+                    raise e
+                res_output = NeedHelp(step_number=agent_deps.current_step, message=f"NOT USER FACING: {e.message}")
+                res_all_messages = run_messages
+                agent_deps.blitz()
+        if res_output:
             logger.info(
-                f"Agent response: {res.output if isinstance(res.output, (str, NeedHelp)) else res.output.model_dump_json(indent=2)}"
+                f"Agent response: {res_output if isinstance(res_output, (str, NeedHelp)) else res_output.model_dump_json(indent=2)}"
             )
         logger.info(
             f"Mode: {agent_deps.mode}, Current Step: {agent_deps.current_step}/{len(agent_deps.plan.steps) if agent_deps.plan else 0}"
         )
-        if res.output is None:
-            plan_message_history += res.new_messages()
+        if isinstance(res_output, PlanApproved):
+            plan_user_prompt = None
+            plan_message_history = [
+                ModelRequest.user_text_prompt(format_as_xml(agent_deps.plan, root_tag="approved_plan"))
+            ]
             continue
-        if isinstance(res.output, (StepResult, NeedHelp)):
+        if isinstance(res_output, StepResult):
             act_user_prompt = None
             act_message_history = []
-            plan_message_history.append(ModelRequest.user_text_prompt(res.output.model_dump_json()))
+            plan_message_history.append(ModelRequest.user_text_prompt(res_output.model_dump_json()))
+            continue
+        if isinstance(res_output, NeedHelp):
+            plan_message_history += res_all_messages
             continue
         if agent_deps.mode == "plan":
-            plan_message_history += res.new_messages()
-            agent_message = res.output if isinstance(res.output, str) else res.output.model_dump_json(indent=2)
+            plan_message_history = res_all_messages
+            agent_message = res_output if isinstance(res_output, str) else res_output.model_dump_json(indent=2)
             plan_user_prompt = input(f"{agent_message}\n> ")
             if plan_user_prompt.lower() in ["exit", "quit", "q"]:
                 Path("message_history.json").write_bytes(
@@ -428,8 +453,8 @@ async def run_agent(user_prompt: str, agent_deps: AgentDeps):
                 )
                 break
         else:
-            act_message_history = res.all_messages()
-            agent_message = res.output if isinstance(res.output, str) else res.output.model_dump_json(indent=2)
+            act_message_history = res_all_messages
+            agent_message = res_output if isinstance(res_output, str) else res_output.model_dump_json(indent=2)
             act_user_prompt = input(f"{agent_message}\n> ")
 
 
@@ -440,5 +465,5 @@ if __name__ == "__main__":
         user_info=UserInfo(name="Hamza", city="Paris"),
         toolsets=[toolset.filtered(lambda ctx, _: ctx.deps.mode == "plan")],
     )
-    asyncio.run(run_agent("What is the temp in celcius at my location?", agent_deps=agent_deps))
+    asyncio.run(run_agent("What is the temp in celcius and fahrenheit at my location?", agent_deps=agent_deps))
     logger.success("Agent run completed successfully.")
