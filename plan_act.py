@@ -19,6 +19,7 @@ from pydantic_ai import (
     format_as_xml,
 )
 from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter, ModelRequest
+from pydantic_ai.models import KnownModelName, Model
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.tools import ToolDefinition
@@ -389,34 +390,44 @@ async def prepare_output_tools(
 
 # toolset = CombinedToolset([user_info_toolset, weather_toolset, FunctionToolset([user_interaction])])
 
-plan_model = OpenAIModel("google/gemini-2.5-flash", provider=OpenRouterProvider())
-act_model = OpenAIModel("openrouter/horizon-beta", provider=OpenRouterProvider())
-agent = Agent(
-    instructions=[plan_mode_instructions, step_instructions],
-    deps_type=PlanAndActDeps,
-    output_type=[
-        ToolOutput(user_interaction, name="user_interaction"),
-        ToolOutput(create_plan, name="create_plan"),
-        ToolOutput(execute_plan, name="execute_plan"),
-        ToolOutput(task_result, name="task_result"),
-        ToolOutput(step_result, name="step_result"),
-        ToolOutput(need_help, name="need_help"),
-    ],
-    prepare_output_tools=prepare_output_tools,
-    retries=3,
-)
+
+def create_plan_and_act_agent(
+    retries: int = 3,
+) -> Agent[PlanAndActDeps, ExecutionStarted | NeedHelp | Plan | StepResult | TaskResult | str]:
+    return Agent(
+        instructions=[plan_mode_instructions, step_instructions],
+        deps_type=PlanAndActDeps,
+        output_type=[
+            ToolOutput(user_interaction, name="user_interaction"),
+            ToolOutput(create_plan, name="create_plan"),
+            ToolOutput(execute_plan, name="execute_plan"),
+            ToolOutput(task_result, name="task_result"),
+            ToolOutput(step_result, name="step_result"),
+            ToolOutput(need_help, name="need_help"),
+        ],
+        prepare_output_tools=prepare_output_tools,
+        retries=retries,
+    )
 
 
-async def run_agent(user_prompt: str, agent_deps: PlanAndActDeps):
+async def run_plan_and_act_agent(
+    user_prompt: str,
+    agent_deps: PlanAndActDeps,
+    plan_model: Model | KnownModelName | None = None,
+    act_model: Model | KnownModelName | None = None,
+    retries: int = 3,
+    message_history_path: Path | str = "message_history.json",
+):
+    agent = create_plan_and_act_agent(retries=retries)
+    plan_model = plan_model or OpenAIModel("google/gemini-2.5-flash", provider=OpenRouterProvider())
+    act_model = act_model or OpenAIModel("openrouter/horizon-beta", provider=OpenRouterProvider())
     plan_user_prompt = user_prompt
     act_user_prompt = None
     plan_message_history: list[ModelMessage] = []
     act_message_history: list[ModelMessage] = []
 
     while True:
-        Path("message_history.json").write_bytes(
-            ModelMessagesTypeAdapter.dump_json(plan_message_history, indent=2)
-        )
+        Path(message_history_path).write_bytes(ModelMessagesTypeAdapter.dump_json(plan_message_history, indent=2))
         with capture_run_messages() as run_messages:
             try:
                 res = await agent.run(
@@ -469,14 +480,3 @@ async def run_agent(user_prompt: str, agent_deps: PlanAndActDeps):
             act_message_history = run_messages
             agent_message = res_output if isinstance(res_output, str) else res_output.model_dump_json(indent=2)
             act_user_prompt = input(f"{agent_message}\n> ")
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    agent_deps = PlanAndActDeps(
-        user_info=UserInfo(name="Hamza", city="Paris"),
-        toolsets=[toolset.filtered(lambda ctx, _: ctx.deps.mode == "plan")],
-    )
-    asyncio.run(run_agent("What is the temp in celcius and fahrenheit at my location?", agent_deps=agent_deps))
-    logger.success("Agent run completed successfully.")

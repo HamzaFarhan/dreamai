@@ -1,33 +1,14 @@
-from __future__ import annotations
-
-from importlib.resources import files
-from pathlib import Path
-from typing import Annotated, Any, Literal, Self
-from uuid import uuid4
+from dataclasses import dataclass
+from typing import Any
 
 import logfire
 from dotenv import load_dotenv
 from loguru import logger
-from pydantic import UUID4, AfterValidator, BaseModel, ConfigDict, Field, model_validator
-from pydantic_ai import (
-    Agent,
-    ModelRetry,
-    RunContext,
-    ToolOutput,
-    UnexpectedModelBehavior,
-    capture_run_messages,
-    format_as_xml,
-)
-from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter, ModelRequest
-from pydantic_ai.models.openai import OpenAIModel
-from pydantic_ai.providers.openrouter import OpenRouterProvider
-from dataclasses import dataclass
-from pydantic_ai.tools import ToolDefinition
-from pydantic_ai.output import ToolOutput
-from pydantic_ai.toolsets import CombinedToolset, FilteredToolset, FunctionToolset
-from pydantic_ai.toolsets.abstract import AbstractToolset
+from pydantic_ai import ModelRetry, RunContext
+from pydantic_ai.toolsets import FunctionToolset
 
-from .plan_act import PlanAndActDeps, plan_mode_instructions, step_instructions, prepare_output_tools, user_interaction, create_plan, execute_plan, task_result, step_result, need_help
+from plan_act import PlanAndActDeps, run_plan_and_act_agent
+
 load_dotenv()
 
 logfire.configure(scrubbing=False)
@@ -55,7 +36,7 @@ def get_user_name(ctx: RunContext[AgentDeps]) -> str:
     return ctx.deps.user_info.name
 
 
-user_info_toolset = FunctionToolset([get_user_name])
+user_info_toolset = FunctionToolset([get_user_name, get_user_city])
 
 
 def temperature_celsius(city: str) -> float:
@@ -94,29 +75,13 @@ weather_toolset = FunctionToolset[Any](
 )
 
 
-plan_model = OpenAIModel("google/gemini-2.5-flash", provider=OpenRouterProvider())
-act_model = OpenAIModel("openrouter/horizon-beta", provider=OpenRouterProvider())
-agent = Agent(
-    instructions=[plan_mode_instructions, step_instructions],
-    deps_type=AgentDeps,
-    output_type=[
-        ToolOutput(user_interaction, name="user_interaction"),
-        ToolOutput(create_plan, name="create_plan"),
-        ToolOutput(execute_plan, name="execute_plan"),
-        ToolOutput(task_result, name="task_result"),
-        ToolOutput(step_result, name="step_result"),
-        ToolOutput(need_help, name="need_help"),
-    ],
-    prepare_output_tools=prepare_output_tools,
-    retries=3,
-)
-
 if __name__ == "__main__":
     import asyncio
 
-    agent_deps = PlanAndActDeps(
-        user_info=UserInfo(name="Hamza", city="Paris"),
-        toolsets=[toolset.filtered(lambda ctx, _: ctx.deps.mode == "plan")],
+    agent_deps = AgentDeps(
+        user_info=UserInfo(name="Hamza", city="Paris"), toolsets=[user_info_toolset, weather_toolset]
     )
-    asyncio.run(run_agent("What is the temp in celcius and fahrenheit at my location?", agent_deps=agent_deps))
+    asyncio.run(
+        run_plan_and_act_agent("What is the temp in celcius and fahrenheit at my location?", agent_deps=agent_deps)
+    )
     logger.success("Agent run completed successfully.")
