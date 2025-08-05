@@ -1,22 +1,31 @@
-from pydantic_ai import Agent
-from pydantic_ai.models.test import TestModel
+from dataclasses import dataclass
+
+from dotenv import load_dotenv
+from pydantic_ai import Agent, RunContext
+from pydantic_ai.messages import ToolReturn
+
+load_dotenv()
 
 
-def fruit(name: str, color: str) -> dict[str, str]:
-    """
-    Returns a fruit with the given name and color.
-    """
-    return {"name": name, "color": color}
+@dataclass
+class AgentDeps:
+    city: str
 
 
-def vehicle(name: str, type: str) -> dict[str, str]:
-    """
-    Returns a vehicle with the given name and type.
-    """
-    return {"name": name, "type": type}
+def temperature_celsius(ctx: RunContext[AgentDeps]) -> ToolReturn:
+    """get the temperature in celsius for the user's city."""
+    temp_map = {"New York": 21.0, "Paris": 19.0, "Tokyo": 22.0}
+    city = ctx.deps.city
+    return ToolReturn(
+        return_value=temp_map.get(city, 20.0),
+        content="waow kya nikala hai",
+        metadata={f"{city}_temp_celsius": temp_map.get(city, 20.0)},
+    )
 
 
-test_model = TestModel()
-agent = Agent(test_model, output_type=[fruit, vehicle])
-result = agent.run_sync("What is a banana?")
-print([t.name for t in test_model.last_model_request_parameters.output_tools])
+agent = Agent(model="google-gla:gemini-2.5-flash", deps_type=AgentDeps, tools=[temperature_celsius])
+deps = AgentDeps(city="New York")
+res = agent.run_sync("whats the temp at my city?", deps=deps)
+print(res)
+print("\n-------------------------\n")
+print(res.all_messages())

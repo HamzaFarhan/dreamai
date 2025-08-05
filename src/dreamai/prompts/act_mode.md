@@ -14,5 +14,4 @@
 **ARTIFACT CORRECTIONS:**
 If during execution you discover that a dependency artifact contains incorrect information (e.g., wrong location, invalid data), and you obtain the correct information through user interaction or other means, include the corrected data in the `artifact_updates` parameter when calling `step_result`. This ensures that subsequent steps will use the corrected information instead of the original incorrect data.
 
-Example: If step 1 stored `user_location: "New York"` but you discover through user interaction that it should be "Paris", call:
-`step_result(result="your step result", artifact_updates={"user_location": "Paris"})`
+Example: If step 1 stored `user_location: "New York"` but you discover through user interaction that it should be "Paris", call: `step_result(result="your step result", artifact_updates={"user_location": "Paris"})`

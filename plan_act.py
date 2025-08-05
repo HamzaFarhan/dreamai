@@ -181,6 +181,7 @@ async def step_instructions(ctx: RunContext[AgentDeps]) -> str:
         return ""
     step = ctx.deps.plan.steps[ctx.deps.current_step]
     step_str_list = [
+        (files("dreamai.prompts") / "act_mode.md").read_text().strip() + "\n",
         f"<step number={step.step_number}>",
         f"<instructions>\n{step.instructions}\n</instructions>",
         f"<resultant_artifact_name>\n{step.resultant_artifact_name}\n</resultant_artifact_name>",
@@ -194,7 +195,6 @@ async def step_instructions(ctx: RunContext[AgentDeps]) -> str:
             + "</dependant_artifacts>"
         )
     step_str_list.append("</step>")
-    step_str_list.append((files("dreamai.prompts") / "act_mode.md").read_text().strip())
     return "\n".join(step_str_list).strip()
 
 
@@ -426,7 +426,10 @@ async def prepare_output_tools(
     ctx: RunContext[AgentDeps], tool_defs: list[ToolDefinition]
 ) -> list[ToolDefinition] | None:
     if ctx.deps.mode == "act":
-        not_allowed_tools = ["create_plan", "execute_plan", "task_result", "user_interaction"]
+        not_allowed_tools = {"create_plan", "execute_plan", "task_result", "user_interaction"}
+        if ctx.deps.plan is not None:
+            step_tool = ctx.deps.plan.steps[ctx.deps.current_step].tool_name
+            not_allowed_tools -= {step_tool}
         return [tool_def for tool_def in tool_defs if tool_def.name not in not_allowed_tools]
     plan_mode_tools = ["create_plan"]
     if ctx.deps.plan is None:
@@ -442,7 +445,7 @@ def toolset_filter(ctx: RunContext[AgentDeps], tooldef: ToolDefinition) -> bool:
     if ctx.deps.mode == "act" and ctx.deps.plan is not None:
         return (
             tooldef.name == ctx.deps.plan.steps[ctx.deps.current_step].tool_name
-            # and tooldef.name != "user_interaction"
+            and tooldef.name != "user_interaction"
         )
     return False
 
