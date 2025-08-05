@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Any
 
 from dotenv import load_dotenv
@@ -11,6 +12,8 @@ from .plan_act import PlanAndActDeps
 
 load_dotenv()
 
+@dataclass
+class UserIn
 
 def get_user_city(ctx: RunContext[PlanAndActDeps]) -> str:
     """Get the user's city"""
