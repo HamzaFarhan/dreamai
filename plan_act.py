@@ -11,7 +11,7 @@ from uuid import uuid4
 import logfire
 from dotenv import load_dotenv
 from loguru import logger
-from pydantic import UUID4, AfterValidator, BaseModel, Field, model_validator
+from pydantic import UUID4, AfterValidator, BaseModel, ConfigDict, Field, model_validator
 from pydantic_ai import (
     Agent,
     ModelRetry,
@@ -96,6 +96,8 @@ class UserInfo:
 
 
 class AgentDeps(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     user_info: UserInfo
     toolsets: list[AbstractToolset[Any]] = Field(default_factory=list)  # type: ignore
     plan: Plan | None = None
@@ -147,8 +149,8 @@ class AgentDeps(BaseModel):
         else:
             self.current_step += 1
 
-    def blitz(self):
-        if self.plan is not None:
+    def blitz(self, keep_artifacts: bool = False):
+        if self.plan is not None and not keep_artifacts:
             self.drop_artifacts(self.plan.plan_id)
         self.plan = None
         self.current_step = 0
@@ -192,7 +194,7 @@ async def step_instructions(ctx: RunContext[AgentDeps]) -> str:
             + "</dependant_artifacts>"
         )
     step_str_list.append("</step>")
-    step_str_list.append("\nYou may also use `user_interaction` and `need_help` tools if needed.")
+    step_str_list.append((files("dreamai.prompts") / "act_mode.md").read_text().strip())
     return "\n".join(step_str_list).strip()
 
 
@@ -268,10 +270,10 @@ async def review_plan(message_history: list[ModelMessage]) -> LooksGood | NeedsR
         return LooksGood()
 
 
-class PlanApproved(BaseModel): ...
+class ExecutionStarted(BaseModel): ...
 
 
-async def mark_plan_approved(ctx: RunContext[AgentDeps]) -> PlanApproved:
+async def execute_plan(ctx: RunContext[AgentDeps]) -> ExecutionStarted:
     """Use this as soon as the user approves the plan to kickoff the execution."""
     if ctx.deps.plan is None:
         raise ModelRetry("No plan has been created. Please create a plan first.")
@@ -281,7 +283,7 @@ async def mark_plan_approved(ctx: RunContext[AgentDeps]) -> PlanApproved:
         raise ModelRetry(f"Plan needs revision: {review.suggestions}")
     ctx.deps.mode = "act"
     ctx.deps.incr_current_step()
-    return PlanApproved()
+    return ExecutionStarted()
 
 
 def get_user_city(ctx: RunContext[AgentDeps]) -> str:
@@ -359,6 +361,7 @@ def task_result(ctx: RunContext[AgentDeps], message: str) -> TaskResult:
     """Returns the final response to the user."""
     if ctx.deps.plan is not None:
         ctx.deps.add_artifacts(ctx.deps.plan.plan_id, {ctx.deps.plan.task_result_name: message})
+    ctx.deps.blitz(keep_artifacts=True)
     return TaskResult(message=message)
 
 
@@ -371,7 +374,9 @@ class StepResult(BaseModel):
     result: str
 
 
-def step_result(ctx: RunContext[AgentDeps], result: str) -> StepResult:
+def step_result(
+    ctx: RunContext[AgentDeps], result: str, artifact_updates: dict[str, Any] | None = None
+) -> StepResult:
     """
     Process the result of the current step.
 
@@ -379,11 +384,18 @@ def step_result(ctx: RunContext[AgentDeps], result: str) -> StepResult:
         result: The result of the step execution.
             This will be stored in `resultant_artifact_name` key in our running context.
             It is a dict[str, Any]. Make sure to include everything to help the next steps.
+        artifact_updates: Optional dict of artifact_name -> new_value pairs to update existing artifacts
+            that this step has corrected or refined (e.g., correcting a location from a previous step).
     """
     if ctx.deps.plan is not None and ctx.deps.current_step > 0:
+        # Add the main result artifact
         ctx.deps.add_artifacts(
             ctx.deps.plan.plan_id, {ctx.deps.plan.steps[ctx.deps.current_step].resultant_artifact_name: result}
         )
+        if artifact_updates:
+            ctx.deps.add_artifacts(ctx.deps.plan.plan_id, artifact_updates)
+            logger.warning(f"Step {ctx.deps.current_step} updated artifacts: {artifact_updates}")
+
     res = StepResult(step_number=ctx.deps.current_step, result=result)
     ctx.deps.incr_current_step()
     return res
@@ -395,12 +407,17 @@ class NeedHelp(BaseModel):
 
 
 def need_help(ctx: RunContext[AgentDeps], message: str) -> NeedHelp:
-    """Use this when you need help to proceed.
+    """
+    Use this when you need help from your supervisor agent to proceed after exhausting all retry options.
+    This should be used as a LAST RESORT only when:
+    - You've tried reasonable variations/alternatives for the current step
+    - The step fundamentally cannot be completed with available tools
+    - There are technical/execution issues that require plan revision
 
     Args:
-        message: The message explaining the issue or what you need help with.
+        message: The message explaining the issue or what you need help with. Internal. Not user facing.
     """
-    _need_help = NeedHelp(step_number=ctx.deps.current_step, message=f"NOT USER FACING: {message}")
+    _need_help = NeedHelp(step_number=ctx.deps.current_step, message=f"NOT USER FACING\n{message}")
     ctx.deps.blitz()
     return _need_help
 
@@ -408,16 +425,16 @@ def need_help(ctx: RunContext[AgentDeps], message: str) -> NeedHelp:
 async def prepare_output_tools(
     ctx: RunContext[AgentDeps], tool_defs: list[ToolDefinition]
 ) -> list[ToolDefinition] | None:
-    plan_mode_tools = ["create_plan", "mark_plan_approved", "task_result"]
     if ctx.deps.mode == "act":
-        return [tool_def for tool_def in tool_defs if tool_def.name not in plan_mode_tools]
+        not_allowed_tools = ["create_plan", "execute_plan", "task_result", "user_interaction"]
+        return [tool_def for tool_def in tool_defs if tool_def.name not in not_allowed_tools]
     plan_mode_tools = ["create_plan"]
     if ctx.deps.plan is None:
         return [tool_def for tool_def in tool_defs if tool_def.name in plan_mode_tools]
     if ctx.deps.current_step == len(ctx.deps.plan.steps):
-        plan_mode_tools += ["user_interaction", "task_result"]
+        plan_mode_tools += ["task_result"]
     else:
-        plan_mode_tools.append("mark_plan_approved")
+        plan_mode_tools += ["execute_plan"]
     return [tool_def for tool_def in tool_defs if tool_def.name in plan_mode_tools]
 
 
@@ -425,23 +442,23 @@ def toolset_filter(ctx: RunContext[AgentDeps], tooldef: ToolDefinition) -> bool:
     if ctx.deps.mode == "act" and ctx.deps.plan is not None:
         return (
             tooldef.name == ctx.deps.plan.steps[ctx.deps.current_step].tool_name
-            and tooldef.name != "user_interaction"
+            # and tooldef.name != "user_interaction"
         )
     return False
 
 
 toolset = CombinedToolset([user_info_toolset, weather_toolset, FunctionToolset([user_interaction])])
 
-model = OpenAIModel("openrouter/horizon-beta", provider=OpenRouterProvider())
+plan_model = OpenAIModel("google/gemini-2.5-flash", provider=OpenRouterProvider())
+act_model = OpenAIModel("openrouter/horizon-beta", provider=OpenRouterProvider())
 agent = Agent(
-    model=model,
     instructions=[plan_mode_instructions, step_instructions],
     deps_type=AgentDeps,
     toolsets=[toolset.filtered(toolset_filter)],
     output_type=[
         ToolOutput(user_interaction, name="user_interaction"),
         ToolOutput(create_plan, name="create_plan"),
-        ToolOutput(mark_plan_approved, name="mark_plan_approved"),
+        ToolOutput(execute_plan, name="execute_plan"),
         ToolOutput(task_result, name="task_result"),
         ToolOutput(step_result, name="step_result"),
         ToolOutput(need_help, name="need_help"),
@@ -464,6 +481,7 @@ async def run_agent(user_prompt: str, agent_deps: AgentDeps):
         with capture_run_messages() as run_messages:
             try:
                 res = await agent.run(
+                    model=plan_model if agent_deps.mode == "plan" else act_model,
                     user_prompt=plan_user_prompt if agent_deps.mode == "plan" else act_user_prompt,
                     message_history=plan_message_history if agent_deps.mode == "plan" else act_message_history,
                     deps=agent_deps,
@@ -481,11 +499,17 @@ async def run_agent(user_prompt: str, agent_deps: AgentDeps):
         logger.info(
             f"Mode: {agent_deps.mode}, Current Step: {agent_deps.current_step}/{len(agent_deps.plan.steps) if agent_deps.plan else 0}"
         )
-        if isinstance(res_output, PlanApproved):
+        if isinstance(res_output, ExecutionStarted):
             plan_user_prompt = None
-            plan_message_history = [
-                ModelRequest.user_text_prompt(format_as_xml(agent_deps.plan, root_tag="approved_plan"))
-            ]
+            plan_message_history = (
+                [
+                    ModelRequest.user_text_prompt(
+                        format_as_xml(agent_deps.plan.model_dump(exclude={"plan_id"}), root_tag="approved_plan")
+                    )
+                ]
+                if agent_deps.plan
+                else []
+            )
             continue
         if isinstance(res_output, StepResult):
             act_user_prompt = None
