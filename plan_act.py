@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Self
+from uuid import uuid4
 
 import logfire
 from dotenv import load_dotenv
 from loguru import logger
-from pydantic import AfterValidator, BaseModel, Field
+from pydantic import UUID4, AfterValidator, BaseModel, Field, model_validator
 from pydantic_ai import (
     Agent,
     ModelRetry,
@@ -40,6 +41,10 @@ def get_tool_info(tool: Callable[..., Any]) -> str:
     return f"{tool.__name__}{sig}: {doc.strip()}"
 
 
+def to_snake_case(name: str) -> str:
+    return name.replace(" ", "_").lower()
+
+
 class Step(BaseModel):
     step_number: Annotated[int, AfterValidator(lambda x: max(x, 1))] = Field(
         description="The sequential number of the step in the plan. Starts at 1."
@@ -55,9 +60,9 @@ class Step(BaseModel):
         default="none",
         description="The name of the tool to use for the step. Set to `none` if no tool is needed.",
     )
-    resultant_artifact_name: str = Field(
+    resultant_artifact_name: Annotated[str, AfterValidator(to_snake_case)] = Field(
         description=(
-            "Descriptive name of the artifact produced by the step. "
+            "Descriptive, relevant, and specific snake-case name of the artifact produced by the step. "
             "This will be stored in a dict[str, Any] in our running context. "
             "Not in a file, but in our internal memory. "
         )
@@ -72,8 +77,11 @@ class Step(BaseModel):
 
 
 class Plan(BaseModel):
+    plan_id: UUID4 = Field(default_factory=uuid4)
     task: str = Field(description="The user's task to be executed.")
-    task_result_name: str = Field(description="A relevant and descriptive name for the result of the task.")
+    task_result_name: Annotated[str, AfterValidator(to_snake_case)] = Field(
+        description="Descriptive, relevant, and specific snake-case name for the result of the task."
+    )
     steps: dict[int, Step] = Field(default_factory=dict)  # type: ignore
 
     def add_steps(self, steps: list[Step] | Step):
@@ -87,17 +95,49 @@ class UserInfo:
     city: str
 
 
-@dataclass
-class AgentDeps:
+class AgentDeps(BaseModel):
     user_info: UserInfo
-    toolsets: list[AbstractToolset[Any]] = field(default_factory=list)  # type: ignore
+    toolsets: list[AbstractToolset[Any]] = Field(default_factory=list)  # type: ignore
     plan: Plan | None = None
     mode: Literal["plan", "act"] = "plan"
-    artifacts: dict[str, Any] = field(default_factory=dict)  # type: ignore
+    artifacts: dict[UUID4, dict[str, Any]] = Field(default_factory=dict)  # type: ignore
     current_step: int = 0
+
+    @model_validator(mode="after")
+    def validate_artifacts(self) -> Self:
+        if self.plan is not None:
+            self.artifacts[self.plan.plan_id] = {}
+        return self
 
     def add_toolsets(self, toolsets: list[AbstractToolset] | AbstractToolset):
         self.toolsets += toolsets if isinstance(toolsets, list) else [toolsets]
+
+    def init_plan(self, plan: Plan):
+        self.plan = plan
+        self.current_step = 0
+        self.artifacts[plan.plan_id] = {}
+
+    def get_artifacts(self, plan_id: UUID4 | None = None) -> dict[str, Any]:
+        if plan_id is None:
+            return {k: v for artifact in self.artifacts.values() for k, v in artifact.items()}
+        return self.artifacts.get(plan_id, {})
+
+    def add_artifacts(self, plan_id: UUID4, artifacts: dict[str, Any]):
+        if plan_id not in self.artifacts:
+            self.artifacts[plan_id] = {}
+        for k, v in artifacts.items():
+            if k in self.artifacts[plan_id]:
+                logger.warning(f"Artifact {k} already exists in plan {plan_id}. Overwriting.")
+            self.artifacts[plan_id][k] = v
+
+    def drop_artifacts(self, plan_id: UUID4 | None = None):
+        if plan_id is None:
+            self.artifacts.clear()
+        else:
+            if plan_id in self.artifacts:
+                del self.artifacts[plan_id]
+            else:
+                logger.warning(f"Plan ID {plan_id} not found in artifacts. No action taken.")
 
     def incr_current_step(self):
         if self.plan is None:
@@ -108,8 +148,9 @@ class AgentDeps:
             self.current_step += 1
 
     def blitz(self):
+        if self.plan is not None:
+            self.drop_artifacts(self.plan.plan_id)
         self.plan = None
-        self.artifacts.clear()
         self.current_step = 0
         self.mode = "plan"
 
@@ -142,18 +183,16 @@ async def step_instructions(ctx: RunContext[AgentDeps]) -> str:
         f"<instructions>\n{step.instructions}\n</instructions>",
         f"<resultant_artifact_name>\n{step.resultant_artifact_name}\n</resultant_artifact_name>",
     ]
-    if step.dependant_artifact_names:
+    if step.dependant_artifact_names and (artifacts := ctx.deps.get_artifacts(ctx.deps.plan.plan_id)):
         step_str_list.append(
             "<dependant_artifacts>"
             + "\n".join(
-                [
-                    f"<artifact name={dep}>{ctx.deps.artifacts[dep]}</artifact>\n"
-                    for dep in step.dependant_artifact_names
-                ]
+                [f"<artifact name={dep}>{artifacts[dep]}</artifact>\n" for dep in step.dependant_artifact_names]
             )
             + "</dependant_artifacts>"
         )
     step_str_list.append("</step>")
+    step_str_list.append("\nYou may also use `user_interaction` and `need_help` tools if needed.")
     return "\n".join(step_str_list).strip()
 
 
@@ -162,12 +201,10 @@ async def plan_mode_instructions(ctx: RunContext[AgentDeps]) -> str:
         return ""
     tool_defs = await get_tool_def_instructions(ctx)
     plan_str_list = [(files("dreamai.prompts") / "plan_mode.md").read_text().strip(), tool_defs]
-    if ctx.deps.artifacts:
+    if artifacts := ctx.deps.get_artifacts():
         plan_str_list.append(
             "<saved_artifacts>\n"
-            + "\n".join(
-                [f"<artifact name={name}>{value}</artifact>" for name, value in ctx.deps.artifacts.items()]
-            )
+            + "\n".join([f"<artifact name={name}>{value}</artifact>" for name, value in artifacts.items()])
             + "\n</saved_artifacts>"
         )
     return "\n\n".join(plan_str_list).strip()
@@ -180,7 +217,7 @@ async def create_plan(ctx: RunContext[AgentDeps], task: str, task_result_name: s
 
     Args:
         task: The user's task to be executed.
-        task_result_name: A relevant and descriptive name for the result of the task.
+        task_result_name: Descriptive, relevant, and specific snake-case name for the result of the task.
         steps: A list of steps to be executed in the plan.
     """
     if not steps:
@@ -198,8 +235,7 @@ async def create_plan(ctx: RunContext[AgentDeps], task: str, task_result_name: s
             )
     plan = Plan(task=task, task_result_name=task_result_name)
     plan.add_steps(steps)
-    ctx.deps.plan = plan
-    ctx.deps.current_step = 0
+    ctx.deps.init_plan(plan)
     return plan
 
 
@@ -239,7 +275,7 @@ async def mark_plan_approved(ctx: RunContext[AgentDeps]) -> PlanApproved:
     """Use this as soon as the user approves the plan to kickoff the execution."""
     if ctx.deps.plan is None:
         raise ModelRetry("No plan has been created. Please create a plan first.")
-    review = await review_plan(message_history=ctx.messages)
+    review = await review_plan(ctx.messages)
     if isinstance(review, NeedsRevision):
         logger.warning(f"Plan needs revision: {review.suggestions}")
         raise ModelRetry(f"Plan needs revision: {review.suggestions}")
@@ -264,11 +300,7 @@ user_info_toolset = FunctionToolset([get_user_name])
 def temperature_celsius(city: str) -> float:
     """Get the current temperature in Celsius for the specified city."""
     logger.info(f"Getting temperature in Celsius for {city}")
-    temp_map = {
-        "New York": 21.0,
-        "Paris": 19.0,
-        "Tokyo": 22.0,
-    }
+    temp_map = {"New York": 21.0, "Paris": 19.0, "Tokyo": 22.0}
     try:
         return temp_map[city]
     except KeyError as e:
@@ -278,11 +310,7 @@ def temperature_celsius(city: str) -> float:
 def temperature_fahrenheit(city: str) -> float:
     """Get the current temperature in Fahrenheit for the specified city."""
     logger.info(f"Getting temperature in Fahrenheit for {city}")
-    temp_map = {
-        "New York": 69.8,
-        "Paris": 66.2,
-        "Tokyo": 71.6,
-    }
+    temp_map = {"New York": 69.8, "Paris": 66.2, "Tokyo": 71.6}
     try:
         return temp_map[city]
     except KeyError as e:
@@ -329,8 +357,8 @@ class TaskResult(BaseModel):
 
 def task_result(ctx: RunContext[AgentDeps], message: str) -> TaskResult:
     """Returns the final response to the user."""
-    if ctx.deps.plan:
-        ctx.deps.artifacts[ctx.deps.plan.task_result_name] = message
+    if ctx.deps.plan is not None:
+        ctx.deps.add_artifacts(ctx.deps.plan.plan_id, {ctx.deps.plan.task_result_name: message})
     return TaskResult(message=message)
 
 
@@ -353,7 +381,9 @@ def step_result(ctx: RunContext[AgentDeps], result: str) -> StepResult:
             It is a dict[str, Any]. Make sure to include everything to help the next steps.
     """
     if ctx.deps.plan is not None and ctx.deps.current_step > 0:
-        ctx.deps.artifacts[ctx.deps.plan.steps[ctx.deps.current_step].resultant_artifact_name] = result
+        ctx.deps.add_artifacts(
+            ctx.deps.plan.plan_id, {ctx.deps.plan.steps[ctx.deps.current_step].resultant_artifact_name: result}
+        )
     res = StepResult(step_number=ctx.deps.current_step, result=result)
     ctx.deps.incr_current_step()
     return res
@@ -381,11 +411,11 @@ async def prepare_output_tools(
     plan_mode_tools = ["create_plan", "mark_plan_approved", "task_result"]
     if ctx.deps.mode == "act":
         return [tool_def for tool_def in tool_defs if tool_def.name not in plan_mode_tools]
-    plan_mode_tools = ["user_interaction", "create_plan"]
+    plan_mode_tools = ["create_plan"]
     if ctx.deps.plan is None:
         return [tool_def for tool_def in tool_defs if tool_def.name in plan_mode_tools]
     if ctx.deps.current_step == len(ctx.deps.plan.steps):
-        plan_mode_tools.append("task_result")
+        plan_mode_tools += ["user_interaction", "task_result"]
     else:
         plan_mode_tools.append("mark_plan_approved")
     return [tool_def for tool_def in tool_defs if tool_def.name in plan_mode_tools]
@@ -428,6 +458,9 @@ async def run_agent(user_prompt: str, agent_deps: AgentDeps):
     act_message_history: list[ModelMessage] = []
 
     while True:
+        Path("message_history.json").write_bytes(
+            ModelMessagesTypeAdapter.dump_json(plan_message_history, indent=2)
+        )
         with capture_run_messages() as run_messages:
             try:
                 res = await agent.run(
@@ -436,12 +469,10 @@ async def run_agent(user_prompt: str, agent_deps: AgentDeps):
                     deps=agent_deps,
                 )
                 res_output = res.output
-                res_all_messages = res.all_messages()
             except UnexpectedModelBehavior as e:
                 if agent_deps.mode == "plan":
                     raise e
                 res_output = NeedHelp(step_number=agent_deps.current_step, message=f"NOT USER FACING: {e.message}")
-                res_all_messages = run_messages
                 agent_deps.blitz()
         if res_output:
             logger.info(
@@ -462,19 +493,16 @@ async def run_agent(user_prompt: str, agent_deps: AgentDeps):
             plan_message_history.append(ModelRequest.user_text_prompt(res_output.model_dump_json()))
             continue
         if isinstance(res_output, NeedHelp):
-            plan_message_history += res_all_messages
+            plan_message_history += run_messages
             continue
         if agent_deps.mode == "plan":
-            plan_message_history = res_all_messages
+            plan_message_history = run_messages
             agent_message = res_output if isinstance(res_output, str) else res_output.model_dump_json(indent=2)
             plan_user_prompt = input(f"{agent_message}\n> ")
             if plan_user_prompt.lower() in ["exit", "quit", "q"]:
-                Path("message_history.json").write_bytes(
-                    ModelMessagesTypeAdapter.dump_json(plan_message_history, indent=2)
-                )
                 break
         else:
-            act_message_history = res_all_messages
+            act_message_history = run_messages
             agent_message = res_output if isinstance(res_output, str) else res_output.model_dump_json(indent=2)
             act_user_prompt = input(f"{agent_message}\n> ")
 
