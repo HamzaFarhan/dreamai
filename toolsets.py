@@ -1,90 +1,61 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Self
+from typing import Any
 
 from dotenv import load_dotenv
 from loguru import logger
-from pydantic_ai import Agent, RunContext
-from pydantic_ai.messages import ModelMessage
-from pydantic_ai.tools import ToolDefinition
-from pydantic_ai.toolsets import FunctionToolset, WrapperToolset
+from pydantic_ai import (
+    ModelRetry,
+    RunContext,
+)
+from pydantic_ai.toolsets import FunctionToolset
+from .plan_act import PlanAndActDeps
 
 load_dotenv()
 
 
-@dataclass
-class AgentDeps:
-    city: str
-    wrapped_toolset: WrapperToolset[Self]
+def get_user_city(ctx: RunContext[PlanAndActDeps]) -> str:
+    """Get the user's city"""
+    return ctx.deps.user_info.city
 
 
-def temperature_celsius(ctx: RunContext[AgentDeps]) -> float:
-    logger.info(f"Getting temperature in Celsius for {ctx.deps.city}")
-    return 21.0
+def get_user_name(ctx: RunContext[PlanAndActDeps]) -> str:
+    """Get the user's name"""
+    return ctx.deps.user_info.name
 
 
-def temperature_fahrenheit(ctx: RunContext[AgentDeps]) -> float:
-    logger.info(f"Getting temperature in Fahrenheit for {ctx.deps.city}")
-    return 69.8
+user_info_toolset = FunctionToolset([get_user_name])
 
 
-weather_toolset = FunctionToolset(tools=[temperature_celsius, temperature_fahrenheit])
+def temperature_celsius(city: str) -> float:
+    """Get the current temperature in Celsius for the specified city."""
+    logger.info(f"Getting temperature in Celsius for {city}")
+    temp_map = {"New York": 21.0, "Paris": 19.0, "Tokyo": 22.0}
+    try:
+        return temp_map[city]
+    except KeyError as e:
+        raise ModelRetry(f"City '{city}' not found in temperature data: {str(e)}")
 
 
-@weather_toolset.tool
-def conditions(ctx: RunContext, city: str) -> str:
-    logger.info(f"Getting weather conditions for {city} at step {ctx.run_step}")
-    if ctx.run_step % 2 == 0:
-        return "It's sunny"
-    else:
-        return "It's raining"
+def temperature_fahrenheit(city: str) -> float:
+    """Get the current temperature in Fahrenheit for the specified city."""
+    logger.info(f"Getting temperature in Fahrenheit for {city}")
+    temp_map = {"New York": 69.8, "Paris": 66.2, "Tokyo": 71.6}
+    try:
+        return temp_map[city]
+    except KeyError as e:
+        raise ModelRetry(f"City '{city}' not found in temperature data: {str(e)}")
 
 
-datetime_toolset = FunctionToolset[AgentDeps]()
-datetime_toolset.add_function(lambda: datetime.now(), name="get_current_time")
+def weather_forecast(city: str) -> str:
+    """Get the weather forecast for the specified city."""
+    logger.info(f"Getting weather forecast for {city}")
+    weather_map = {
+        "New York": "Sunny",
+        "Paris": "Cloudy with a chance of rain",
+        "Tokyo": "Clear skies and warm temperatures",
+    }
+    return weather_map[city]
 
 
-togglable_toolset = WrapperToolset(weather_toolset)
-
-
-async def prepare_toolset(ctx: RunContext[AgentDeps], tool_defs: list[ToolDefinition]) -> list[ToolDefinition]:
-    return [tool_def for tool_def in tool_defs if tool_def.name != "now"]
-
-
-def toggle(ctx: RunContext[AgentDeps]):
-    """You have 2 toolsets: weather and datetime. Toggle between them."""
-    if ctx.deps.wrapped_toolset.wrapped == weather_toolset:
-        ctx.deps.wrapped_toolset.wrapped = datetime_toolset.prepared(prepare_func=prepare_toolset)
-
-    else:
-        ctx.deps.wrapped_toolset.wrapped = weather_toolset
-
-
-def current_toolset_instructions(ctx: RunContext[AgentDeps]) -> str:
-    """Return the name of the current toolset."""
-    return f"Current active toolset: {ctx.deps.wrapped_toolset.wrapped.name}"
-
-
-agent = Agent(
-    model="google-gla:gemini-2.5-flash",
-    deps_type=AgentDeps,
-    tools=[toggle],
-    toolsets=[togglable_toolset],
-    instructions=current_toolset_instructions,
+weather_toolset = FunctionToolset[Any](
+    [temperature_celsius, temperature_fahrenheit, weather_forecast], max_retries=3
 )
-agent_deps = AgentDeps(city="Paris", wrapped_toolset=togglable_toolset)
-
-user_prompt = "What is the time right now?"
-message_history: list[ModelMessage] = []
-while True:
-    logger.info(f"User prompt: {user_prompt}")
-    res = agent.run_sync(user_prompt=user_prompt, deps=agent_deps, message_history=message_history)
-    message_history = res.all_messages()
-    user_prompt = input(f"{res.output}\n> ")
-    if user_prompt.lower() in ["exit", "quit", "q"]:
-        break
-
-for message in message_history:
-    print(message, end="\n\n")

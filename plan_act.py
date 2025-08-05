@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import inspect
-from collections.abc import Callable
-from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
 from typing import Annotated, Any, Literal, Self
@@ -25,7 +22,7 @@ from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter, ModelRe
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.tools import ToolDefinition
-from pydantic_ai.toolsets import CombinedToolset, FunctionToolset
+from pydantic_ai.toolsets import CombinedToolset, FilteredToolset
 from pydantic_ai.toolsets.abstract import AbstractToolset
 
 load_dotenv()
@@ -33,12 +30,6 @@ load_dotenv()
 logfire.configure(scrubbing=False)
 logfire.instrument_pydantic_ai()
 logfire.instrument_httpx(capture_all=True)
-
-
-def get_tool_info(tool: Callable[..., Any]) -> str:
-    doc = tool.__doc__ or "No description"
-    sig = inspect.signature(tool)
-    return f"{tool.__name__}{sig}: {doc.strip()}"
 
 
 def to_snake_case(name: str) -> str:
@@ -89,16 +80,9 @@ class Plan(BaseModel):
             self.steps[step.step_number] = step
 
 
-@dataclass
-class UserInfo:
-    name: str
-    city: str
-
-
-class AgentDeps(BaseModel):
+class PlanAndActDeps(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    user_info: UserInfo
     toolsets: list[AbstractToolset[Any]] = Field(default_factory=list)  # type: ignore
     plan: Plan | None = None
     mode: Literal["plan", "act"] = "plan"
@@ -111,8 +95,32 @@ class AgentDeps(BaseModel):
             self.artifacts[self.plan.plan_id] = {}
         return self
 
+    @staticmethod
+    def toolset_filter(ctx: RunContext[PlanAndActDeps], tooldef: ToolDefinition) -> bool:
+        if ctx.deps.mode == "act" and ctx.deps.plan is not None:
+            return (
+                tooldef.name == ctx.deps.plan.steps[ctx.deps.current_step].tool_name
+                and tooldef.name != "user_interaction"
+            )
+        return False
+
+    @property
+    def plan_toolset(self) -> FilteredToolset[Any]:
+        return CombinedToolset(self.toolsets).filtered(lambda ctx, _: ctx.deps.mode == "plan")
+
+    @property
+    def run_toolset(self) -> FilteredToolset[Any]:
+        return CombinedToolset(self.toolsets).filtered(self.toolset_filter)
+
     def add_toolsets(self, toolsets: list[AbstractToolset] | AbstractToolset):
         self.toolsets += toolsets if isinstance(toolsets, list) else [toolsets]
+
+    @staticmethod
+    async def get_plan_tool_defs(ctx: RunContext[PlanAndActDeps]) -> dict[str, str]:
+        return {
+            tool_name: str(tool.tool_def)
+            for tool_name, tool in (await ctx.deps.plan_toolset.get_tools(ctx)).items()
+        }
 
     def init_plan(self, plan: Plan):
         self.plan = plan
@@ -157,26 +165,7 @@ class AgentDeps(BaseModel):
         self.mode = "plan"
 
 
-async def get_tool_defs(ctx: RunContext[AgentDeps]) -> dict[str, str]:
-    return {
-        tool_name: str(tool.tool_def)
-        for toolset in ctx.deps.toolsets
-        for tool_name, tool in (await toolset.get_tools(ctx)).items()
-    }
-
-
-async def get_tool_def_instructions(ctx: RunContext[AgentDeps]) -> str:
-    if ctx.deps.mode == "act":
-        return ""
-    tool_defs = await get_tool_defs(ctx)
-    return (
-        "<available_tools>\n"
-        + "\n".join([f"{tool_def}" for tool_def in tool_defs.values()])
-        + "\n</available_tools>"
-    )
-
-
-async def step_instructions(ctx: RunContext[AgentDeps]) -> str:
+async def step_instructions(ctx: RunContext[PlanAndActDeps]) -> str:
     if ctx.deps.mode == "plan" or ctx.deps.plan is None or ctx.deps.current_step == 0:
         return ""
     step = ctx.deps.plan.steps[ctx.deps.current_step]
@@ -198,10 +187,14 @@ async def step_instructions(ctx: RunContext[AgentDeps]) -> str:
     return "\n".join(step_str_list).strip()
 
 
-async def plan_mode_instructions(ctx: RunContext[AgentDeps]) -> str:
+async def plan_mode_instructions(ctx: RunContext[PlanAndActDeps]) -> str:
     if ctx.deps.mode == "act":
         return ""
-    tool_defs = await get_tool_def_instructions(ctx)
+    tool_defs = (
+        "<available_tools>\n"
+        + "\n".join([f"{tool_def}" for tool_def in (await ctx.deps.get_plan_tool_defs(ctx)).values()])
+        + "\n</available_tools>"
+    )
     plan_str_list = [(files("dreamai.prompts") / "plan_mode.md").read_text().strip(), tool_defs]
     if artifacts := ctx.deps.get_artifacts():
         plan_str_list.append(
@@ -212,7 +205,9 @@ async def plan_mode_instructions(ctx: RunContext[AgentDeps]) -> str:
     return "\n\n".join(plan_str_list).strip()
 
 
-async def create_plan(ctx: RunContext[AgentDeps], task: str, task_result_name: str, steps: list[Step]) -> Plan:
+async def create_plan(
+    ctx: RunContext[PlanAndActDeps], task: str, task_result_name: str, steps: list[Step]
+) -> Plan:
     """
     Create an execution-ready plan based on the user's task.
     Steps must be minimal and atomic, with one artifact per step and explicit filenames/locations.
@@ -224,7 +219,7 @@ async def create_plan(ctx: RunContext[AgentDeps], task: str, task_result_name: s
     """
     if not steps:
         raise ModelRetry("No steps provided. Please provide a list of steps.")
-    tool_defs = await get_tool_defs(ctx)
+    tool_defs = await ctx.deps.get_plan_tool_defs(ctx)
     if tool_defs:
         tool_names = tool_defs.keys()
         wrong_steps = [step for step in steps if step.tool_name != "none" and step.tool_name not in tool_names]
@@ -273,7 +268,7 @@ async def review_plan(message_history: list[ModelMessage]) -> LooksGood | NeedsR
 class ExecutionStarted(BaseModel): ...
 
 
-async def execute_plan(ctx: RunContext[AgentDeps]) -> ExecutionStarted:
+async def execute_plan(ctx: RunContext[PlanAndActDeps]) -> ExecutionStarted:
     """Use this as soon as the user approves the plan to kickoff the execution."""
     if ctx.deps.plan is None:
         raise ModelRetry("No plan has been created. Please create a plan first.")
@@ -284,55 +279,6 @@ async def execute_plan(ctx: RunContext[AgentDeps]) -> ExecutionStarted:
     ctx.deps.mode = "act"
     ctx.deps.incr_current_step()
     return ExecutionStarted()
-
-
-def get_user_city(ctx: RunContext[AgentDeps]) -> str:
-    """Get the user's city"""
-    return ctx.deps.user_info.city
-
-
-def get_user_name(ctx: RunContext[AgentDeps]) -> str:
-    """Get the user's name"""
-    return ctx.deps.user_info.name
-
-
-user_info_toolset = FunctionToolset([get_user_name])
-
-
-def temperature_celsius(city: str) -> float:
-    """Get the current temperature in Celsius for the specified city."""
-    logger.info(f"Getting temperature in Celsius for {city}")
-    temp_map = {"New York": 21.0, "Paris": 19.0, "Tokyo": 22.0}
-    try:
-        return temp_map[city]
-    except KeyError as e:
-        raise ModelRetry(f"City '{city}' not found in temperature data: {str(e)}")
-
-
-def temperature_fahrenheit(city: str) -> float:
-    """Get the current temperature in Fahrenheit for the specified city."""
-    logger.info(f"Getting temperature in Fahrenheit for {city}")
-    temp_map = {"New York": 69.8, "Paris": 66.2, "Tokyo": 71.6}
-    try:
-        return temp_map[city]
-    except KeyError as e:
-        raise ModelRetry(f"City '{city}' not found in temperature data: {str(e)}")
-
-
-def weather_forecast(city: str) -> str:
-    """Get the weather forecast for the specified city."""
-    logger.info(f"Getting weather forecast for {city}")
-    weather_map = {
-        "New York": "Sunny",
-        "Paris": "Cloudy with a chance of rain",
-        "Tokyo": "Clear skies and warm temperatures",
-    }
-    return weather_map[city]
-
-
-weather_toolset = FunctionToolset[Any](
-    [temperature_celsius, temperature_fahrenheit, weather_forecast], max_retries=3
-)
 
 
 def user_interaction(message: str) -> str:
@@ -357,7 +303,7 @@ class TaskResult(BaseModel):
     message: str = Field(description="The final response to the user.")
 
 
-def task_result(ctx: RunContext[AgentDeps], message: str) -> TaskResult:
+def task_result(ctx: RunContext[PlanAndActDeps], message: str) -> TaskResult:
     """Returns the final response to the user."""
     if ctx.deps.plan is not None:
         ctx.deps.add_artifacts(ctx.deps.plan.plan_id, {ctx.deps.plan.task_result_name: message})
@@ -375,7 +321,7 @@ class StepResult(BaseModel):
 
 
 def step_result(
-    ctx: RunContext[AgentDeps], result: str, artifact_updates: dict[str, Any] | None = None
+    ctx: RunContext[PlanAndActDeps], result: str, artifact_updates: dict[str, Any] | None = None
 ) -> StepResult:
     """
     Process the result of the current step.
@@ -406,7 +352,7 @@ class NeedHelp(BaseModel):
     message: str
 
 
-def need_help(ctx: RunContext[AgentDeps], message: str) -> NeedHelp:
+def need_help(ctx: RunContext[PlanAndActDeps], message: str) -> NeedHelp:
     """
     Use this when you need help from your supervisor agent to proceed after exhausting all retry options.
     This should be used as a LAST RESORT only when:
@@ -423,7 +369,7 @@ def need_help(ctx: RunContext[AgentDeps], message: str) -> NeedHelp:
 
 
 async def prepare_output_tools(
-    ctx: RunContext[AgentDeps], tool_defs: list[ToolDefinition]
+    ctx: RunContext[PlanAndActDeps], tool_defs: list[ToolDefinition]
 ) -> list[ToolDefinition] | None:
     if ctx.deps.mode == "act":
         not_allowed_tools = {"create_plan", "execute_plan", "task_result", "user_interaction"}
@@ -441,23 +387,13 @@ async def prepare_output_tools(
     return [tool_def for tool_def in tool_defs if tool_def.name in plan_mode_tools]
 
 
-def toolset_filter(ctx: RunContext[AgentDeps], tooldef: ToolDefinition) -> bool:
-    if ctx.deps.mode == "act" and ctx.deps.plan is not None:
-        return (
-            tooldef.name == ctx.deps.plan.steps[ctx.deps.current_step].tool_name
-            and tooldef.name != "user_interaction"
-        )
-    return False
-
-
-toolset = CombinedToolset([user_info_toolset, weather_toolset, FunctionToolset([user_interaction])])
+# toolset = CombinedToolset([user_info_toolset, weather_toolset, FunctionToolset([user_interaction])])
 
 plan_model = OpenAIModel("google/gemini-2.5-flash", provider=OpenRouterProvider())
 act_model = OpenAIModel("openrouter/horizon-beta", provider=OpenRouterProvider())
 agent = Agent(
     instructions=[plan_mode_instructions, step_instructions],
-    deps_type=AgentDeps,
-    toolsets=[toolset.filtered(toolset_filter)],
+    deps_type=PlanAndActDeps,
     output_type=[
         ToolOutput(user_interaction, name="user_interaction"),
         ToolOutput(create_plan, name="create_plan"),
@@ -471,7 +407,7 @@ agent = Agent(
 )
 
 
-async def run_agent(user_prompt: str, agent_deps: AgentDeps):
+async def run_agent(user_prompt: str, agent_deps: PlanAndActDeps):
     plan_user_prompt = user_prompt
     act_user_prompt = None
     plan_message_history: list[ModelMessage] = []
@@ -488,6 +424,7 @@ async def run_agent(user_prompt: str, agent_deps: AgentDeps):
                     user_prompt=plan_user_prompt if agent_deps.mode == "plan" else act_user_prompt,
                     message_history=plan_message_history if agent_deps.mode == "plan" else act_message_history,
                     deps=agent_deps,
+                    toolsets=[agent_deps.run_toolset],
                 )
                 res_output = res.output
             except UnexpectedModelBehavior as e:
@@ -537,7 +474,7 @@ async def run_agent(user_prompt: str, agent_deps: AgentDeps):
 if __name__ == "__main__":
     import asyncio
 
-    agent_deps = AgentDeps(
+    agent_deps = PlanAndActDeps(
         user_info=UserInfo(name="Hamza", city="Paris"),
         toolsets=[toolset.filtered(lambda ctx, _: ctx.deps.mode == "plan")],
     )
