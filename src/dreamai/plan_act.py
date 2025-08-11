@@ -20,6 +20,8 @@ from pydantic_ai import (
 )
 from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter, ModelRequest
 from pydantic_ai.models import KnownModelName, Model
+from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.tools import ToolDefinition
 from pydantic_ai.toolsets import CombinedToolset, FilteredToolset
 from pydantic_ai.toolsets.abstract import AbstractToolset
@@ -47,8 +49,7 @@ class Step(BaseModel):
         )
     )
     tool_name: str = Field(
-        default="none",
-        description="The name of the tool to use for the step. Set to `none` if no tool is needed.",
+        description="The name of the tool to use for the step.",
     )
     resultant_artifact_name: Annotated[str, AfterValidator(to_snake_case)] = Field(
         description=(
@@ -73,6 +74,7 @@ class Plan(BaseModel):
         description="Descriptive, relevant, and specific snake-case name for the result of the task."
     )
     steps: dict[int, Step] = Field(default_factory=dict)  # type: ignore
+    can_execute: bool = True
 
     def add_steps(self, steps: list[Step] | Step):
         for step in sorted(steps if isinstance(steps, list) else [steps], key=lambda x: x.step_number):
@@ -229,7 +231,7 @@ async def create_plan(
     tool_defs = await ctx.deps.get_plan_tool_defs(ctx)
     if tool_defs:
         tool_names = tool_defs.keys()
-        wrong_steps = [step for step in steps if step.tool_name != "none" and step.tool_name not in tool_names]
+        wrong_steps = [step for step in steps if step.tool_name not in tool_names]
         if wrong_steps:
             raise ModelRetry(
                 (
@@ -281,10 +283,11 @@ async def execute_plan(ctx: RunContext[PlanAndActDeps]) -> ExecutionStarted:
         raise ModelRetry("No plan has been created. Please create a plan first.")
     review = await review_plan(ctx.messages)
     if isinstance(review, NeedsRevision):
+        ctx.deps.plan.can_execute = False
         logger.warning(f"Plan needs revision: {review.suggestions}")
         raise ModelRetry(f"Plan needs revision: {review.suggestions}")
+    ctx.deps.plan.can_execute = True
     ctx.deps.mode = "act"
-    ctx.deps.incr_current_step()
     return ExecutionStarted()
 
 
@@ -389,7 +392,7 @@ async def prepare_output_tools(
         return [tool_def for tool_def in tool_defs if tool_def.name in plan_mode_tools]
     if ctx.deps.current_step == ctx.deps.plan.last_step_number:
         plan_mode_tools += ["task_result"]
-    else:
+    elif ctx.deps.plan.can_execute:
         plan_mode_tools += ["execute_plan"]
     return [tool_def for tool_def in tool_defs if tool_def.name in plan_mode_tools]
 
@@ -423,10 +426,10 @@ async def run_plan_and_act_agent(
     message_history_path: Path | str = "message_history.json",
 ):
     agent = create_plan_and_act_agent(retries=retries)
-    plan_model = plan_model or "google-gla:gemini-2.5-flash"
-    act_model = act_model or "google-gla:gemini-2.5-flash"
-    # plan_model = plan_model or OpenAIModel("google/gemini-2.5-flash", provider=OpenRouterProvider())
-    # act_model = act_model or OpenAIModel("openrouter/horizon-beta", provider=OpenRouterProvider())
+    # plan_model = plan_model or "gpt-4.1"
+    # act_model = act_model or "google-gla:gemini-2.5-flash"
+    plan_model = plan_model or OpenAIModel("openai/gpt-5-mini", provider=OpenRouterProvider())
+    act_model = act_model or OpenAIModel("openai/gpt-5-mini", provider=OpenRouterProvider())
     plan_user_prompt = user_prompt
     act_user_prompt = None
     plan_message_history: list[ModelMessage] = []

@@ -5,7 +5,7 @@ Try to reuse any available information from previous steps.
 Don't add a final step to formulate a final user message to present the results. You will get the step results and formulate the final message later.
 
 **First Step Requirements:**
-- **CLARIFY ASSUMPTIONS** upfront: date ranges, calculation formulas, data sources, file formats, scope limitations, etc.
+- **CLARIFY ASSUMPTIONS** upfront: date ranges, calculation formulas, scope limitations, etc.
 - **CONFIRM REQUIREMENTS** with the user before proceeding with execution
 - This prevents rework and ensures alignment on expectations
 
