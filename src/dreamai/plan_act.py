@@ -20,8 +20,6 @@ from pydantic_ai import (
 )
 from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter, ModelRequest
 from pydantic_ai.models import KnownModelName, Model
-from pydantic_ai.models.openai import OpenAIModel
-from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.tools import ToolDefinition
 from pydantic_ai.toolsets import CombinedToolset, FilteredToolset
 from pydantic_ai.toolsets.abstract import AbstractToolset
@@ -80,6 +78,14 @@ class Plan(BaseModel):
         for step in sorted(steps if isinstance(steps, list) else [steps], key=lambda x: x.step_number):
             self.steps[step.step_number] = step
 
+    @property
+    def first_step_number(self) -> int:
+        return self.steps[min(self.steps)].step_number if self.steps else 0
+
+    @property
+    def last_step_number(self) -> int:
+        return self.steps[max(self.steps)].step_number if self.steps else 0
+
 
 class PlanAndActDeps(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -125,7 +131,7 @@ class PlanAndActDeps(BaseModel):
 
     def init_plan(self, plan: Plan):
         self.plan = plan
-        self.current_step = 0
+        self.current_step = plan.first_step_number
         self.artifacts[plan.plan_id] = {}
 
     def get_artifacts(self, plan_id: UUID4 | None = None) -> dict[str, Any]:
@@ -153,7 +159,7 @@ class PlanAndActDeps(BaseModel):
     def incr_current_step(self):
         if self.plan is None:
             self.current_step = 0
-        elif self.current_step == len(self.plan.steps):
+        elif self.current_step == self.plan.last_step_number:
             self.mode = "plan"
         else:
             self.current_step += 1
@@ -381,14 +387,11 @@ async def prepare_output_tools(
     plan_mode_tools = ["create_plan"]
     if ctx.deps.plan is None:
         return [tool_def for tool_def in tool_defs if tool_def.name in plan_mode_tools]
-    if ctx.deps.current_step == len(ctx.deps.plan.steps):
+    if ctx.deps.current_step == ctx.deps.plan.last_step_number:
         plan_mode_tools += ["task_result"]
     else:
         plan_mode_tools += ["execute_plan"]
     return [tool_def for tool_def in tool_defs if tool_def.name in plan_mode_tools]
-
-
-# toolset = CombinedToolset([user_info_toolset, weather_toolset, FunctionToolset([user_interaction])])
 
 
 def create_plan_and_act_agent(
@@ -416,11 +419,14 @@ async def run_plan_and_act_agent(
     plan_model: Model | KnownModelName | None = None,
     act_model: Model | KnownModelName | None = None,
     retries: int = 3,
+    agent_deps_path: Path | str = "agent_deps.json",
     message_history_path: Path | str = "message_history.json",
 ):
     agent = create_plan_and_act_agent(retries=retries)
-    plan_model = plan_model or OpenAIModel("google/gemini-2.5-flash", provider=OpenRouterProvider())
-    act_model = act_model or OpenAIModel("openrouter/horizon-beta", provider=OpenRouterProvider())
+    plan_model = plan_model or "google-gla:gemini-2.5-flash"
+    act_model = act_model or "google-gla:gemini-2.5-flash"
+    # plan_model = plan_model or OpenAIModel("google/gemini-2.5-flash", provider=OpenRouterProvider())
+    # act_model = act_model or OpenAIModel("openrouter/horizon-beta", provider=OpenRouterProvider())
     plan_user_prompt = user_prompt
     act_user_prompt = None
     plan_message_history: list[ModelMessage] = []
@@ -438,6 +444,7 @@ async def run_plan_and_act_agent(
                     toolsets=[agent_deps.run_toolset],
                 )
                 res_output = res.output
+                Path(agent_deps_path).write_text(agent_deps.model_dump_json(exclude={"toolsets"}))
             except UnexpectedModelBehavior as e:
                 if agent_deps.mode == "plan":
                     raise e
@@ -448,7 +455,7 @@ async def run_plan_and_act_agent(
                 f"Agent response: {res_output if isinstance(res_output, (str, NeedHelp)) else res_output.model_dump_json(indent=2)}"
             )
         logger.info(
-            f"Mode: {agent_deps.mode}, Current Step: {agent_deps.current_step}/{len(agent_deps.plan.steps) if agent_deps.plan else 0}"
+            f"Mode: {agent_deps.mode}, Current Step: {agent_deps.current_step}/{agent_deps.plan.last_step_number if agent_deps.plan else 0}"
         )
         if isinstance(res_output, ExecutionStarted):
             plan_user_prompt = None

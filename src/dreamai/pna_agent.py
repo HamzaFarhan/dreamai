@@ -7,7 +7,7 @@ from loguru import logger
 from pydantic_ai import ModelRetry, RunContext
 from pydantic_ai.toolsets import FunctionToolset
 
-from plan_act import PlanAndActDeps, run_plan_and_act_agent
+from dreamai.plan_act import PlanAndActDeps, run_plan_and_act_agent
 
 load_dotenv()
 
