@@ -21,8 +21,6 @@ from pydantic_ai import (
 )
 from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter, ModelRequest
 from pydantic_ai.models import KnownModelName, Model
-from pydantic_ai.models.openai import OpenAIModel
-from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.tools import ToolDefinition
 from pydantic_ai.toolsets.abstract import AbstractToolset
 
@@ -178,23 +176,30 @@ def step_instructions(ctx: RunContext[PlanAndActDeps]) -> str:
     ]
     if step.dependant_artifact_names and (artifacts := ctx.deps.get_artifacts(ctx.deps.plan.plan_id)):
         step_str_list.append(
-            "<dependant_artifacts>"
+            "<dependant_artifacts>\n"
             + "\n".join(
                 [f"<artifact name={dep}>{artifacts[dep]}</artifact>\n" for dep in step.dependant_artifact_names]
             )
-            + "</dependant_artifacts>"
+            + "\n</dependant_artifacts>"
         )
     step_str_list.append("</step>")
     return "\n".join(step_str_list).strip()
 
 
-def plan_mode_instructions(ctx: RunContext[PlanAndActDeps]) -> str:
+async def plan_mode_instructions(ctx: RunContext[PlanAndActDeps]) -> str:
     if ctx.deps.mode == Mode.ACT:
         return ""
-    tool_defs = "<available_toolsets>\n" + "\n".join(ctx.deps.toolsets.keys()) + "\n</available_toolsets>"
-    plan_str_list = [(files("dreamai.prompts") / "plan_mode.md").read_text().strip(), tool_defs]
-    if ctx.deps.toolset_descriptions:
-        plan_str_list.append(f"<toolset_descriptions>\n{ctx.deps.toolset_descriptions}\n</toolset_descriptions>")
+    plan_str_list = [(files("dreamai.prompts") / "plan_mode.md").read_text().strip()]
+    if ctx.deps.toolsets:
+        toolsets_str_list = ["<available_toolsets>"]
+        for toolset in ctx.deps.toolsets.values():
+            toolsets_str_list.append(f"<toolset name={toolset.id}>")
+            toolset_tools = await toolset.get_tools(ctx)
+            for tool, toolset_tool in toolset_tools.items():
+                toolsets_str_list.append(f"<tool name={tool}>\n{toolset_tool.tool_def}\n</tool>")
+            toolsets_str_list.append("</toolset>")
+        toolsets_str_list.append("</available_toolsets>")
+        plan_str_list.append("\n".join(toolsets_str_list))
     if artifacts := ctx.deps.get_artifacts():
         plan_str_list.append(
             "<saved_artifacts>\n"
@@ -415,10 +420,10 @@ async def run_plan_and_act_agent(
     message_history_path: Path | str = "message_history.json",
 ):
     agent = create_plan_and_act_agent(retries=retries)
-    # plan_model = plan_model or "gpt-4.1"
-    # act_model = act_model or "google-gla:gemini-2.5-flash"
-    plan_model = plan_model or OpenAIModel("openai/gpt-4.1", provider=OpenRouterProvider())
+    plan_model = plan_model or "google-gla:gemini-2.5-flash"
     act_model = act_model or "google-gla:gemini-2.5-flash"
+    # plan_model = plan_model or OpenAIModel("openai/gpt-5-mini", provider=OpenRouterProvider())
+    # act_model = act_model or "google-gla:gemini-2.5-flash"
     # act_model = act_model or OpenAIModel("openai/gpt-5-mini", provider=OpenRouterProvider())
     plan_user_prompt = user_prompt
     act_user_prompt = None
