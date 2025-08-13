@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from .agent_deps import AgentDeps
+from .agent import AgentDeps
 
 
 @dataclass(init=False)
