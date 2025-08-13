@@ -21,7 +21,9 @@ from pydantic_ai import (
 )
 from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter, ModelRequest
 from pydantic_ai.models import KnownModelName, Model
-from pydantic_ai.tools import ToolDefinition
+from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.providers.openrouter import OpenRouterProvider
+from pydantic_ai.tools import SystemPromptFunc, ToolDefinition
 from pydantic_ai.toolsets.abstract import AbstractToolset
 
 load_dotenv()
@@ -45,12 +47,6 @@ class Step(BaseModel):
         description="The sequential number of the step in the plan. Starts at 1."
     )
     description: str = Field(description=("Human-readable description of the step. No mention of the toolset."))
-    instructions: str = Field(
-        description=(
-            "Atomic, execution-ready instructions for this single step. Spell out everything. "
-            "Produce exactly one artifact per step. If reading data, specify full file paths."
-        )
-    )
     toolset_name: str = Field(
         description="The name of the toolset to use for the step.",
     )
@@ -171,14 +167,14 @@ def step_instructions(ctx: RunContext[PlanAndActDeps]) -> str:
     step_str_list = [
         (files("dreamai.prompts") / "act_mode.md").read_text().strip() + "\n",
         f"<step number={step.step_number}>",
-        f"<instructions>\n{step.instructions}\n</instructions>",
+        f"<description>\n{step.description.strip()}\n</description>",
         f"<resultant_artifact_name>\n{step.resultant_artifact_name}\n</resultant_artifact_name>",
     ]
     if step.dependant_artifact_names and (artifacts := ctx.deps.get_artifacts(ctx.deps.plan.plan_id)):
         step_str_list.append(
             "<dependant_artifacts>\n"
             + "\n".join(
-                [f"<artifact name={dep}>{artifacts[dep]}</artifact>\n" for dep in step.dependant_artifact_names]
+                [f"<artifact name={dep}>{artifacts[dep]}</artifact>" for dep in step.dependant_artifact_names]
             )
             + "\n</dependant_artifacts>"
         )
@@ -191,15 +187,22 @@ async def plan_mode_instructions(ctx: RunContext[PlanAndActDeps]) -> str:
         return ""
     plan_str_list = [(files("dreamai.prompts") / "plan_mode.md").read_text().strip()]
     if ctx.deps.toolsets:
-        toolsets_str_list = ["<available_toolsets>"]
-        for toolset in ctx.deps.toolsets.values():
-            toolsets_str_list.append(f"<toolset name={toolset.id}>")
-            toolset_tools = await toolset.get_tools(ctx)
-            for tool, toolset_tool in toolset_tools.items():
-                toolsets_str_list.append(f"<tool name={tool}>\n{toolset_tool.tool_def}\n</tool>")
-            toolsets_str_list.append("</toolset>")
-        toolsets_str_list.append("</available_toolsets>")
-        plan_str_list.append("\n".join(toolsets_str_list))
+        plan_str_list.append(
+            "<available_toolsets>\n" + "\n".join(ctx.deps.toolsets.keys()) + "\n</available_toolsets>"
+        )
+        # toolsets_str_list = ["<available_toolsets>"]
+        # for toolset in ctx.deps.toolsets.values():
+        #     toolsets_str_list.append(f"<toolset name={toolset.id}>")
+        #     toolset_tools = await toolset.get_tools(ctx)
+        #     for tool, toolset_tool in toolset_tools.items():
+        #         toolsets_str_list.append(f"<tool name={tool}>\n{toolset_tool.tool_def}\n</tool>")
+        #     toolsets_str_list.append("</toolset>")
+        # toolsets_str_list.append("</available_toolsets>")
+        # plan_str_list.append("\n".join(toolsets_str_list))
+    if ctx.deps.toolset_descriptions:
+        plan_str_list.append(
+            f"<toolset_descriptions>\n{ctx.deps.toolset_descriptions.strip()}\n</toolset_descriptions>"
+        )
     if artifacts := ctx.deps.get_artifacts():
         plan_str_list.append(
             "<saved_artifacts>\n"
@@ -212,7 +215,7 @@ async def plan_mode_instructions(ctx: RunContext[PlanAndActDeps]) -> str:
 def create_plan(ctx: RunContext[PlanAndActDeps], task: str, task_result_name: str, steps: list[Step]) -> Plan:
     """
     Create an execution-ready plan based on the user's task.
-    Steps must be minimal and atomic, with one artifact per step and explicit filenames/locations.
+    Steps must be minimal and atomic, with one artifact per step.
 
     Args:
         task: The user's task to be executed.
@@ -360,7 +363,7 @@ def need_help(ctx: RunContext[PlanAndActDeps], message: str) -> NeedHelp:
     _need_help = NeedHelp(
         step_number=ctx.deps.plan.steps[ctx.deps.current_step].step_number, message=f"NOT USER FACING\n{message}"
     )
-    ctx.deps.blitz()
+    ctx.deps.blitz(keep_artifacts=True)
     return _need_help
 
 
@@ -387,20 +390,30 @@ def act_toolset(ctx: RunContext[PlanAndActDeps]) -> AbstractToolset[Any] | None:
     if ctx.deps.mode == Mode.PLAN or ctx.deps.plan is None or ctx.deps.current_step is None:
         return None
     toolset_name = ctx.deps.plan.steps[ctx.deps.current_step].toolset_name
-    return ctx.deps.toolsets.get(toolset_name, None) if toolset_name != "user_interaction" else None
+    return (
+        ctx.deps.toolsets.get(toolset_name, None)
+        if toolset_name not in {"user_interaction", "files_toolset"}
+        else None
+    )
 
 
 def create_plan_and_act_agent(
+    instructions: list[SystemPromptFunc[PlanAndActDeps] | str]
+    | SystemPromptFunc[PlanAndActDeps]
+    | str
+    | None = None,
+    toolsets: list[AbstractToolset[Any]] | None = None,
     retries: int = 3,
 ) -> Agent[PlanAndActDeps, ExecutionStarted | NeedHelp | Plan | StepResult | TaskResult | str]:
     return Agent(
-        instructions=[plan_mode_instructions, step_instructions],
+        instructions=[plan_mode_instructions, step_instructions]
+        + ([] if instructions is None else (instructions if isinstance(instructions, list) else [instructions])),
         deps_type=PlanAndActDeps,
-        toolsets=[act_toolset],
+        toolsets=[act_toolset] + (toolsets if toolsets is not None else []),
         output_type=[
             ToolOutput(user_interaction, name="user_interaction"),
             ToolOutput(create_plan, name="create_plan"),
-            ToolOutput(execute_plan, name="execute_plan"),
+            # ToolOutput(execute_plan, name="execute_plan"),
             ToolOutput(task_result, name="task_result"),
             ToolOutput(step_result, name="step_result"),
             ToolOutput(need_help, name="need_help"),
@@ -415,16 +428,20 @@ async def run_plan_and_act_agent(
     agent_deps: PlanAndActDeps,
     plan_model: Model | KnownModelName | None = None,
     act_model: Model | KnownModelName | None = None,
+    instructions: list[SystemPromptFunc[PlanAndActDeps] | str]
+    | SystemPromptFunc[PlanAndActDeps]
+    | str
+    | None = None,
+    toolsets: list[AbstractToolset[Any]] | None = None,
     retries: int = 3,
     agent_deps_path: Path | str = "agent_deps.json",
     message_history_path: Path | str = "message_history.json",
 ):
-    agent = create_plan_and_act_agent(retries=retries)
-    plan_model = plan_model or "google-gla:gemini-2.5-flash"
-    act_model = act_model or "google-gla:gemini-2.5-flash"
-    # plan_model = plan_model or OpenAIModel("openai/gpt-5-mini", provider=OpenRouterProvider())
+    agent = create_plan_and_act_agent(instructions, toolsets, retries)
+    # plan_model = plan_model or "google-gla:gemini-2.5-flash"
     # act_model = act_model or "google-gla:gemini-2.5-flash"
-    # act_model = act_model or OpenAIModel("openai/gpt-5-mini", provider=OpenRouterProvider())
+    plan_model = plan_model or OpenAIModel("anthropic/claude-sonnet-4", provider=OpenRouterProvider())
+    act_model = act_model or OpenAIModel("anthropic/claude-sonnet-4", provider=OpenRouterProvider())
     plan_user_prompt = user_prompt
     act_user_prompt = None
     plan_message_history: list[ModelMessage] = []
@@ -456,18 +473,18 @@ async def run_plan_and_act_agent(
         logger.info(
             f"Mode: {agent_deps.mode}, Current Step: {agent_deps.current_step}/{agent_deps.plan.last_step_number if agent_deps.plan else 0}"
         )
-        if isinstance(res_output, ExecutionStarted):
-            plan_user_prompt = None
-            plan_message_history = (
-                [
-                    ModelRequest.user_text_prompt(
-                        format_as_xml(agent_deps.plan.model_dump(exclude={"plan_id"}), root_tag="approved_plan")
-                    )
-                ]
-                if agent_deps.plan
-                else []
-            )
-            continue
+        # if isinstance(res_output, ExecutionStarted):
+        #     plan_user_prompt = None
+        #     plan_message_history = (
+        #         [
+        #             ModelRequest.user_text_prompt(
+        #                 format_as_xml(agent_deps.plan.model_dump(exclude={"plan_id"}), root_tag="approved_plan")
+        #             )
+        #         ]
+        #         if agent_deps.plan
+        #         else []
+        #     )
+        #     continue
         if isinstance(res_output, StepResult):
             act_user_prompt = None
             act_message_history = []
@@ -482,6 +499,22 @@ async def run_plan_and_act_agent(
             plan_user_prompt = input(f"{agent_message}\n> ")
             if plan_user_prompt.lower() in ["exit", "quit", "q"]:
                 break
+            if plan_user_prompt.lower() in ["y"] and agent_deps.plan:
+                agent_deps.plan.can_execute = True
+                agent_deps.mode = Mode.ACT
+                plan_user_prompt = None
+                plan_message_history = (
+                    [
+                        ModelRequest.user_text_prompt(
+                            format_as_xml(
+                                agent_deps.plan.model_dump(exclude={"plan_id"}), root_tag="approved_plan"
+                            )
+                        )
+                    ]
+                    if agent_deps.plan
+                    else []
+                )
+                continue
         else:
             act_message_history = run_messages
             agent_message = res_output if isinstance(res_output, str) else res_output.model_dump_json(indent=2)

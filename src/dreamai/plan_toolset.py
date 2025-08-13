@@ -1,174 +1,114 @@
-from enum import StrEnum
-from typing import Annotated, Any
+from pydantic_ai import ModelRetry, RunContext
 
-from loguru import logger
-from pydantic import AfterValidator, BaseModel, Field
-from pydantic_ai import Agent, ModelRetry, RunContext
-
-from dreamai.toolsets import AgentDeps
+from .agent_deps import AgentDeps, Mode
 
 
-class RecommendedTool(BaseModel):
-    recommended_tool_name: str
-    recommended_tool_parameters: dict[str, Any]
+async def create_plan_steps(ctx: RunContext[AgentDeps], plan: str) -> str:
+    """
+    Creates a new sequential markdown plan with systematic steps and presents it to the user.
+    These steps are the atomic, unambiguous, sequential steps that you will follow to complete the task.
+
+    Args:
+        plan: The sequential steps formatted as markdown.
+
+    Example:
+        create_plan_steps(plan="## SEQUENTIAL STEPS\n1. Data preparation: Filter active customers using subscription table\n2. Base calculation: Calculate monthly revenue per customer cohort\n3. Final output: Generate cohort analysis table with retention metrics")
+    """
+    ctx.deps.mode = Mode.PLAN
+    ctx.deps.update_plan(plan)
+    return f"<sequential_plan>\n{plan}\n</sequential_plan>"
 
 
-class Step(BaseModel):
-    step_number: Annotated[int, AfterValidator(lambda x: max(x, 1))] = Field(
-        description="The sequential number of the step in the plan. Starts at 1."
-    )
-    instructions: str = Field(
-        description=(
-            "Atomic, execution‑ready instructions for this single step. "
-            "Assume a smaller AI model with no context; spell out everything. "
-            "Produce exactly one result table or artifact per step. "
-            "If reading data, specify full file paths. "
-            "If the task involves time‑based metrics, include the approved as‑of date "
-            "and build a point‑in‑time snapshot "
-            "(for example, one row per subscription active as of that date). "
-            "Never sum multiple periods then annualize unless the step explicitly says so. "
-            "End with 1–2 acceptance criteria and a quick QA check."
-        )
-    )
+async def update_plan_steps(ctx: RunContext[AgentDeps], old_text: str, new_text: str) -> str:
+    """
+    Updates existing content in the plan.
 
-    toolset_name: str = Field(
-        default="none",
-        description="The name of the toolset to fetch for the step. Set to 'none' if no toolset is needed.",
-    )
-    # recommended_tools: list[str] = Field(default_factory=list, description="The tool(s) to use for the step.")
+    This function is typically used to **mark plan steps as completed** or to tweak their wording. It
+    replaces all occurrences of `old_text` in the plan.
 
+    **TOKEN-EFFICIENT BUT FEWER CALLS:**
+    • Prefer bundling several related step updates in one call whenever a single action finishes multiple
+    sequential steps. Reducing tool invocations is usually worth the few extra tokens a longer replacement string
+    might consume.
 
-class PlanStepStatus(StrEnum):
-    PENDING = "pending"
-    COMPLETED = "completed"
-    FAILED = "failed"
+    **Practical rules:**
+    1. *Bulk completions* - If the steps are adjacent in the plan, select the contiguous block and
+       append "COMPLETED ✓" to each line in a single replacement.
+    2. *Sparse completions* - If the affected steps are far apart you may need multiple calls, but
+       try grouping when reasonable.
+    3. *Single-step edits* - For isolated tweaks, stick with the classic substring pattern.
 
+    Args:
+        old_text: String to locate the text to replace.
+        new_text: The full replacement string.
 
-class PlanStep(Step):
-    status: PlanStepStatus = Field(default=PlanStepStatus.PENDING)
-    # result: Any | None = None
+    Examples
+    --------
+    Bulk completion of three contiguous steps:
 
-    def __str__(self) -> str:
-        res = f"<plan_step>\n<step_number>{self.step_number}</step_number>\n<instructions>{self.instructions}</instructions>\n<toolset_name>{self.toolset_name}</toolset_name>\n</plan_step>\n"
-        # TODO: ADD RECOMMENDED TOOLS BACK LATER
-        # TODO: ADD STATUS BACK LATER
-        # TODO: ADD RESULT BACK LATER
-        return res.strip()
-
-
-class Plan(BaseModel):
-    task: str = Field(description="The user's task to be executed.")
-    steps: dict[int, PlanStep] = Field(default_factory=dict)  # type: ignore
-
-    def add_steps(self, steps: list[Step | PlanStep] | Step | PlanStep):
-        for step in sorted(
-            steps if isinstance(steps, list) else [steps], key=lambda x: x.step_number
-        ):
-            self.steps[step.step_number] = PlanStep(**step.model_dump())
-
-    # def mark_step_completed(self, step_number: int, result: Any | None = None):
-    #     self.steps[step_number].status = PlanStepStatus.COMPLETED
-    #     self.steps[step_number].result = result
-
-    def get_step(self, step_number: int) -> PlanStep | None:
-        return self.steps.get(step_number)
-
-    def get_completed_steps(self) -> list[PlanStep]:
-        return [
-            step for step in self.steps.values() if step.status == PlanStepStatus.COMPLETED
-        ]
-
-    def completed_steps_str(self) -> str:
-        return (
-            f"<completed_steps>\n"
-            f"{'\n'.join(str(step) for step in self.get_completed_steps())}\n"
-            f"</completed_steps>\n"
+        update_plan_steps(
+            "Load customer data\n2. Transform customer data\n3. Validate customer data",
+            "Load customer data - COMPLETED ✓\n2. Transform customer data - COMPLETED ✓\n3. Validate customer data - COMPLETED ✓",
         )
 
-    def get_next_pending_step(self) -> PlanStep | None:
-        for step in self.steps.values():
-            if step.status == PlanStepStatus.PENDING:
-                return step
-        return None
+    Two similar revenue steps in one go:
 
-    def next_pending_step_str(self) -> str:
-        return f"<next_pending_step>\n{str(self.get_next_pending_step())}\n</next_pending_step>\n"
-
-    def __str__(self) -> str:
-        return (
-            f"<task>\n{self.task}\n</task>\n"
-            f"<plan>\n"
-            f"{'\n'.join(str(step) for step in self.steps.values())}\n"
-            f"</plan>\n"
+        update_plan_steps(
+            "Calculate revenue Q1 2023\nCalculate revenue Q2 2023",
+            "Calculate revenue Q1 2023 - COMPLETED ✓\nCalculate revenue Q2 2023 - COMPLETED ✓",
         )
 
+    Minimal single-step update:
 
-def present_plan(ctx: RunContext[AgentDeps], plan: str) -> str:
+        update_plan_steps("customer data", "customer data - COMPLETED ✓")
     """
-    Present the complete plan to the user in non‑technical language.
-    Must include: the as‑of date, assumptions/questions, explicit deliverables, and consent gates for optional artifacts (e.g., Excel workbooks).
-    Do not mention internal tools or toolsets.
-    Ask the user to confirm: (a) the as‑of date, (b) assumptions, and (c) whether to create optional artifacts.
-    """
-    ctx.deps.presented_plan = plan
-    return plan
 
+    current_plan = ctx.deps.plan
 
-class LooksGood(BaseModel): ...
+    if current_plan is None:
+        return "<sequential_plan>\nNo plan exists yet.\n</sequential_plan>"
 
-
-class NeedsRevision(BaseModel):
-    suggestions: str = Field(
-        description="Suggestions for revising the steps with respect to the task and the user approved plan. "
-    )
-
-
-async def _review_steps(
-    task: str, approved_plan: str, steps: list[Step | PlanStep]
-) -> LooksGood | NeedsRevision:
-    reviewer_agent = Agent(
-        model="google-gla:gemini-2.5-flash",
-        instructions=(
-            "Given the task and the user approved plan, "
-            "you have to identify if the internal plan steps are correct "
-            "and execution-ready. So no steps omitted and no extra steps added.\n"
-            "If they are, return a LooksGood response. "
-            "If not, return a NeedsRevision response with suggestions for revision."
-        ),
-        output_type=[LooksGood, NeedsRevision],
-    )
-    reviewer_prompt = (
-        f"<task>\n{task}\n</task>\n"
-        f"<approved_plan>\n{approved_plan}\n</approved_plan>\n"
-        f"<steps>\n{'\n'.join(str(step) for step in steps)}\n</steps>\n"
-    )
-    try:
-        return (await reviewer_agent.run(user_prompt=reviewer_prompt)).output
-    except Exception as e:
-        logger.error(f"Error reviewing steps: {e}")
-        return LooksGood()
-
-
-async def create_plan(
-    ctx: RunContext[AgentDeps], task: str, steps: list[Step | PlanStep]
-) -> Plan:
-    """
-    Create the internal, execution‑ready plan only after the user approves `present_plan`.
-    Steps must be minimal and atomic, with one output per step and explicit filenames/locations.
-    Each step should include acceptance criteria and a brief QA check.
-    """
-    if ctx.deps.presented_plan is None:
+    if old_text not in current_plan:
         raise ModelRetry(
-            "No plan has been presented to the user. Please present a plan first."
+            f"<sequential_plan>\nText not found in plan: '{old_text}'\n\nCurrent plan:\n{current_plan}\n</sequential_plan>"
         )
-    if not steps:
-        raise ModelRetry("No steps provided. Please provide a list of steps.")
+    ctx.deps.update_plan(current_plan.replace(old_text, new_text).strip())
+    return f"<sequential_plan>\nUpdated plan step successfully.\n\n{ctx.deps.plan}\n</sequential_plan>"
 
-    steps_review = await _review_steps(
-        task=task, approved_plan=ctx.deps.presented_plan, steps=steps
+
+async def add_plan_step(ctx: RunContext[AgentDeps], new_step: str) -> str:
+    """
+    Adds a new step to the sequential plan.
+
+    This adds a new step to the end of the existing plan. Use this when you discover during analysis execution
+    that additional steps are needed that weren't in the original user-approved plan, or when expanding the
+    analysis scope based on findings.
+
+    Args:
+        new_step: The new step to add to the plan. Should be properly formatted and follow the atomic, sequential pattern (e.g., "6. Validate results against business logic").
+
+    Example:
+        add_plan_step("4. Validation step: Cross-check MRR calculations against transaction totals")
+    """
+    current_plan = ctx.deps.plan or ""
+    ctx.deps.update_plan((current_plan.rstrip() + "\n" + new_step).strip())
+    return f"<sequential_plan>\nAdded new step successfully.\n\n{ctx.deps.plan}\n</sequential_plan>"
+
+
+async def load_plan_steps(ctx: RunContext[AgentDeps]) -> str:
+    """
+    Loads the current sequential plan.
+
+    Use this to check the current plan status, see what steps have been completed, or reference the overall
+    analysis approach.
+    """
+    return (
+        f"<sequential_plan>\n"
+        f"{ctx.deps.plan or 'No plan exists yet. Use create_plan_steps to create one.'}\n"
+        f"</sequential_plan>"
     )
-    if isinstance(steps_review, NeedsRevision):
-        raise ModelRetry(f"Steps need revision: {steps_review.suggestions}\n")
-    plan = Plan(task=task)
-    plan.add_steps(steps)
-    return plan
+
+
+async def execute_plan_steps(ctx: RunContext[AgentDeps]):
+    """Use this as soon as the user approves the plan to kickoff the execution."""
+    ctx.deps.mode = Mode.ACT
