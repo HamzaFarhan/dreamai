@@ -258,7 +258,7 @@ wheels = [
 
 [[package]]
 name = "cohere"
-version = "5.16.3"
+version = "5.17.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastavro" },
@@ -271,9 +271,9 @@ dependencies = [
     { name = "types-requests" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/94/09/b39aeee3b3f0eb3cd6abd69f775fca0c81c4eda9104034f6e2fdb09a6ecb/cohere-5.16.3.tar.gz", hash = "sha256:72fc22fba51cc16f009ee659c95a3dd7d33ba17b0827a7a1f7d6c7ceb14fe49e", size = 164827, upload-time = "2025-08-08T15:47:59.664Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8a/ea/0b4bfb4b7f0f445db97acc979308f80ed5ab31df3786b1951d6e48b30d27/cohere-5.17.0.tar.gz", hash = "sha256:70d2fb7bccf8c9de77b07e1c0b3d93accf6346242e3cdc6ce293b577afa74a63", size = 164665, upload-time = "2025-08-13T06:58:00.608Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/64/a9/9cec8efc6bdf31e999634e288e5adbf9021e984da358babeeac5f105b0b4/cohere-5.16.3-py3-none-any.whl", hash = "sha256:84b05eb368de8976f135f49ea5cf594eef9dbfa0089410a72473016c0898a636", size = 295505, upload-time = "2025-08-08T15:47:57.961Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/21/d0eb7c8e5b3bb748190c59819928c38cafcdf8f8aaca9d21074c64cf1cae/cohere-5.17.0-py3-none-any.whl", hash = "sha256:fe7d8228cda5335a7db79a828893765a4d5a40b7f7a43443736f339dc7813fa4", size = 295301, upload-time = "2025-08-13T06:57:59.072Z" },
 ]
 
 [[package]]
@@ -344,6 +344,7 @@ dependencies = [
     { name = "ipykernel" },
     { name = "logfire", extra = ["httpx"] },
     { name = "loguru" },
+    { name = "polars" },
     { name = "pydantic-ai" },
     { name = "pytest" },
     { name = "python-dotenv" },
@@ -356,6 +357,7 @@ requires-dist = [
     { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "logfire", extras = ["httpx"], specifier = ">=3.24.2" },
     { name = "loguru", specifier = ">=0.7.3" },
+    { name = "polars", specifier = ">=1.32.2" },
     { name = "pydantic-ai", specifier = ">=0.7.0" },
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
@@ -821,7 +823,7 @@ wheels = [
 
 [[package]]
 name = "logfire"
-version = "4.3.1"
+version = "4.3.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "executing" },
@@ -832,9 +834,9 @@ dependencies = [
     { name = "rich" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ec/f3/66f656cf4d482c290c4b847963a137bbb9ede97dd7f1cde1cda53878f5eb/logfire-4.3.1.tar.gz", hash = "sha256:8b8788bb044e14259ac54ae0c027341ba884a362f0cba7dd858f1378ecc6f043", size = 515669, upload-time = "2025-08-12T12:49:40.713Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a5/49/41e2a0febcbdf9717d10dd3094935e5efa5edee4be125a4d808382c92c64/logfire-4.3.2.tar.gz", hash = "sha256:aa597b9c2a62535a0784b0df48851156354334884acf3ba60611257f459ded67", size = 515775, upload-time = "2025-08-13T07:44:18.475Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/59/c0978a21e8757f1559648dcd00c77215221c50ee2c59da6aa831b74130c6/logfire-4.3.1-py3-none-any.whl", hash = "sha256:1bd48c782cc71bf1c19751338b9229062c037c2644ae13137dfc00a474476762", size = 213490, upload-time = "2025-08-12T12:49:37.666Z" },
+    { url = "https://files.pythonhosted.org/packages/13/6b/f1e4641f1832d74ac724da6920712dd778853fad3c15c212fda881001833/logfire-4.3.2-py3-none-any.whl", hash = "sha256:5e6393568c6da838a44256a0a8205c243a5a45425a642588949009d1d8377b75", size = 213523, upload-time = "2025-08-13T07:44:15.325Z" },
 ]
 
 [package.optional-dependencies]
@@ -844,11 +846,11 @@ httpx = [
 
 [[package]]
 name = "logfire-api"
-version = "4.3.1"
+version = "4.3.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/33/29/8aa07eb5e841aab63ab53bbd251b5b6a1b485f8b42f8076c50e2c8d423c2/logfire_api-4.3.1.tar.gz", hash = "sha256:2e5f81b28406db7ef42152b8e2c616213133f408004fa0b5aa5f995f454e67eb", size = 52791, upload-time = "2025-08-12T12:49:41.923Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/93/65/73e841823eab57a2faae9b4834e16cc430cf12cd9fe2837c8f9ae5d2ea5d/logfire_api-4.3.2.tar.gz", hash = "sha256:8f4e7f818bf037fcca4f2e340687708ee051e9fbb00a26928ace437b5de2cac5", size = 52791, upload-time = "2025-08-13T07:44:19.795Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/dc/c1/3a49b8a3b8ce3b8f9d80937a58b817d919de7225fcecbc05b986791929af/logfire_api-4.3.1-py3-none-any.whl", hash = "sha256:98985eee43c356e3af067d9e1f9b2c5cf1cae344fe7259c96309516e85e0af3d", size = 88328, upload-time = "2025-08-12T12:49:39.445Z" },
+    { url = "https://files.pythonhosted.org/packages/81/ff/73fc71b071ad68e57cb97181768e10ff703681550d2a46937e861f8d452f/logfire_api-4.3.2-py3-none-any.whl", hash = "sha256:e97e504114b52b4dc5b575d216315464b1b51c09cebb87b4e18b53a66df07dc1", size = 88326, upload-time = "2025-08-13T07:44:17.097Z" },
 ]
 
 [[package]]
@@ -1188,6 +1190,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3", size = 69412, upload-time = "2025-05-15T12:30:07.975Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
+]
+
+[[package]]
+name = "polars"
+version = "1.32.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/8a/07/7864688644139b1bc198c36e34e81581ec76c8d20ae57c4879914786b2a1/polars-1.32.2.tar.gz", hash = "sha256:b4c5cefc7cf7a2461f8800cf2c09976c47cb1fd959c6ef3024d5618b497f05d3", size = 4788876, upload-time = "2025-08-07T10:51:16.587Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f5/61/b251ce6755d0d3c6f4c8cb245941b80901624fce7efeb95b37c170da2565/polars-1.32.2-cp39-abi3-macosx_10_12_x86_64.whl", hash = "sha256:f21da6a5210898ec800b7e9e667fb53eb9161b7ceb812ee6555ff5661a00e517", size = 37770199, upload-time = "2025-08-07T10:50:05.627Z" },
+    { url = "https://files.pythonhosted.org/packages/22/74/ea073a88073cd6025b12850484f51d30dad695b51432a3f0a0439e2f8094/polars-1.32.2-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:d3f4e061312ef6c2a907378ce407a6132734fe1a13f261a1984a1a9ca2f6febc", size = 34461798, upload-time = "2025-08-07T10:50:10.452Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/14/ee34ebe3eb842c83ca1d2d3af6ee02b08377e056ffad156c9a2b15a6d05c/polars-1.32.2-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a711a750cfc19f1f883d2b46895dd698abf4d446ca41c3bf510ced0ff1178057", size = 38280883, upload-time = "2025-08-07T10:50:14.168Z" },
+    { url = "https://files.pythonhosted.org/packages/af/ed/0f5ab777b0dc95936074266bc6fd9cf117886ebdd6685589437edfdbb186/polars-1.32.2-cp39-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:d1c53a828eedc215fb0dabc7cef02c6f4ad042157512ddb99840fd42b8da1e8a", size = 35490843, upload-time = "2025-08-07T10:50:18.325Z" },
+    { url = "https://files.pythonhosted.org/packages/91/58/d2840554ef1c69e06a28ee928bdaa0d6a61af12205ff24c096628f217f99/polars-1.32.2-cp39-abi3-win_amd64.whl", hash = "sha256:5e1660a584e89e1d60cd89984feca38a695e491a966581fefe8be99c230ea154", size = 37897347, upload-time = "2025-08-07T10:50:22.247Z" },
+    { url = "https://files.pythonhosted.org/packages/b8/53/4eaaa4f219add46594db21a05a9a5629ec6af20bd859a90668d5a1448abc/polars-1.32.2-cp39-abi3-win_arm64.whl", hash = "sha256:cd390364f6f3927474bd0aed255103195b9d2b3eef0f0c5bb429db5e6311615e", size = 34059100, upload-time = "2025-08-07T10:50:26.445Z" },
 ]
 
 [[package]]

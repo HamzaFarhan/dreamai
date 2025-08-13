@@ -19,7 +19,7 @@ async def create_plan_steps(ctx: RunContext[AgentDeps], plan: str) -> str:
     return f"<sequential_plan>\n{plan}\n</sequential_plan>"
 
 
-async def update_plan_steps(ctx: RunContext[AgentDeps], old_text: str, new_text: str) -> str:
+async def update_plan_steps(ctx: RunContext[AgentDeps], old_text: str, new_text: str):
     """
     Updates existing content in the plan.
 
@@ -73,10 +73,9 @@ async def update_plan_steps(ctx: RunContext[AgentDeps], old_text: str, new_text:
             f"<sequential_plan>\nText not found in plan: '{old_text}'\n\nCurrent plan:\n{current_plan}\n</sequential_plan>"
         )
     ctx.deps.update_plan(current_plan.replace(old_text, new_text).strip())
-    return f"<sequential_plan>\nUpdated plan step successfully.\n\n{ctx.deps.plan}\n</sequential_plan>"
 
 
-async def add_plan_step(ctx: RunContext[AgentDeps], new_step: str) -> str:
+async def add_plan_step(ctx: RunContext[AgentDeps], new_step: str):
     """
     Adds a new step to the sequential plan.
 
@@ -92,7 +91,6 @@ async def add_plan_step(ctx: RunContext[AgentDeps], new_step: str) -> str:
     """
     current_plan = ctx.deps.plan or ""
     ctx.deps.update_plan((current_plan.rstrip() + "\n" + new_step).strip())
-    return f"<sequential_plan>\nAdded new step successfully.\n\n{ctx.deps.plan}\n</sequential_plan>"
 
 
 async def load_plan_steps(ctx: RunContext[AgentDeps]) -> str:
