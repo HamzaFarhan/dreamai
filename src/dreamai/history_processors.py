@@ -76,7 +76,6 @@ def remove_used_tools(
 
 
 class ToolEdit(BaseModel):
-    tool_name: str
     edit_func: EditFunc[...]
     lifespan: int | float = 3
 
@@ -126,15 +125,15 @@ def edit_tool_call_part(
     )
 
 
-def edit_tool_result_part(
+def edit_tool_return_part(
     part: ToolCallPart | ToolReturnPart, content: str | None, thresh: int | None = 200
 ) -> ToolCallPart | ToolReturnPart | None:
     if isinstance(part, ToolCallPart):
         return part
     if content is None:
         return None
-    result_content = part.model_response_str()
-    if thresh is not None and len(result_content) < thresh:
+    return_content = part.model_response_str()
+    if thresh is not None and len(return_content) < thresh:
         return part
     return ToolReturnPart(
         tool_name=part.tool_name,

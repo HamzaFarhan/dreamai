@@ -44,7 +44,7 @@ async def create_plan_steps(ctx: RunContext[AgentDeps], plan: str) -> str:
     """
     ctx.deps.mode = Mode.PLAN
     ctx.deps.update_plan(plan)
-    return f"<sequential_plan>\n{plan}\n</sequential_plan>"
+    return plan
 
 
 async def update_plan_steps(ctx: RunContext[AgentDeps], old_text: str, new_text: str):
@@ -94,12 +94,10 @@ async def update_plan_steps(ctx: RunContext[AgentDeps], old_text: str, new_text:
     current_plan = ctx.deps.plan
 
     if current_plan is None:
-        return "<sequential_plan>\nNo plan exists yet.\n</sequential_plan>"
+        raise ModelRetry("No plan exists yet. Use `create_plan_steps` to create one.")
 
     if old_text not in current_plan:
-        raise ModelRetry(
-            f"<sequential_plan>\nText not found in plan: '{old_text}'\n\nCurrent plan:\n{current_plan}\n</sequential_plan>"
-        )
+        raise ModelRetry(f"Text not found in plan: '{old_text}'\n\nCurrent plan:\n{current_plan}\n")
     ctx.deps.update_plan(current_plan.replace(old_text, new_text).strip())
 
 
@@ -107,9 +105,9 @@ async def add_plan_step(ctx: RunContext[AgentDeps], new_step: str):
     """
     Adds a new step to the sequential plan.
 
-    This adds a new step to the end of the existing plan. Use this when you discover during analysis execution
+    This adds a new step to the end of the existing plan. Use this when you discover during execution
     that additional steps are needed that weren't in the original user-approved plan, or when expanding the
-    analysis scope based on findings.
+    scope based on findings.
 
     Args:
         new_step: The new step to add to the plan. Should be properly formatted and follow the atomic, sequential pattern (e.g., "6. Validate results against business logic").
@@ -117,8 +115,12 @@ async def add_plan_step(ctx: RunContext[AgentDeps], new_step: str):
     Example:
         add_plan_step("4. Validation step: Cross-check MRR calculations against transaction totals")
     """
-    current_plan = ctx.deps.plan or ""
-    ctx.deps.update_plan((current_plan.rstrip() + "\n" + new_step).strip())
+    current_plan = ctx.deps.plan
+
+    if current_plan is None:
+        raise ModelRetry("No plan exists yet. Use `create_plan_steps` to create one.")
+
+    ctx.deps.update_plan((current_plan.strip() + "\n" + new_step).strip())
 
 
 async def load_plan_steps(ctx: RunContext[AgentDeps]) -> str:
@@ -126,13 +128,9 @@ async def load_plan_steps(ctx: RunContext[AgentDeps]) -> str:
     Loads the current sequential plan.
 
     Use this to check the current plan status, see what steps have been completed, or reference the overall
-    analysis approach.
+    approach.
     """
-    return (
-        f"<sequential_plan>\n"
-        f"{ctx.deps.plan or 'No plan exists yet. Use create_plan_steps to create one.'}\n"
-        f"</sequential_plan>"
-    )
+    return f"{ctx.deps.plan or 'No plan exists yet. Use `create_plan_steps` to create one.'}"
 
 
 async def execute_plan_steps(ctx: RunContext[AgentDeps]):
@@ -207,7 +205,11 @@ class NotAllStepsMarkedCompleted(BaseModel):
     message: str
 
 
-async def task_result(ctx: RunContext[AgentDeps], message: str) -> str:
+class TaskResult(BaseModel):
+    message: str
+
+
+async def task_result(ctx: RunContext[AgentDeps], message: str) -> TaskResult:
     """Returns the final response to the user after executing the plan."""
 
     steps_checker = Agent(
@@ -229,10 +231,10 @@ async def task_result(ctx: RunContext[AgentDeps], message: str) -> str:
         res = await steps_checker.run(user_prompt=user_prompt)
     except Exception:
         ctx.deps.mode = Mode.PLAN
-        return message
+        return TaskResult(message=message)
     if isinstance(res.output, AllStepsMarkedCompleted):
         ctx.deps.mode = Mode.PLAN
-        return message
+        return TaskResult(message=message)
     raise ModelRetry(res.output.message)
 
 
@@ -263,7 +265,7 @@ async def prepare_output_tools(
     return [tool_def for tool_def in tool_defs if tool_def.name in output_types]
 
 
-def create_agent(retries: int = 3) -> Agent[AgentDeps, str]:
+def create_agent(retries: int = 3) -> Agent[AgentDeps, str | TaskResult]:
     return Agent(
         model=OpenAIModel("google/gemini-2.5-flash", provider=OpenRouterProvider()),
         deps_type=AgentDeps,
