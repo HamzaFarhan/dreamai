@@ -1,4 +1,5 @@
 from enum import StrEnum
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +9,8 @@ from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.tools import ToolDefinition
 from pydantic_ai.toolsets import AbstractToolset, FunctionToolset
+
+from .history_processors import ToolEdit, edit_tool_call_part, edit_tool_return_part, edit_used_tools
 
 
 class Mode(StrEnum):
@@ -35,6 +38,8 @@ async def create_plan_steps(ctx: RunContext[AgentDeps], plan: str) -> str:
     """
     Creates a new sequential markdown plan with systematic steps and presents it to the user.
     These steps are the atomic, unambiguous, sequential steps that you will follow to complete the task.
+    Also include the toolset(s) to be used for each step.
+    Make sure to clarify any assumptions you have about the task beforehand using `user_interaction`.
 
     Args:
         plan: The sequential steps formatted as markdown.
@@ -181,6 +186,7 @@ def user_interaction(message: str) -> str:
     - A question
     - An assumption made that needs to be validated
     - A request for clarification
+    - A progress report after each step
     - Anything else needed from the user to proceed
 
     Args:
@@ -265,9 +271,28 @@ async def prepare_output_tools(
     return [tool_def for tool_def in tool_defs if tool_def.name in output_types]
 
 
+truncate_tool_return = ToolEdit(
+    edit_func=partial(
+        edit_tool_return_part,
+        content="[Truncated to save tokens] You can call the tool again if you need this output.",
+        thresh=None,
+    ),
+    lifespan=10,
+)
+
+truncate_update_call = ToolEdit(
+    edit_func=partial(
+        edit_tool_call_part,
+        content="[Truncated to save tokens] Your updates were made and you can use `load_plan_steps` to see the full plan.",
+        thresh=None,
+    ),
+    lifespan=3,
+)
+
+
 def create_agent(retries: int = 3) -> Agent[AgentDeps, str | TaskResult]:
     return Agent(
-        model=OpenAIModel("google/gemini-2.5-flash", provider=OpenRouterProvider()),
+        model=OpenAIModel("anthropic/claude-sonnet-4", provider=OpenRouterProvider()),
         deps_type=AgentDeps,
         instructions=[
             (
@@ -286,5 +311,15 @@ def create_agent(retries: int = 3) -> Agent[AgentDeps, str | TaskResult]:
             ToolOutput(task_result, name="task_result"),
         ],
         prepare_output_tools=prepare_output_tools,
+        history_processors=[
+            partial(
+                edit_used_tools,
+                tools_to_edit_funcs={
+                    "describe_df": truncate_tool_return,
+                    "load_plan_steps": truncate_tool_return,
+                    "update_plan_steps": truncate_update_call,
+                },
+            )
+        ],
         retries=retries,
     )

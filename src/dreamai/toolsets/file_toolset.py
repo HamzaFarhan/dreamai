@@ -5,7 +5,7 @@ import polars as pl
 from loguru import logger
 from pydantic_ai import ModelRetry, RunContext
 
-from .finn_deps import FinnDeps
+from ..finn_deps import FinnDeps
 
 
 async def _list_files(

@@ -3,8 +3,8 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
-def add_current_time_instructions() -> str:
-    return f"<current_time>{datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S')}</current_time>\n"
+def add_current_date_instructions() -> str:
+    return f"<current_date>{datetime.now().astimezone().strftime('%Y-%m-%d')}</current_date>\n"
 
 
 def user_interaction(message: str) -> str:

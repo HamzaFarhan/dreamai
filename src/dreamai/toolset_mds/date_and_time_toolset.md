@@ -1,0 +1,104 @@
+Date & Time Functions
+Essential for forecasting, scheduling cash flows, and working with time series data.
+
+- **TODAY**
+  - Purpose: Return the current date
+  - Input: No parameters
+  - Output: Current date
+  - Example: =TODAY()
+- **NOW**
+  - Purpose: Return the current date and time
+  - Input: No parameters
+  - Output: Current date and time
+  - Example: =NOW()
+- **DATE**
+  - Purpose: Construct a date from year, month, and day components
+  - Input: year, month, day
+  - Output: Date value
+  - Example: =DATE(2025, 4, 15)
+- **YEAR**
+  - Purpose: Extract the year from a date
+  - Input: date
+  - Output: Integer (year)
+  - Example: =YEAR(A1)
+- **MONTH**
+  - Purpose: Extract the month from a date
+  - Input: date
+  - Output: Integer (month 1-12)
+  - Example: =MONTH(A1)
+- **DAY**
+  - Purpose: Extract the day from a date
+  - Input: date
+  - Output: Integer (day 1-31)
+  - Example: =DAY(A1)
+- **EDATE**
+  - Purpose: Calculate a date a given number of months before or after a specified date
+  - Input: start_date, months
+  - Output: Date value
+  - Example: =EDATE(start_date, months)
+- **EOMONTH**
+  - Purpose: Find the end of the month for a given date
+  - Input: start_date, months
+  - Output: Date value (end of month)
+  - Example: =EOMONTH(start_date, months)
+- **DATEDIF**
+  - Purpose: Calculate the difference between two dates
+  - Input: start_date, end_date, unit
+  - Output: Integer (difference in specified unit)
+  - Example: =DATEDIF(start_date, end_date, "unit")
+- **YEARFRAC**
+  - Purpose: Calculate the fraction of a year between two dates极
+  - Input: start_date, end_date, basis (optional)
+  - Output: Decimal fraction of year
+  - Example: =YEARFRAC(start_date, end_date)
+- **WORKDAY**
+  - Purpose: Return a future or past date excluding weekends and holidays
+  - Input: start_date, days, holidays (optional)
+  - Output: Date value
+  - Example: =WORKDAY(start_date, days, [holidays])
+- **NETWORKDAYS**
+  - Purpose: Count working days between two dates
+  - Input: start_date, end_date, holidays (optional)
+  - Output: Integer (number of working days)
+  - Example: =NETWORKDAYS(start_date, end_date, [holidays])
+- **DATE_RANGE**
+  - Purpose: Generate a series of dates between a start and end date with a specified frequency, essential for creating financial model timelines
+  - Input: start_date (str or date), end_date (str or date), frequency (str, e.g., 'M' for month-end, 'D' for day, 'Q' for quarter-end)
+  - Output: Series of dates
+  - Example: =DATE_RANGE("2025-01-01", "2025-12-31", "M")
+
+- **WEEKDAY**
+  - Purpose: Return day of week as number
+  - Input: serial_number, [return_type]
+  - Output: Integer (1-7)
+  - Example: WEEKDAY(DATE(2024,1,1))
+
+- **QUARTER**
+  - Purpose: Extract quarter from date
+  - Input: date
+  - Output: Integer (1-4)
+  - Example: QUARTER(DATE(2024,7,15))
+
+- **TIME**
+  - Purpose: Create time value from hours, minutes, seconds
+  - Input: hour, minute, second
+  - Output: Time value
+  - Example: TIME(14, 30, 0)
+
+- **HOUR**
+  - Purpose: Extract hour from time
+  - Input: serial_number
+  - Output: Integer (0-23)
+  - Example: HOUR(TIME(14,30,0))
+
+- **MINUTE**
+  - Purpose: Extract minute from time
+  - Input: serial_number
+  - Output: Integer (0-59)
+  - Example: MINUTE(TIME(14,30,45))
+
+- **SECOND**
+  - Purpose: Extract second from time
+  - Input: serial_number
+  - Output: Integer (0-59)
+  - Example: SECOND(TIME(14,30,45))

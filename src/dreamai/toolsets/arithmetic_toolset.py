@@ -3,8 +3,8 @@ from decimal import ROUND_CEILING, ROUND_FLOOR, ROUND_HALF_UP, Decimal, getconte
 import polars as pl
 from pydantic_ai import ModelRetry, RunContext
 
+from ..finn_deps import FinnDeps
 from .file_toolset import load_df, save_df_to_analysis_dir
-from .finn_deps import FinnDeps
 
 getcontext().prec = 28
 
