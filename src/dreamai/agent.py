@@ -10,7 +10,13 @@ from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.tools import ToolDefinition
 from pydantic_ai.toolsets import AbstractToolset, FunctionToolset
 
-from .history_processors import ToolEdit, edit_tool_call_part, edit_tool_return_part, edit_used_tools
+from .history_processors import (
+    ToolEdit,
+    add_reminder_since_tool_call,
+    edit_tool_call_part,
+    edit_tool_return_part,
+    edit_used_tools,
+)
 
 
 class Mode(StrEnum):
@@ -284,9 +290,9 @@ truncate_update_call = ToolEdit(
     edit_func=partial(
         edit_tool_call_part,
         content="[Truncated to save tokens] Your updates were made and you can use `load_plan_steps` to see the full plan.",
-        thresh=None,
+        thresh=200,
     ),
-    lifespan=3,
+    lifespan=5,
 )
 
 
@@ -319,7 +325,12 @@ def create_agent(retries: int = 3) -> Agent[AgentDeps, str | TaskResult]:
                     "load_plan_steps": truncate_tool_return,
                     "update_plan_steps": truncate_update_call,
                 },
-            )
+            ),
+            partial(
+                add_reminder_since_tool_call,
+                tool_name="update_plan_steps",
+                reminder="Remember to load and update the plan steps using `load_plan_steps` and `update_plan_steps` to keep on track.",
+            ),
         ],
         retries=retries,
     )

@@ -10,7 +10,7 @@ from pydantic_ai.messages import ModelMessagesTypeAdapter
 from pydantic_ai.toolsets import FunctionToolset
 from pydantic_ai.usage import UsageLimits
 
-from .agent import create_agent
+from .agent import AgentDeps, create_agent
 from .finn_deps import DataDirs, FinnDeps
 from .toolsets.arithmetic_toolset import (
     calculate_abs,
@@ -280,7 +280,7 @@ arithmetic_toolset = FunctionToolset(
     max_retries=3,
 )
 
-file_toolset = FunctionToolset(
+file_toolset = FunctionToolset[AgentDeps](
     [describe_df, list_data_files, list_analysis_files], id="file_toolset", max_retries=3
 )
 
@@ -309,6 +309,7 @@ transformation_and_pivoting_toolset = FunctionToolset(
 )
 
 agent = create_agent()
+
 
 if __name__ == "__main__":
     workspace_dir = Path("/Users/hamza/dev/dreamai/workspaces/session")

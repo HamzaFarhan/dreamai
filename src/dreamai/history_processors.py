@@ -143,3 +143,24 @@ def edit_tool_return_part(
         timestamp=part.timestamp,
         part_kind=part.part_kind,
     )
+
+
+def add_reminder_since_tool_call(
+    message_history: list[ModelMessage], tool_name: str, reminder: str, reminder_interval: int = 6
+) -> list[ModelMessage]:
+    if not isinstance(message_history[-1], ModelRequest):
+        return message_history
+    messages_since_tool = 0
+    has_target_tool = False
+    for message in message_history[::-1]:
+        if has_target_tool := any(
+            isinstance(part, ToolReturnPart) and part.tool_name == tool_name for part in message.parts
+        ):
+            messages_since_tool = 0
+            break
+        messages_since_tool += 1
+        if messages_since_tool >= reminder_interval:
+            break
+    if (has_target_tool and messages_since_tool >= reminder_interval) or not has_target_tool:
+        message_history.append(ModelRequest.user_text_prompt(reminder))
+    return message_history
