@@ -15,7 +15,6 @@ from typing import Any, Optional
 from openpyxl import Workbook, load_workbook
 from openpyxl.pivot.cache import CacheDefinition, WorksheetSource
 from openpyxl.pivot.table import DataField, TableDefinition
-from openpyxl.utils.exceptions import InvalidFileException
 
 
 # Custom Exceptions
@@ -74,6 +73,8 @@ def create_excel_file(file_path: str) -> str:
 
         return str(path.absolute())
 
+    except FileExistsError:
+        raise
     except PermissionError as e:
         raise PermissionError(f"Permission denied creating file {file_path}: {e}")
     except Exception as e:
@@ -340,9 +341,10 @@ def get_sheet_names(excel_path: str) -> list[str]:
 
     except FileNotFoundError:
         raise
-    except InvalidFileException:
-        raise ValueError(f"Invalid Excel file: {excel_path}")
     except Exception as e:
+        # Handle all zip/file format related errors
+        if "zip" in str(e).lower() or "bad zip" in str(e).lower():
+            raise ValueError(f"Invalid Excel file: {excel_path}")
         raise FileOperationError(f"Failed to get sheet names: {e}")
 
 
@@ -479,6 +481,77 @@ def copy_sheet(excel_path: str, sheet_name: str, new_name: str) -> str:
         raise FileOperationError(f"Failed to copy sheet: {e}")
 
 
+def update_sheet_properties(
+    excel_path: str,
+    sheet_name: str,
+    new_title: str | None = None,
+    row_count: int | None = None,
+    column_count: int | None = None,
+) -> str:
+    """
+    Updates properties of an existing sheet (title and/or dimensions).
+
+    Args:
+        excel_path: Path to the Excel file
+        sheet_name: Current name of the sheet to update
+        new_title: New title for the sheet (optional)
+        row_count: New number of rows (optional)
+        column_count: New number of columns (optional)
+
+    Returns:
+        str: Excel file path
+
+    Raises:
+        FileNotFoundError: If Excel file doesn't exist
+        SheetNotFoundError: If sheet doesn't exist
+        ValueError: If new title exists or no properties provided
+        FileOperationError: If operation fails
+    """
+    try:
+        excel_file = Path(excel_path)
+        if not excel_file.exists():
+            raise FileNotFoundError(f"Excel file not found: {excel_path}")
+
+        if new_title is None and row_count is None and column_count is None:
+            raise ValueError("At least one property (new_title, row_count, column_count) must be provided")
+
+        wb = load_workbook(excel_path)
+
+        if sheet_name not in wb.sheetnames:
+            raise SheetNotFoundError(f"Sheet '{sheet_name}' not found in {excel_path}")
+
+        # Check if new title conflicts with existing sheet names
+        if new_title is not None and new_title != sheet_name and new_title in wb.sheetnames:
+            raise ValueError(f"Sheet with title '{new_title}' already exists")
+
+        ws = wb[sheet_name]
+
+        # Update title if provided
+        if new_title is not None and new_title != sheet_name:
+            ws.title = new_title
+
+        # Update dimensions if provided
+        if row_count is not None or column_count is not None:
+            current_max_row = ws.max_row
+            current_max_col = ws.max_column
+
+            # Expand rows if needed
+            if row_count is not None and row_count > current_max_row:
+                ws.cell(row=row_count, column=1, value="")
+
+            # Expand columns if needed
+            if column_count is not None and column_count > current_max_col:
+                ws.cell(row=1, column=column_count, value="")
+
+        wb.save(excel_path)
+        return str(excel_file.absolute())
+
+    except (FileNotFoundError, SheetNotFoundError, ValueError):
+        raise
+    except Exception as e:
+        raise FileOperationError(f"Failed to update sheet properties: {e}")
+
+
 def merge_excel_files(file_paths: list[str], output_path: str) -> str:
     """
     Combines multiple Excel files into one.
@@ -588,6 +661,291 @@ def extract_sheet_to_csv(excel_path: str, sheet_name: str, csv_path: str) -> str
         raise PermissionError(f"Permission denied writing CSV {csv_path}: {e}")
     except Exception as e:
         raise FileOperationError(f"Failed to extract sheet to CSV: {e}")
+
+
+def update_sheet_dimensions(
+    excel_path: str, sheet_name: str, row_count: int | None = None, column_count: int | None = None
+) -> str:
+    """
+    Updates the dimensions (row and column count) of an existing sheet.
+
+    Args:
+        excel_path: Path to the Excel file
+        sheet_name: Name of the sheet to update
+        row_count: New number of rows (optional)
+        column_count: New number of columns (optional)
+
+    Returns:
+        str: Excel file path
+
+    Raises:
+        FileNotFoundError: If Excel file doesn't exist
+        SheetNotFoundError: If sheet doesn't exist
+        ValueError: If neither row_count nor column_count provided
+        FileOperationError: If operation fails
+    """
+    try:
+        excel_file = Path(excel_path)
+        if not excel_file.exists():
+            raise FileNotFoundError(f"Excel file not found: {excel_path}")
+
+        if row_count is None and column_count is None:
+            raise ValueError("At least one of row_count or column_count must be provided")
+
+        wb = load_workbook(excel_path)
+
+        if sheet_name not in wb.sheetnames:
+            raise SheetNotFoundError(f"Sheet '{sheet_name}' not found in {excel_path}")
+
+        ws = wb[sheet_name]
+
+        # Get current dimensions
+        current_max_row = ws.max_row
+        current_max_col = ws.max_column
+
+        # Expand rows if needed
+        if row_count is not None and row_count > current_max_row:
+            # Add empty rows by writing to the last cell in the new range
+            ws.cell(row=row_count, column=1, value="")
+
+        # Expand columns if needed
+        if column_count is not None and column_count > current_max_col:
+            # Add empty columns by writing to the last cell in the new range
+            ws.cell(row=1, column=column_count, value="")
+
+        # Note: OpenPyXL doesn't support shrinking sheets directly
+        # The sheet will maintain its current size if the new dimensions are smaller
+
+        wb.save(excel_path)
+        return str(excel_file.absolute())
+
+    except (FileNotFoundError, SheetNotFoundError, ValueError):
+        raise
+    except Exception as e:
+        raise FileOperationError(f"Failed to update sheet dimensions: {e}")
+
+
+def get_spreadsheet_metadata(excel_path: str) -> dict[str, Any]:
+    """
+    Gets comprehensive metadata about an Excel spreadsheet and all its sheets.
+
+    Args:
+        excel_path: Path to the Excel file
+
+    Returns:
+        Dict containing spreadsheet and sheet metadata
+
+    Raises:
+        FileNotFoundError: If Excel file doesn't exist
+        ValueError: If invalid Excel file
+        FileOperationError: If operation fails
+    """
+    try:
+        excel_file = Path(excel_path)
+        if not excel_file.exists():
+            raise FileNotFoundError(f"Excel file not found: {excel_path}")
+
+        wb = load_workbook(excel_path, read_only=True)
+
+        # Get file stats
+        file_stats = excel_file.stat()
+
+        # Build sheet information
+        sheets_info = []
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+
+            # Get sheet dimensions
+            max_row = ws.max_row
+            max_col = ws.max_column
+
+            # Count non-empty cells (approximate)
+            used_cells = 0
+            if max_row and max_col:
+                # Sample approach to avoid loading entire sheet
+                sample_size = min(100, max_row)
+                for row_num in range(1, sample_size + 1):
+                    for col_num in range(1, min(26, max_col) + 1):  # Check first 26 columns
+                        cell = ws.cell(row=row_num, column=col_num)
+                        if cell.value is not None:
+                            used_cells += 1
+
+            sheet_info = {
+                "sheet_name": sheet_name,
+                "max_row": max_row or 0,
+                "max_column": max_col or 0,
+                "estimated_used_cells": used_cells,
+                "is_active": sheet_name == wb.active.title if wb.active else False,
+            }
+            sheets_info.append(sheet_info)
+
+        wb.close()
+
+        metadata = {
+            "file_path": str(excel_file.absolute()),
+            "file_name": excel_file.name,
+            "file_size_bytes": file_stats.st_size,
+            "created_time": file_stats.st_ctime,
+            "modified_time": file_stats.st_mtime,
+            "sheet_count": len(wb.sheetnames),
+            "sheet_names": wb.sheetnames,
+            "sheets": sheets_info,
+            "active_sheet": wb.active.title if wb.active else None,
+        }
+
+        return metadata
+
+    except FileNotFoundError:
+        raise
+    except Exception as e:
+        # Handle all zip/file format related errors
+        if "zip" in str(e).lower() or "bad zip" in str(e).lower():
+            raise ValueError(f"Invalid Excel file format: {excel_path}")
+        raise FileOperationError(f"Failed to get spreadsheet metadata: {e}")
+
+
+def duplicate_sheet_to_file(
+    source_excel_path: str, source_sheet_name: str, target_excel_path: str, target_sheet_name: str | None = None
+) -> str:
+    """
+    Copies a sheet from one Excel file to another Excel file.
+
+    Args:
+        source_excel_path: Path to the source Excel file
+        source_sheet_name: Name of the sheet to copy
+        target_excel_path: Path to the target Excel file (created if doesn't exist)
+        target_sheet_name: Name for the copied sheet (defaults to source name)
+
+    Returns:
+        str: Target Excel file path
+
+    Raises:
+        FileNotFoundError: If source Excel file doesn't exist
+        SheetNotFoundError: If source sheet doesn't exist
+        ValueError: If target sheet name exists or is invalid
+        FileOperationError: If operation fails
+    """
+    try:
+        source_file = Path(source_excel_path)
+        if not source_file.exists():
+            raise FileNotFoundError(f"Source Excel file not found: {source_excel_path}")
+
+        target_file = Path(target_excel_path)
+
+        # Use source sheet name if target name not provided
+        if target_sheet_name is None:
+            target_sheet_name = source_sheet_name
+
+        # Load source workbook
+        source_wb = load_workbook(source_excel_path)
+
+        if source_sheet_name not in source_wb.sheetnames:
+            raise SheetNotFoundError(f"Sheet '{source_sheet_name}' not found in source file")
+
+        source_ws = source_wb[source_sheet_name]
+
+        # Load or create target workbook
+        if target_file.exists():
+            target_wb = load_workbook(target_excel_path)
+
+            if target_sheet_name in target_wb.sheetnames:
+                raise ValueError(f"Sheet '{target_sheet_name}' already exists in target file")
+        else:
+            target_wb = Workbook()
+            # Remove default sheet if we're creating a new workbook
+            if "Sheet" in target_wb.sheetnames:
+                target_wb.remove(target_wb["Sheet"])
+
+        # Create new sheet in target workbook
+        target_ws = target_wb.create_sheet(title=target_sheet_name)
+
+        # Copy all data from source to target
+        for row in source_ws.iter_rows():
+            target_row = []
+            for cell in row:
+                target_row.append(cell.value)
+            target_ws.append(target_row)
+
+        # Copy column widths
+        for col_letter, col_dim in source_ws.column_dimensions.items():
+            target_ws.column_dimensions[col_letter] = col_dim
+
+        # Copy row heights
+        for row_num, row_dim in source_ws.row_dimensions.items():
+            target_ws.row_dimensions[row_num] = row_dim
+
+        # Save target workbook
+        target_wb.save(target_excel_path)
+
+        return str(target_file.absolute())
+
+    except (FileNotFoundError, SheetNotFoundError, ValueError):
+        raise
+    except Exception as e:
+        raise FileOperationError(f"Failed to duplicate sheet to file: {e}")
+
+
+def get_sheet_info(excel_path: str, sheet_name: str) -> dict[str, Any]:
+    """
+    Gets detailed information about a specific sheet.
+
+    Args:
+        excel_path: Path to the Excel file
+        sheet_name: Name of the sheet
+
+    Returns:
+        Dict containing sheet information
+
+    Raises:
+        FileNotFoundError: If Excel file doesn't exist
+        SheetNotFoundError: If sheet doesn't exist
+        FileOperationError: If operation fails
+    """
+    try:
+        excel_file = Path(excel_path)
+        if not excel_file.exists():
+            raise FileNotFoundError(f"Excel file not found: {excel_path}")
+
+        wb = load_workbook(excel_path, read_only=True)
+
+        if sheet_name not in wb.sheetnames:
+            raise SheetNotFoundError(f"Sheet '{sheet_name}' not found in {excel_path}")
+
+        ws = wb[sheet_name]
+
+        # Get sheet dimensions and data info
+        max_row = ws.max_row or 0
+        max_col = ws.max_column or 0
+
+        # Count non-empty cells (sample approach)
+        used_cells = 0
+        if max_row and max_col:
+            for row in ws.iter_rows(max_row=min(100, max_row), max_col=min(26, max_col)):
+                for cell in row:
+                    if cell.value is not None:
+                        used_cells += 1
+
+        # Check if sheet has data
+        has_data = max_row > 0 and max_col > 0
+
+        wb.close()
+
+        sheet_info = {
+            "sheet_name": sheet_name,
+            "max_row": max_row,
+            "max_column": max_col,
+            "estimated_used_cells": used_cells,
+            "has_data": has_data,
+            "is_active": sheet_name == wb.active.title if wb.active else False,
+            "sheet_index": wb.sheetnames.index(sheet_name),
+        }
+
+        return sheet_info
+
+    except (FileNotFoundError, SheetNotFoundError):
+        raise
+    except Exception as e:
+        raise FileOperationError(f"Failed to get sheet info: {e}")
 
 
 # Formula Writing Functions
@@ -1376,105 +1734,6 @@ def create_autofilter(excel_path: str, sheet_name: str, data_range: str) -> str:
         raise FileOperationError(f"Failed to create autofilter: {e}")
 
 
-def add_conditional_formatting(
-    excel_path: str,
-    sheet_name: str,
-    cell_range: str,
-    condition_type: str,
-    condition_value: Any,
-    format_style: dict,
-) -> str:
-    """
-    Adds conditional formatting to a range.
-
-    Args:
-        excel_path: Path to the Excel file
-        sheet_name: Name of the target sheet
-        cell_range: Range to apply formatting (e.g., 'A1:A10')
-        condition_type: Type of condition ('greater_than', 'less_than', 'equal', 'between', 'contains_text', 'formula')
-        condition_value: Value(s) for the condition
-        format_style: Dict with formatting options {'fill': 'red', 'font_color': 'white', 'bold': True}
-
-    Returns:
-        str: Excel file path
-
-    Example:
-        add_conditional_formatting("file.xlsx", "Sheet1", "B2:B10", "greater_than", 1000,
-                                 {"fill": "green", "font_color": "white"})
-    """
-    try:
-        from openpyxl.formatting.rule import CellIsRule, FormulaRule
-        from openpyxl.styles import Font, PatternFill
-
-        excel_file = Path(excel_path)
-        if not excel_file.exists():
-            raise FileNotFoundError(f"Excel file not found: {excel_path}")
-
-        wb = load_workbook(excel_path)
-
-        if sheet_name not in wb.sheetnames:
-            raise SheetNotFoundError(f"Sheet '{sheet_name}' not found")
-
-        ws = wb[sheet_name]
-
-        # Create formatting style
-        fill = None
-        font = None
-
-        if "fill" in format_style:
-            fill = PatternFill(start_color=format_style["fill"], end_color=format_style["fill"], fill_type="solid")
-
-        if "font_color" in format_style or "bold" in format_style:
-            font_kwargs = {}
-            if "font_color" in format_style:
-                font_kwargs["color"] = format_style["font_color"]
-            if "bold" in format_style:
-                font_kwargs["bold"] = format_style["bold"]
-            font = Font(**font_kwargs)
-
-        # Create conditional formatting rule
-        if condition_type == "formula":
-            rule = FormulaRule(formula=[condition_value], fill=fill, font=font)
-        else:
-            operator_map = {
-                "greater_than": "greaterThan",
-                "less_than": "lessThan",
-                "equal": "equal",
-                "not_equal": "notEqual",
-                "between": "between",
-                "contains_text": "containsText",
-            }
-
-            if condition_type not in operator_map:
-                raise ValueError(f"Invalid condition type: {condition_type}")
-
-            operator = operator_map[condition_type]
-
-            if (
-                condition_type == "between"
-                and isinstance(condition_value, (list, tuple))
-                and len(condition_value) == 2
-            ):
-                rule = CellIsRule(
-                    operator=operator,
-                    formula=[str(condition_value[0]), str(condition_value[1])],
-                    fill=fill,
-                    font=font,
-                )
-            else:
-                rule = CellIsRule(operator=operator, formula=[str(condition_value)], fill=fill, font=font)
-
-        ws.conditional_formatting.add(cell_range, rule)
-        wb.save(excel_path)
-
-        return str(excel_file.absolute())
-
-    except (FileNotFoundError, SheetNotFoundError, ValueError):
-        raise
-    except Exception as e:
-        raise FileOperationError(f"Failed to add conditional formatting: {e}")
-
-
 def create_data_validation(
     excel_path: str, sheet_name: str, cell_range: str, validation_type: str, validation_criteria: Any
 ) -> str:
@@ -1827,7 +2086,8 @@ def create_dynamic_chart(
         str: Excel file path
     """
     try:
-        from openpyxl.chart import BarChart, ColumnChart, LineChart, PieChart, ScatterChart
+        from openpyxl.chart import BarChart, LineChart, PieChart, ScatterChart
+        from openpyxl.chart.bar_chart import BarChart as ColumnChart
         from openpyxl.chart.reference import Reference
 
         excel_file = Path(excel_path)
@@ -1902,9 +2162,6 @@ if __name__ == "__main__":
 
         # Add advanced features
         create_autofilter(file_path, "Sheet", "A1:C4")
-        add_conditional_formatting(
-            file_path, "Sheet", "C2:C4", "greater_than", 45000, {"fill": "green", "font_color": "white"}
-        )
 
         print("Excel file created with data, formulas, and advanced features!")
 
