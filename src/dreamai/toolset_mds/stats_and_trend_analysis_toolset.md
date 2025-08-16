@@ -1,0 +1,110 @@
+Statistical & Trend Analysis Functions
+These functions support forecasting and risk analysis by uncovering trends and relationships in data.
+
+- **STDEV.P**
+  - Purpose: Calculate the standard deviation for a full population
+  - Input: Array or range of numeric values
+  - Output: Single numeric value (population standard deviation)
+  - Example: =STDEV.P(data_range)
+- **STDEV.S**
+  - Purpose: Calculate the standard deviation for a sample
+  - Input: Array or range of numeric values
+  - Output: Single numeric value (sample standard deviation)
+  - Example: =STDEV.S(data_range)
+- **VAR.P**
+  - Purpose: Calculate variance for a population
+  - Input: Array or range of numeric values
+  - Output: Single numeric value (population variance)
+  - Example: =VAR.P(data_range)
+- **VAR.S**
+  - Purpose: Calculate variance for a sample
+  - Input: Array or range of numeric values
+  - Output: Single numeric value (sample variance)
+  - Example: =VAR.S(data_range)
+- **MEDIAN**
+  - Purpose: Determine the middle value in a dataset
+  - Input: Array or range of numeric values
+  - Output: Single numeric value (median)
+  - Example: =MEDIAN(data_range)
+- **MODE**
+  - Purpose: Find the most frequently occurring value in a dataset
+  - Input: Array or range of numeric values
+  - Output: Single numeric value (mode)
+  - Example: =MODE(data_range)
+- **CORREL**
+  - Purpose: Measure the correlation between two datasets
+  - Input: range1, range2
+  - Output: Single numeric value (-1 to 1)
+  - Example: =CORREL(range1, range2)
+- **COVARIANCE.P**
+  - Purpose: Calculate covariance for a population
+  - Input: range1, range2
+  - Output: Single numeric value (population covariance)
+  - Example: =COVARIANCE.P(range1, range2)
+- **COVARIANCE.S**
+  - Purpose: Calculate covariance for a sample
+  - Input: range1, range2
+  - Output: Single numeric value (sample covariance)
+  - Example: =COVARIANCE.S(range1, range2)
+- **TREND**
+  - Purpose: Predict future values based on linear trends
+  - Input: known_y's, known_x's (optional), new_x's (optional), const (optional)
+  - Output: Array of predicted values
+  - Example: =TREND(known_y's, [known_x's], [new_x's])
+- **FORECAST**
+  - Purpose: Predict a future value based on linear regression
+  - Input: new_x, known_y's, known_x's
+  - Output: Single predicted value
+  - Example: =FORECAST(new_x, known_y's, known_x's)
+- **FORECAST.LINEAR**
+  - Purpose: Predict a future value based on linear regression (newer version)
+  - Input: new_x, known_y's, known_x's
+  - Output: Single predicted value
+  - Example: =FORECAST.LINEAR(new_x, known_y's, known_x's)
+- **GROWTH**
+  - Purpose: Forecast exponential growth trends
+  - Input: known_y's, known_x's (optional), new极_x's (optional), const (optional)
+  - Output: Array of predicted values
+  - Example: =GROWTH(known_y's, [known_x's], [new_x's])
+
+- **SLOPE**
+  - Purpose: Calculate slope of linear regression line
+  - Input: known_ys, known_xs
+  - Output: Float (slope)
+  - Example: SLOPE(B1:B10, A1:A10)
+
+- **INTERCEPT**
+  - Purpose: Calculate y-intercept of linear regression line
+  - Input: known_ys, known_xs
+  - Output: Float (intercept)
+  - Example: INTERCEPT(B1:B10, A1:A10)
+
+- **RSQ**
+  - Purpose: Calculate R-squared of linear regression
+  - Input: known_ys, known_xs
+  - Output: Float (R-squared)
+  - Example: RSQ(B1:B10, A1:A10)
+
+- **LINEST**
+  - Purpose: Calculate linear regression statistics
+  - Input: known_ys, [known_xs], [const], [stats]
+  - Output: Array of regression statistics
+  - Example: LINEST(B1:B10, A1:A10, TRUE, TRUE)
+
+- **LOGEST**
+  - Purpose: Calculate exponential regression statistics
+  - Input: known_ys, [known_xs], [const], [stats]
+  - Output: Array of regression statistics
+  - Example: LOGEST(B1:B10, A1:A10, TRUE, TRUE)
+
+- **RANK**
+  - Purpose: Calculate rank of number in array
+  - Input: number, ref, [order]
+  - Output: Integer (rank)
+  - Example: RANK(85, A1:A10, 0)
+
+- **PERCENTRANK**
+  - Purpose: Calculate percentile rank
+  - Input: array, x, [significance]
+  - Output: Float (percentile rank)
+  - Example: PERCENTRANK(A1:A10, 85)

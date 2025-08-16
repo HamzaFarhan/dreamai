@@ -2,7 +2,7 @@
 <task name="Generate Toolset from Markdown">
 
 <task_objective>
-Generate a complete Python toolset implementation from a markdown specification file. Takes a toolset_mds/*_toolset.md file as input and creates a corresponding *_toolset.py file with all functions implemented using polars, following the established pattern from arithmetic_toolset.py and lookup_and_reference_toolset.py.
+Generate a complete Python toolset implementation from a markdown specification file. Takes a toolset_mds/*_toolset.md file as input and creates a corresponding *_toolset.py file with all functions implemented using polars, following the established pattern from arithmetic_toolset.py, conditional_toolset.py, and filtering_and_selection_toolset.py
 </task_objective>
 
 <detailed_sequence_steps>
@@ -64,13 +64,21 @@ Generate a complete Python toolset implementation from a markdown specification 
 1. For each function identified in step 1, generate a complete implementation following the pattern:
    - **Parameter Types**: Use `file_path: str` for data input (never `data: pl.DataFrame | str`)
    - **Data Loading**: Always use `load_df(ctx, file_path)` to load DataFrame from file
+   - **Error Handling**: Wrap all function logic in try-except blocks with `ModelRetry`:
+     ```python
+     def function_name(ctx: RunContext[FinnDeps], ...):
+         try:
+             # Function implementation here
+             return result
+         except Exception as e:
+             raise ModelRetry(f"Error in function_name: {e}")
+     ```
    - **Numeric Precision**: Use `Decimal` for all numeric results and calculations where precision matters
    - **Return Types**: 
      - For scalar numeric results: `Decimal` (not `int` or `float`)
      - For string results: `str`
      - For array/list results where numeric: `list[Decimal]` or `list[Any]`
      - For file-based results: `str` (file path)
-   - **Error Handling**: Include proper error handling with `ModelRetry`
    - **Docstrings**: Add comprehensive docstrings with examples (do not include ctx in examples)
    - **Imports**: Include `from decimal import Decimal, getcontext` and set `getcontext().prec = 28`
 
@@ -121,15 +129,15 @@ Generate a complete Python toolset implementation from a markdown specification 
    - All function implementations following the established patterns
    - Consistent formatting and style
 
-2. Ensure the file follows the exact same structure as `arithmetic_toolset.py` and `lookup_and_reference_toolset.py`.
+2. Ensure the file follows the exact same structure as arithmetic_toolset.py, conditional_toolset.py, and filtering_and_selection_toolset.py.
 
 ## 6. Validate Implementation
 
 1. Use the `read_file` tool to review the generated toolset file for:
    - Consistent parameter naming (`file_path: str` not `data`)
+   - Proper try-except ModelRetry error handling in all functions
    - Proper Decimal usage for numeric results
    - Correct return type annotations (no `int`/`float` when converted to `Decimal`)
-   - Proper error handling with `ModelRetry`
    - Complete docstrings without ctx references
    - Correct function signatures with `RunContext[FinnDeps]`
 

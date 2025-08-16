@@ -151,16 +151,13 @@ def add_reminder_since_tool_call(
     if not isinstance(message_history[-1], ModelRequest):
         return message_history
     messages_since_tool = 0
-    has_target_tool = False
     for message in message_history[::-1]:
-        if has_target_tool := any(
-            isinstance(part, ToolReturnPart) and part.tool_name == tool_name for part in message.parts
-        ):
-            messages_since_tool = 0
+        if any(isinstance(part, ToolReturnPart) and part.tool_name == tool_name for part in message.parts):
             break
         messages_since_tool += 1
         if messages_since_tool >= reminder_interval:
             break
-    if (has_target_tool and messages_since_tool >= reminder_interval) or not has_target_tool:
+    if messages_since_tool >= reminder_interval:
         message_history.append(ModelRequest.user_text_prompt(reminder))
+        logger.info(f"Added reminder for tool '{tool_name}': {reminder}")
     return message_history

@@ -302,11 +302,12 @@ def create_agent(retries: int = 3) -> Agent[AgentDeps, str | TaskResult]:
         deps_type=AgentDeps,
         instructions=[
             (
-                "1. Create a plan.\n"
-                "2. Once approved, start executing.\n"
-                "3. Fetch the toolsets needed for each step of the plan as you go.\n"
-                "4. Keep updating the plan after every step.\n"
-                "5. Use task_result to end the process.\n"
+                "1. Clarify any and all assumptions from the user.\n"
+                "2. Create a plan.\n"
+                "3. Once approved, start executing.\n"
+                "4. Fetch the toolsets needed for each step of the plan as you go.\n"
+                "5. Keep updating the plan after every step.\n"
+                "6. Use task_result to end the process.\n"
             ),
             toolset_defs_instructions,
         ],
