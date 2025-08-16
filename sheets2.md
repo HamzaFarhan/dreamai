@@ -156,3 +156,28 @@ wb.save('example.xlsx')
 ```
 
 The formulas will be evaluated by Excel when the file is opened, not by OpenPyXL itself.
+
+## Advanced Data Analysis Features in OpenPyXL
+
+### Pivot Tables (Excel's GroupBy Equivalent)
+OpenPyXL provides comprehensive pivot table support for data aggregation:
+
+**Supported Aggregation Types:**
+- SUM, COUNT, AVERAGE, MAX, MIN
+- PRODUCT, STDEV, STDEVP, VAR, VARP
+- Custom subtotals and grand totals
+
+**Pivot Table Capabilities:**
+- Multi-level row/column grouping
+- Data filtering and conditional formatting
+- Hierarchical data organization
+- Custom field calculations
+
+**Example:**
+```python
+from openpyxl.pivot.table import TableDefinition, DataField
+from openpyxl.pivot.cache import CacheDefinition
+
+# Create pivot table with SUM aggregation
+data_field = DataField(fld=0, subtotal='sum', name='Sales Total')
+pivot_table = TableDefinition(name='SalesAnalysis', dataFields=[data_field])
