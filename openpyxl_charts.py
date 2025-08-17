@@ -572,7 +572,6 @@ def create_matplotlib_chart(
                         numeric_row.append(0)
                 numeric_data.append(numeric_row)
             
-            import matplotlib.pyplot as plt
             im = ax.imshow(numeric_data, cmap='viridis', aspect='auto')
             ax.set_xticks(range(len(headers[1:])))
             ax.set_xticklabels(headers[1:])
