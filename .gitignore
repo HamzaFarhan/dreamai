@@ -11,3 +11,4 @@ wheels/
 .env
 message_history.json
 workspaces/
+*.xlsx

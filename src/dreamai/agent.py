@@ -74,10 +74,10 @@ async def create_plan_steps(ctx: RunContext[AgentDeps], plan: str) -> str:
     Make sure to clarify any assumptions you have about the task beforehand using `user_interaction`.
 
     Args:
-        plan: The sequential steps formatted as markdown.
+        plan: The sequential steps formatted as markdown checkboxes.
 
     Example:
-        create_plan_steps(plan="## SEQUENTIAL STEPS\n1. Data preparation: Filter active customers using subscription table\n2. Base calculation: Calculate monthly revenue per customer cohort\n3. Final output: Generate cohort analysis table with retention metrics")
+        create_plan_steps(plan="## SEQUENTIAL STEPS\n- [ ] Data preparation: Filter active customers using subscription table\n- [ ] Base calculation: Calculate monthly revenue per customer cohort\n- [ ] Final output: Generate cohort analysis table with retention metrics")
     """
     ctx.deps.mode = Mode.PLAN
     ctx.deps.update_plan(plan)
@@ -98,7 +98,7 @@ async def update_plan_steps(ctx: RunContext[AgentDeps], old_text: str, new_text:
 
     **Practical rules:**
     1. *Bulk completions* - If the steps are adjacent in the plan, select the contiguous block and
-       append "COMPLETED ✓" to each line in a single replacement.
+       change "[ ]" to "[X]" for each line in a single replacement.
     2. *Sparse completions* - If the affected steps are far apart you may need multiple calls, but
        try grouping when reasonable.
     3. *Single-step edits* - For isolated tweaks, stick with the classic substring pattern.
@@ -112,20 +112,20 @@ async def update_plan_steps(ctx: RunContext[AgentDeps], old_text: str, new_text:
     Bulk completion of three contiguous steps:
 
         update_plan_steps(
-            "Load customer data\n2. Transform customer data\n3. Validate customer data",
-            "Load customer data - COMPLETED ✓\n2. Transform customer data - COMPLETED ✓\n3. Validate customer data - COMPLETED ✓",
+            "- [ ] Load customer data\n- [ ] Transform customer data\n- [ ] Validate customer data",
+            "- [X] Load customer data\n- [X] Transform customer data\n- [X] Validate customer data",
         )
 
     Two similar revenue steps in one go:
 
         update_plan_steps(
-            "Calculate revenue Q1 2023\nCalculate revenue Q2 2023",
-            "Calculate revenue Q1 2023 - COMPLETED ✓\nCalculate revenue Q2 2023 - COMPLETED ✓",
+            "- [ ] Calculate revenue Q1 2023\n- [ ] Calculate revenue Q2 2023",
+            "- [X] Calculate revenue Q1 2023\n- [X] Calculate revenue Q2 2023",
         )
 
     Minimal single-step update:
 
-        update_plan_steps("customer data", "customer data - COMPLETED ✓")
+        update_plan_steps("- [ ] Load customer data", "- [X] Load customer data")
     """
 
     current_plan = ctx.deps.plan
@@ -147,10 +147,10 @@ async def add_plan_step(ctx: RunContext[AgentDeps], new_step: str):
     scope based on findings.
 
     Args:
-        new_step: The new step to add to the plan. Should be properly formatted and follow the atomic, sequential pattern (e.g., "6. Validate results against business logic").
+        new_step: The new step to add to the plan. Should be properly formatted and follow the atomic, sequential pattern using checkbox format.
 
     Example:
-        add_plan_step("4. Validation step: Cross-check MRR calculations against transaction totals")
+        add_plan_step("- [ ] Validation step: Cross-check MRR calculations against transaction totals")
     """
     current_plan = ctx.deps.plan
 
