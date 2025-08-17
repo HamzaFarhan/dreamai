@@ -9,7 +9,7 @@ from ..finn_deps import FinnDeps
 
 
 async def _list_files(
-    dir: Path, suffixes: str | list[str] = [".csv", ".parquet"], exclude_in: list[str] | None = None
+    dir: Path, suffixes: str | list[str] = [".csv", ".parquet", ".xlsx"], exclude_in: list[str] | None = None
 ) -> str:
     """
     Lists all available in the `dir` and their summaries.
@@ -41,17 +41,19 @@ async def list_analysis_files(ctx: RunContext[FinnDeps]) -> str:
     return await _list_files(dir=Path(ctx.deps.dirs.analysis_dir))
 
 
-def _resolve_df_path(ctx: RunContext[FinnDeps], df_path: str | Path) -> Path:
+def resolve_data_path(
+    ctx: RunContext[FinnDeps], df_path: str | Path, suffixes: str | list[str] = [".parquet", ".csv", ".xlsx"]
+) -> Path:
     if isinstance(df_path, str):
         df_path = Path(df_path)
-    paths_to_try = [
-        ctx.deps.dirs.analysis_dir / df_path.name,
-        (ctx.deps.dirs.analysis_dir / df_path.stem).with_suffix(".parquet"),
-        (ctx.deps.dirs.analysis_dir / df_path.stem).with_suffix(".csv"),
-        ctx.deps.dirs.data_dir / df_path.name,
-        (ctx.deps.dirs.data_dir / df_path.stem).with_suffix(".parquet"),
-        (ctx.deps.dirs.data_dir / df_path.stem).with_suffix(".csv"),
-    ]
+    paths_to_try: list[Path] = []
+    for suffix in suffixes:
+        paths_to_try += [
+            ctx.deps.dirs.analysis_dir / df_path.name,
+            (ctx.deps.dirs.analysis_dir / df_path.stem).with_suffix(suffix),
+            ctx.deps.dirs.data_dir / df_path.name,
+            (ctx.deps.dirs.data_dir / df_path.stem).with_suffix(suffix),
+        ]
     for path in paths_to_try:
         if path.exists():
             return path
@@ -63,12 +65,12 @@ def _resolve_df_path(ctx: RunContext[FinnDeps], df_path: str | Path) -> Path:
 def load_df(ctx: RunContext[FinnDeps], data: pl.DataFrame | str | Path) -> pl.DataFrame:
     if isinstance(data, pl.DataFrame):
         return data
-    df_path = _resolve_df_path(ctx, data)
+    df_path = resolve_data_path(ctx, data)
     return pl.read_parquet(df_path) if df_path.suffix.lower() == ".parquet" else pl.read_csv(df_path)
 
 
 def load_file(ctx: RunContext[FinnDeps], file_path: str) -> pl.DataFrame:
-    df_path = _resolve_df_path(ctx, file_path)
+    df_path = resolve_data_path(ctx, file_path)
     if df_path.parent != ctx.deps.dirs.analysis_dir:
         raise ModelRetry(
             "Can only load files from the analysis dir. Which are made by most tools after computation."

@@ -1,3 +1,4 @@
+from collections.abc import Callable, Sequence
 from enum import StrEnum
 from functools import partial
 from pathlib import Path
@@ -7,8 +8,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai import Agent, ModelRetry, RunContext, ToolOutput
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
-from pydantic_ai.tools import ToolDefinition
-from pydantic_ai.toolsets import AbstractToolset, FunctionToolset
+from pydantic_ai.tools import Tool, ToolDefinition, ToolFuncEither
+from pydantic_ai.toolsets import AbstractToolset, FunctionToolset, ToolsetTool
+from pydantic_ai.toolsets.function import FunctionToolsetTool
 
 from .history_processors import (
     ToolEdit,
@@ -38,6 +40,30 @@ class AgentDeps(BaseModel):
     @property
     def plan(self) -> str | None:
         return self.plan_path.read_text().strip() if self.plan_path.exists() else None
+
+
+class AgentToolset(FunctionToolset[AgentDeps]):
+    def __init__(
+        self,
+        tools: Sequence[Tool[AgentDeps] | ToolFuncEither[AgentDeps, ...]] = [],
+        max_retries: int = 1,
+        *,
+        id: str | None = None,
+        path_resolver: Callable[[RunContext[AgentDeps], str | Path], str | Path],
+    ):
+        super().__init__(tools=tools, max_retries=max_retries, id=id)
+        self.path_resolver = path_resolver
+
+    async def call_tool(
+        self, name: str, tool_args: dict[str, Any], ctx: RunContext[AgentDeps], tool: ToolsetTool[AgentDeps]
+    ) -> Any:
+        assert isinstance(tool, FunctionToolsetTool)
+        try:
+            if "excel_path" in tool_args:
+                tool_args["excel_path"] = str(self.path_resolver(ctx, tool_args["excel_path"]))
+            return await tool.call_func(tool_args, ctx)
+        except Exception as e:
+            raise ModelRetry(f"Error calling tool {name}: {e}")
 
 
 async def create_plan_steps(ctx: RunContext[AgentDeps], plan: str) -> str:

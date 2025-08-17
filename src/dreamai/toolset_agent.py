@@ -7,10 +7,9 @@ import logfire
 from dotenv import load_dotenv
 from pydantic_ai import ModelRetry
 from pydantic_ai.messages import ModelMessagesTypeAdapter
-from pydantic_ai.toolsets import FunctionToolset
 from pydantic_ai.usage import UsageLimits
 
-from .agent import AgentDeps, create_agent
+from .agent import AgentToolset, create_agent
 from .finn_deps import DataDirs, FinnDeps
 from .toolsets.arithmetic_toolset import (
     calculate_abs,
@@ -75,7 +74,7 @@ from .toolsets.date_and_time_toolset import (
     workday,
     yearfrac,
 )
-from .toolsets.file_toolset import describe_df, list_analysis_files, list_data_files
+from .toolsets.file_toolset import describe_df, list_analysis_files, list_data_files, resolve_data_path
 from .toolsets.filtering_and_selection_toolset import (
     bottom_n,
     filter_by_date_range,
@@ -157,9 +156,9 @@ def get_weather(location: str) -> dict[str, Any]:
     return weather_map[location]
 
 
-weather_toolset = FunctionToolset([get_weather], id="weather_toolset", max_retries=3)
+weather_toolset = AgentToolset([get_weather], id="weather_toolset", max_retries=3, path_resolver=resolve_data_path)
 
-conditional_toolset = FunctionToolset(
+conditional_toolset = AgentToolset(
     tools=[
         sumif,
         sumifs,
@@ -177,9 +176,10 @@ conditional_toolset = FunctionToolset(
     ],
     id="conditional_toolset",
     max_retries=3,
+    path_resolver=resolve_data_path,
 )
 
-date_and_time_toolset = FunctionToolset(
+date_and_time_toolset = AgentToolset(
     tools=[
         today,
         now,
@@ -203,9 +203,10 @@ date_and_time_toolset = FunctionToolset(
     ],
     id="date_and_time_toolset",
     max_retries=3,
+    path_resolver=resolve_data_path,
 )
 
-logical_and_errors_toolset = FunctionToolset(
+logical_and_errors_toolset = AgentToolset(
     tools=[
         logical_if,
         logical_iferror,
@@ -225,9 +226,10 @@ logical_and_errors_toolset = FunctionToolset(
     ],
     id="logical_and_errors_toolset",
     max_retries=3,
+    path_resolver=resolve_data_path,
 )
 
-lookup_and_reference_toolset = FunctionToolset(
+lookup_and_reference_toolset = AgentToolset(
     tools=[
         vlookup,
         hlookup,
@@ -246,9 +248,10 @@ lookup_and_reference_toolset = FunctionToolset(
     ],
     id="lookup_and_reference_toolset",
     max_retries=3,
+    path_resolver=resolve_data_path,
 )
 
-arithmetic_toolset = FunctionToolset(
+arithmetic_toolset = AgentToolset(
     [
         calculate_sum,
         calculate_average,
@@ -278,19 +281,24 @@ arithmetic_toolset = FunctionToolset(
     ],
     id="arithmetic_toolset",
     max_retries=3,
+    path_resolver=resolve_data_path,
 )
 
-file_toolset = FunctionToolset[AgentDeps](
-    [describe_df, list_data_files, list_analysis_files], id="file_toolset", max_retries=3
+file_toolset = AgentToolset(
+    [describe_df, list_data_files, list_analysis_files],
+    id="file_toolset",
+    max_retries=3,
+    path_resolver=resolve_data_path,
 )
 
-filtering_and_selection_toolset = FunctionToolset(
+filtering_and_selection_toolset = AgentToolset(
     [filter_by_date_range, filter_by_value, filter_by_multiple_conditions, top_n, bottom_n, sample_data],
     id="filtering_and_selection_toolset",
     max_retries=3,
+    path_resolver=resolve_data_path,
 )
 
-transformation_and_pivoting_toolset = FunctionToolset(
+transformation_and_pivoting_toolset = AgentToolset(
     tools=[
         create_pivot_table,
         unpivot_data,
@@ -306,6 +314,7 @@ transformation_and_pivoting_toolset = FunctionToolset(
     ],
     id="transformation_and_pivoting_toolset",
     max_retries=3,
+    path_resolver=resolve_data_path,
 )
 
 agent = create_agent()
