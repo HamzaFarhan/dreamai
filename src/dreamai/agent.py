@@ -49,18 +49,19 @@ class AgentToolset(FunctionToolset[AgentDeps]):
         max_retries: int = 1,
         *,
         id: str | None = None,
-        path_resolver: Callable[[RunContext[AgentDeps], str | Path], str | Path],
+        file_path_resolver: Callable[[RunContext[AgentDeps], str | Path], str | Path],
     ):
         super().__init__(tools=tools, max_retries=max_retries, id=id)
-        self.path_resolver = path_resolver
+        self.file_path_resolver = file_path_resolver
 
     async def call_tool(
         self, name: str, tool_args: dict[str, Any], ctx: RunContext[AgentDeps], tool: ToolsetTool[AgentDeps]
     ) -> Any:
         assert isinstance(tool, FunctionToolsetTool)
         try:
-            if "excel_path" in tool_args:
-                tool_args["excel_path"] = str(self.path_resolver(ctx, tool_args["excel_path"]))
+            for arg in tool_args:
+                if "path" in arg:
+                    tool_args[arg] = str(self.file_path_resolver(ctx, tool_args[arg]))
             return await tool.call_func(tool_args, ctx)
         except Exception as e:
             raise ModelRetry(f"Error calling tool {name}: {e}")
@@ -71,13 +72,19 @@ async def create_plan_steps(ctx: RunContext[AgentDeps], plan: str) -> str:
     Creates a new sequential markdown plan with systematic steps and presents it to the user.
     These steps are the atomic, unambiguous, sequential steps that you will follow to complete the task.
     Also include the toolset(s) to be used for each step.
+
+    IMPORTANT: For every step include a bolded "Toolsets" line directly under the step. Format:
+      - [ ] Step description
+      **Toolsets**: toolset_id1, toolset_id2
+
     Make sure to clarify any assumptions you have about the task beforehand using `user_interaction`.
 
     Args:
-        plan: The sequential steps formatted as markdown checkboxes.
+        plan: The sequential steps formatted as markdown checkboxes. Each step must have a "**Toolsets**" line
+              listing the toolset id(s) to use for that step (comma-separated if more than one).
 
     Example:
-        create_plan_steps(plan="## SEQUENTIAL STEPS\n- [ ] Data preparation: Filter active customers using subscription table\n- [ ] Base calculation: Calculate monthly revenue per customer cohort\n- [ ] Final output: Generate cohort analysis table with retention metrics")
+        create_plan_steps(plan="## SEQUENTIAL STEPS\n- [ ] Data preparation: Filter active customers using subscription table\n**Toolsets**: data_toolset\n- [ ] Base calculation: Calculate monthly revenue per customer cohort\n**Toolsets**: analytics_toolset\n- [ ] Final output: Generate cohort analysis table with retention metrics\n**Toolsets**: reporting_toolset")
     """
     ctx.deps.mode = Mode.PLAN
     ctx.deps.update_plan(plan)
@@ -146,11 +153,16 @@ async def add_plan_step(ctx: RunContext[AgentDeps], new_step: str):
     that additional steps are needed that weren't in the original user-approved plan, or when expanding the
     scope based on findings.
 
+    IMPORTANT: When adding a step, include a bolded "**Toolsets**" line immediately after the step:
+      - [ ] New step description
+      **Toolsets**: toolset_id
+
     Args:
-        new_step: The new step to add to the plan. Should be properly formatted and follow the atomic, sequential pattern using checkbox format.
+        new_step: The new step to add to the plan. Should be properly formatted and follow the atomic, sequential pattern using checkbox format
+                  and include the "**Toolsets**" line.
 
     Example:
-        add_plan_step("- [ ] Validation step: Cross-check MRR calculations against transaction totals")
+        add_plan_step("- [ ] Validation step: Cross-check MRR calculations against transaction totals\n**Toolsets**: validation_toolset")
     """
     current_plan = ctx.deps.plan
 

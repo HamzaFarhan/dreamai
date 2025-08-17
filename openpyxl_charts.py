@@ -1,18 +1,9 @@
-"""
-OpenPyXL Chart Functions
-
-This module provides Excel chart creation and management using OpenPyXL and matplotlib.
-All functions take file_path as the first argument and return file paths.
-Functions create charts within Excel files or embed matplotlib charts as images.
-
-Author: Generated for DreamAI chart needs
-"""
-
 import json
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
+import matplotlib.style as style
 from openpyxl import load_workbook
 from openpyxl.chart import (
     AreaChart,
@@ -31,16 +22,6 @@ from openpyxl.chart.reference import Reference
 from openpyxl.drawing.image import Image
 from openpyxl.utils import range_boundaries
 from openpyxl.worksheet.table import Table, TableStyleInfo
-
-# Conditional matplotlib imports
-matplotlib_available = True
-try:
-    import matplotlib.pyplot as plt
-    import matplotlib.style as style
-except ImportError:
-    matplotlib_available = False
-    plt = None
-    style = None
 
 
 # Custom Exceptions
@@ -70,17 +51,15 @@ class DataError(Exception):
 
 # Type definitions
 ChartType = Literal[
-    "column", "bar", "line", "pie", "scatter", "area", "doughnut", 
-    "radar", "bubble", "stock", "surface"
+    "column", "bar", "line", "pie", "scatter", "area", "doughnut", "radar", "bubble", "stock", "surface"
 ]
 MatplotlibChartType = Literal[
-    "line", "bar", "scatter", "pie", "histogram", "box", "heatmap", 
-    "violin", "density", "subplots"
+    "line", "bar", "scatter", "pie", "histogram", "box", "heatmap", "violin", "density", "subplots"
 ]
 
 
 # Helper Functions
-def _split_sheet_and_range(range_spec: str) -> tuple[Optional[str], str]:
+def _split_sheet_and_range(range_spec: str) -> tuple[str | None, str]:
     """
     Parse "Sheet1!A1:B2" or "A1:B2" -> (sheet_name or None, a1_range)
 
@@ -110,14 +89,23 @@ def _validate_chart_type(chart_type: str) -> str:
         ChartError: If chart type is invalid
     """
     valid_types = {
-        "column", "bar", "line", "pie", "scatter", "area", 
-        "doughnut", "radar", "bubble", "stock", "surface"
+        "column",
+        "bar",
+        "line",
+        "pie",
+        "scatter",
+        "area",
+        "doughnut",
+        "radar",
+        "bubble",
+        "stock",
+        "surface",
     }
-    
+
     normalized = chart_type.lower().strip()
     if normalized not in valid_types:
         raise ChartError(f"Invalid chart type '{chart_type}'. Valid types: {', '.join(valid_types)}")
-    
+
     return normalized
 
 
@@ -147,10 +135,10 @@ def _get_chart_class(chart_type: str) -> Any:
         "stock": StockChart,
         "surface": SurfaceChart,
     }
-    
+
     if chart_type not in chart_classes:
         raise ChartError(f"Chart type '{chart_type}' not supported")
-    
+
     return chart_classes[chart_type]
 
 
@@ -170,17 +158,17 @@ def _parse_data_range(data_range: str, source_sheet: Any) -> dict[str, Any]:
     """
     try:
         min_col, min_row, max_col, max_row = range_boundaries(data_range)
-        
+
         # Validate range exists in sheet
         if max_row > source_sheet.max_row or max_col > source_sheet.max_column:
             raise DataError(f"Range '{data_range}' exceeds sheet dimensions")
-        
+
         return {
             "min_col": min_col,
             "min_row": min_row,
             "max_col": max_col,
             "max_row": max_row,
-            "has_headers": True  # Assume first row has headers
+            "has_headers": True,  # Assume first row has headers
         }
     except ValueError as e:
         raise DataError(f"Invalid range specification '{data_range}': {e}")
@@ -192,11 +180,11 @@ def create_chart(
     data_range: str,
     chart_type: ChartType,
     title: str = "Chart",
-    chart_sheet: Optional[str] = None,
+    chart_sheet: str | None = None,
     position: str = "A1",
     width: int = 15,
     height: int = 10,
-    sheet_name: Optional[str] = None,
+    sheet_name: str | None = None,
 ) -> str:
     """
     Create a chart in an Excel file using openpyxl.
@@ -229,25 +217,25 @@ def create_chart(
 
         # Validate chart type
         validated_chart_type = _validate_chart_type(chart_type)
-        
+
         # Parse sheet and range
         sheet_from_range, a1_range = _split_sheet_and_range(data_range)
         source_sheet_name = sheet_from_range or sheet_name
-        
+
         # Load workbook
         wb = load_workbook(excel_file)
-        
+
         # Determine source sheet
         if source_sheet_name is None:
             source_sheet_name = wb.sheetnames[0]
         elif source_sheet_name not in wb.sheetnames:
             raise SheetNotFoundError(f"Sheet '{source_sheet_name}' not found in {excel_path}")
-        
+
         source_ws = wb[source_sheet_name]
-        
+
         # Parse and validate data range
         range_info = _parse_data_range(a1_range, source_ws)
-        
+
         # Determine target sheet for chart
         if chart_sheet is None:
             chart_ws = source_ws
@@ -256,39 +244,39 @@ def create_chart(
                 chart_ws = wb.create_sheet(title=chart_sheet)
             else:
                 chart_ws = wb[chart_sheet]
-        
+
         # Create chart
         chart_class = _get_chart_class(validated_chart_type)
         chart = chart_class()
         chart.title = title
         chart.width = width
         chart.height = height
-        
+
         # Create data reference
         data = Reference(
             source_ws,
             min_col=range_info["min_col"],
             min_row=range_info["min_row"],
             max_col=range_info["max_col"],
-            max_row=range_info["max_row"]
+            max_row=range_info["max_row"],
         )
-        
+
         # Add data to chart
         chart.add_data(data, titles_from_data=range_info["has_headers"])
-        
+
         # Set categories if we have multiple columns
         if range_info["max_col"] > range_info["min_col"]:
             categories = Reference(
                 source_ws,
                 min_col=range_info["min_col"],
                 min_row=range_info["min_row"] + 1,
-                max_row=range_info["max_row"]
+                max_row=range_info["max_row"],
             )
             chart.set_categories(categories)
-        
+
         # Add chart to worksheet
         chart_ws.add_chart(chart, position)
-        
+
         # Save workbook
         wb.save(excel_file)
         return str(excel_file)
@@ -308,7 +296,7 @@ def create_pivot_table(
 ) -> str:
     """
     Create a basic pivot table structure from source data.
-    
+
     Note: This creates a simplified pivot table structure. For full pivot table
     functionality, use Excel's native pivot table features after creating this structure.
 
@@ -341,7 +329,7 @@ def create_pivot_table(
         # Create pivot sheet if it doesn't exist
         if pivot_sheet not in wb.sheetnames:
             wb.create_sheet(title=pivot_sheet)
-            
+
         pivot_ws = wb[pivot_sheet]
 
         # Validate aggregation types
@@ -414,14 +402,14 @@ def create_data_table(
 
         # Create table
         table = Table(displayName=table_name, ref=data_range)
-        
+
         # Add table style
         style = TableStyleInfo(
             name=table_style,
             showFirstColumn=False,
             showLastColumn=False,
             showRowStripes=True,
-            showColumnStripes=True
+            showColumnStripes=True,
         )
         table.tableStyleInfo = style
 
@@ -443,8 +431,8 @@ def create_matplotlib_chart(
     data_range: str,
     chart_type: MatplotlibChartType,
     title: str = "Chart",
-    sheet_name: Optional[str] = None,
-    chart_sheet: Optional[str] = None,
+    sheet_name: str | None = None,
+    chart_sheet: str | None = None,
     position: str = "A1",
     width: int = 600,
     height: int = 400,
@@ -501,7 +489,7 @@ def create_matplotlib_chart(
 
         # Extract data from range
         min_col, min_row, max_col, max_row = range_boundaries(a1_range)
-        
+
         data = []
         headers = []
         for row in ws.iter_rows(min_row=min_row, max_row=max_row, min_col=min_col, max_col=max_col):
@@ -515,51 +503,50 @@ def create_matplotlib_chart(
             raise DataError("No data found in specified range")
 
         # Set matplotlib style
-        if style and hasattr(style, 'available') and style_name in style.available:
+        if style and hasattr(style, "available") and style_name in style.available:
             style.use(style_name)
 
         # Import matplotlib here to avoid scope issues
         import matplotlib.pyplot as plt_local
-            
-        fig, ax = plt_local.subplots(figsize=(width/100, height/100), dpi=100)
-        
+
+        fig, ax = plt_local.subplots(figsize=(width / 100, height / 100), dpi=100)
+
         if chart_type == "line":
             for i, header in enumerate(headers[1:], 1):
                 y_data = [row[i] for row in data if row[i] is not None]
                 x_data = list(range(len(y_data)))
-                ax.plot(x_data, y_data, label=header, marker='o')
+                ax.plot(x_data, y_data, label=header, marker="o")
             ax.legend()
-            
+
         elif chart_type == "bar":
             x_labels = [row[0] for row in data]
             y_data = [row[1] for row in data if row[1] is not None]
             ax.bar(x_labels, y_data)
             ax.set_xlabel(headers[0])
             ax.set_ylabel(headers[1])
-            
+
         elif chart_type == "scatter":
             x_data = [row[0] for row in data if row[0] is not None]
             y_data = [row[1] for row in data if row[1] is not None]
             ax.scatter(x_data, y_data)
             ax.set_xlabel(headers[0])
             ax.set_ylabel(headers[1])
-            
+
         elif chart_type == "pie":
             labels = [row[0] for row in data]
             sizes = [row[1] for row in data if row[1] is not None]
-            ax.pie(sizes, labels=labels, autopct='%1.1f%%')
-            
+            ax.pie(sizes, labels=labels, autopct="%1.1f%%")
+
         elif chart_type == "histogram":
             data_values = [row[1] for row in data if row[1] is not None]
-            ax.hist(data_values, bins=20, edgecolor='black')
+            ax.hist(data_values, bins=20, edgecolor="black")
             ax.set_xlabel(headers[1])
-            ax.set_ylabel('Frequency')
-            
+            ax.set_ylabel("Frequency")
+
         elif chart_type == "box":
-            data_values = [[row[i] for row in data if row[i] is not None] 
-                          for i in range(1, len(headers))]
+            data_values = [[row[i] for row in data if row[i] is not None] for i in range(1, len(headers))]
             ax.boxplot(data_values, labels=headers[1:])
-            
+
         elif chart_type == "heatmap":
             # Convert data to numpy array for heatmap
             numeric_data = []
@@ -571,14 +558,14 @@ def create_matplotlib_chart(
                     except (ValueError, TypeError):
                         numeric_row.append(0)
                 numeric_data.append(numeric_row)
-            
-            im = ax.imshow(numeric_data, cmap='viridis', aspect='auto')
+
+            im = ax.imshow(numeric_data, cmap="viridis", aspect="auto")
             ax.set_xticks(range(len(headers[1:])))
             ax.set_xticklabels(headers[1:])
             ax.set_yticks(range(len(data)))
             ax.set_yticklabels([row[0] for row in data])
             plt_local.colorbar(im, ax=ax)
-            
+
         else:
             raise ChartError(f"Unsupported matplotlib chart type: {chart_type}")
 
@@ -587,13 +574,13 @@ def create_matplotlib_chart(
 
         # Save to memory
         img_buffer = BytesIO()
-        plt_local.savefig(img_buffer, format='png', dpi=100, bbox_inches='tight')
+        plt_local.savefig(img_buffer, format="png", dpi=100, bbox_inches="tight")
         img_buffer.seek(0)
 
         # Save image file if requested
         if save_image:
             image_path = excel_file.parent / f"{excel_file.stem}_{title.replace(' ', '_')}.png"
-            plt_local.savefig(image_path, format='png', dpi=100, bbox_inches='tight')
+            plt_local.savefig(image_path, format="png", dpi=100, bbox_inches="tight")
 
         plt_local.close()
 
@@ -601,9 +588,9 @@ def create_matplotlib_chart(
         target_sheet_name = chart_sheet or source_sheet_name
         if target_sheet_name not in wb.sheetnames:
             wb.create_sheet(title=target_sheet_name)
-        
+
         target_ws = wb[target_sheet_name]
-        
+
         # Create image object and add to worksheet
         img = Image(img_buffer)
         img.width = width
@@ -620,7 +607,7 @@ def create_matplotlib_chart(
 
 
 # Chart Management Functions
-def list_charts(excel_path: str, sheet_name: Optional[str] = None) -> dict[str, Any]:
+def list_charts(excel_path: str, sheet_name: str | None = None) -> dict[str, Any]:
     """
     List all charts in a workbook or specific sheet.
 
@@ -642,17 +629,17 @@ def list_charts(excel_path: str, sheet_name: Optional[str] = None) -> dict[str, 
             raise FileNotFoundError(f"Excel file not found: {excel_path}")
 
         wb = load_workbook(excel_file)
-        
+
         charts_info = {"charts": [], "total_charts": 0}
-        
+
         sheets_to_check = [sheet_name] if sheet_name else wb.sheetnames
-        
+
         for sheet in sheets_to_check:
             if sheet not in wb.sheetnames:
                 raise SheetNotFoundError(f"Sheet '{sheet}' not found")
-            
+
             ws = wb[sheet]
-            
+
             for chart in ws._charts:
                 chart_info = {
                     "sheet": sheet,
@@ -661,7 +648,7 @@ def list_charts(excel_path: str, sheet_name: Optional[str] = None) -> dict[str, 
                     "position": getattr(chart, "anchor", "Unknown"),
                 }
                 charts_info["charts"].append(chart_info)
-        
+
         charts_info["total_charts"] = len(charts_info["charts"])
         return charts_info
 
@@ -695,18 +682,18 @@ def delete_chart(excel_path: str, sheet_name: str, chart_index: int = 0) -> str:
             raise FileNotFoundError(f"Excel file not found: {excel_path}")
 
         wb = load_workbook(excel_file)
-        
+
         if sheet_name not in wb.sheetnames:
             raise SheetNotFoundError(f"Sheet '{sheet_name}' not found")
-        
+
         ws = wb[sheet_name]
-        
+
         if chart_index >= len(ws._charts) or chart_index < 0:
             raise ChartError(f"Chart index {chart_index} is invalid. Sheet has {len(ws._charts)} charts.")
-        
+
         # Remove chart
         del ws._charts[chart_index]
-        
+
         wb.save(excel_file)
         return str(excel_file)
 
@@ -747,40 +734,40 @@ def update_chart_data(
             raise FileNotFoundError(f"Excel file not found: {excel_path}")
 
         wb = load_workbook(excel_file)
-        
+
         if sheet_name not in wb.sheetnames:
             raise SheetNotFoundError(f"Sheet '{sheet_name}' not found")
-        
+
         ws = wb[sheet_name]
-        
+
         if chart_index >= len(ws._charts) or chart_index < 0:
             raise ChartError(f"Chart index {chart_index} is invalid. Sheet has {len(ws._charts)} charts.")
-        
+
         chart = ws._charts[chart_index]
-        
+
         # Parse new data range
         sheet_from_range, a1_range = _split_sheet_and_range(new_data_range)
         source_sheet_name = sheet_from_range or sheet_name
-        
+
         if source_sheet_name not in wb.sheetnames:
             raise SheetNotFoundError(f"Source sheet '{source_sheet_name}' not found")
-        
+
         source_ws = wb[source_sheet_name]
         range_info = _parse_data_range(a1_range, source_ws)
-        
+
         # Create new data reference
         new_data = Reference(
             source_ws,
             min_col=range_info["min_col"],
             min_row=range_info["min_row"],
             max_col=range_info["max_col"],
-            max_row=range_info["max_row"]
+            max_row=range_info["max_row"],
         )
-        
+
         # Update chart data (this is a simplified approach)
         # Full implementation would require more complex data series management
         chart.add_data(new_data, titles_from_data=range_info["has_headers"])
-        
+
         wb.save(excel_file)
         return str(excel_file)
 
@@ -800,14 +787,33 @@ def get_chart_types() -> dict[str, Any]:
     """
     return {
         "openpyxl_charts": [
-            "column", "bar", "line", "pie", "scatter", "area", 
-            "doughnut", "radar", "bubble", "stock", "surface"
+            "column",
+            "bar",
+            "line",
+            "pie",
+            "scatter",
+            "area",
+            "doughnut",
+            "radar",
+            "bubble",
+            "stock",
+            "surface",
         ],
         "matplotlib_charts": [
-            "line", "bar", "scatter", "pie", "histogram", "box", 
-            "heatmap", "violin", "density", "subplots"
-        ] if matplotlib_available else [],
-        "matplotlib_available": matplotlib_available
+            "line",
+            "bar",
+            "scatter",
+            "pie",
+            "histogram",
+            "box",
+            "heatmap",
+            "violin",
+            "density",
+            "subplots",
+        ]
+        if matplotlib_available
+        else [],
+        "matplotlib_available": matplotlib_available,
     }
 
 
@@ -852,10 +858,7 @@ def create_chart_preset(name: str, chart_config: dict[str, Any]) -> str:
 
 
 def apply_chart_preset(
-    excel_path: str,
-    data_range: str,
-    preset_name: str,
-    **override_params
+    excel_path: str, data_range: str, preset_name: str, override_params: dict[str, Any] | None = None
 ) -> str:
     """
     Apply a chart preset with optional parameter overrides.
@@ -864,7 +867,7 @@ def apply_chart_preset(
         excel_path: Path to the Excel file
         data_range: Data range for the chart
         preset_name: Name of the preset to apply
-        **override_params: Parameters to override from preset
+        override_params: Parameters to override from preset
 
     Returns:
         Path to the Excel file
@@ -888,10 +891,11 @@ def apply_chart_preset(
 
         # Get preset configuration
         config = presets[preset_name]["config"].copy()
-        
+
         # Apply overrides
-        config.update(override_params)
-        
+        if override_params:
+            config.update(override_params)
+
         # Determine chart creation function based on config
         if config.get("matplotlib", False):
             return create_matplotlib_chart(excel_path, data_range, **config)

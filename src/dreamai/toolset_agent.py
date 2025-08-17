@@ -156,7 +156,9 @@ def get_weather(location: str) -> dict[str, Any]:
     return weather_map[location]
 
 
-weather_toolset = AgentToolset([get_weather], id="weather_toolset", max_retries=3, path_resolver=resolve_data_path)
+weather_toolset = AgentToolset(
+    [get_weather], id="weather_toolset", max_retries=3, file_path_resolver=resolve_data_path
+)
 
 conditional_toolset = AgentToolset(
     tools=[
@@ -176,7 +178,7 @@ conditional_toolset = AgentToolset(
     ],
     id="conditional_toolset",
     max_retries=3,
-    path_resolver=resolve_data_path,
+    file_path_resolver=resolve_data_path,
 )
 
 date_and_time_toolset = AgentToolset(
@@ -203,7 +205,7 @@ date_and_time_toolset = AgentToolset(
     ],
     id="date_and_time_toolset",
     max_retries=3,
-    path_resolver=resolve_data_path,
+    file_path_resolver=resolve_data_path,
 )
 
 logical_and_errors_toolset = AgentToolset(
@@ -226,7 +228,7 @@ logical_and_errors_toolset = AgentToolset(
     ],
     id="logical_and_errors_toolset",
     max_retries=3,
-    path_resolver=resolve_data_path,
+    file_path_resolver=resolve_data_path,
 )
 
 lookup_and_reference_toolset = AgentToolset(
@@ -248,7 +250,7 @@ lookup_and_reference_toolset = AgentToolset(
     ],
     id="lookup_and_reference_toolset",
     max_retries=3,
-    path_resolver=resolve_data_path,
+    file_path_resolver=resolve_data_path,
 )
 
 arithmetic_toolset = AgentToolset(
@@ -281,21 +283,21 @@ arithmetic_toolset = AgentToolset(
     ],
     id="arithmetic_toolset",
     max_retries=3,
-    path_resolver=resolve_data_path,
+    file_path_resolver=resolve_data_path,
 )
 
 file_toolset = AgentToolset(
     [describe_df, list_data_files, list_analysis_files],
     id="file_toolset",
     max_retries=3,
-    path_resolver=resolve_data_path,
+    file_path_resolver=resolve_data_path,
 )
 
 filtering_and_selection_toolset = AgentToolset(
     [filter_by_date_range, filter_by_value, filter_by_multiple_conditions, top_n, bottom_n, sample_data],
     id="filtering_and_selection_toolset",
     max_retries=3,
-    path_resolver=resolve_data_path,
+    file_path_resolver=resolve_data_path,
 )
 
 transformation_and_pivoting_toolset = AgentToolset(
@@ -314,7 +316,7 @@ transformation_and_pivoting_toolset = AgentToolset(
     ],
     id="transformation_and_pivoting_toolset",
     max_retries=3,
-    path_resolver=resolve_data_path,
+    file_path_resolver=resolve_data_path,
 )
 
 agent = create_agent()

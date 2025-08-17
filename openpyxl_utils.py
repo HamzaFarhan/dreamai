@@ -1,16 +1,6 @@
-"""
-OpenPyXL Utility Functions
-
-This module provides comprehensive Excel file manipulation using OpenPyXL.
-All functions take file_path as the first argument and return file paths.
-Functions write formulas to Excel files - Excel evaluates them when opened.
-
-Author: Generated from sheets2.md specifications
-"""
-
 import csv
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.pivot.cache import CacheDefinition, WorksheetSource
@@ -81,7 +71,7 @@ def create_excel_file(file_path: str) -> str:
         raise FileOperationError(f"Failed to create Excel file {file_path}: {e}")
 
 
-def csv_to_excel_sheet(csv_path: str, excel_path: str, sheet_name: Optional[str] = None) -> str:
+def csv_to_excel_sheet(csv_path: str, excel_path: str, sheet_name: str | None = None) -> str:
     """
     Adds a CSV file as a new sheet in an Excel workbook.
 
@@ -267,7 +257,7 @@ def add_sheet(excel_path: str, sheet_name: str) -> str:
 
 
 def write_data_to_sheet(
-    excel_path: str, sheet_name: str, data: list[list], start_row: int = 1, start_col: int = 1
+    excel_path: str, sheet_name: str, data: list[list[Any]], start_row: int = 1, start_col: int = 1
 ) -> str:
     """
     Writes 2D data to a specific sheet.
@@ -996,7 +986,9 @@ def _write_formula(excel_path: str, sheet_name: str, cell: str, formula: str) ->
 
 
 # Date Functions
-def write_date_function(excel_path: str, sheet_name: str, cell: str, function_name: str, *args) -> str:
+def write_date_function(
+    excel_path: str, sheet_name: str, cell: str, function_name: str, function_args: list[Any]
+) -> str:
     """
     Writes date functions to Excel cells.
 
@@ -1007,7 +999,7 @@ def write_date_function(excel_path: str, sheet_name: str, cell: str, function_na
         sheet_name: Name of the target sheet
         cell: Cell reference (e.g., 'A1')
         function_name: Name of the date function
-        *args: Function arguments
+        function_args: Function arguments
 
     Returns:
         str: Excel file path
@@ -1037,8 +1029,8 @@ def write_date_function(excel_path: str, sheet_name: str, cell: str, function_na
             raise FormulaError(f"Invalid date function: {function_name}")
 
         # Build formula
-        if args:
-            args_str = ",".join(str(arg) for arg in args)
+        if function_args:
+            args_str = ",".join(str(arg) for arg in function_args)
             formula = f"{function_name}({args_str})"
         else:
             formula = f"{function_name}()"
@@ -1052,7 +1044,9 @@ def write_date_function(excel_path: str, sheet_name: str, cell: str, function_na
 
 
 # Financial Functions
-def write_financial_function(excel_path: str, sheet_name: str, cell: str, function_name: str, *params) -> str:
+def write_financial_function(
+    excel_path: str, sheet_name: str, cell: str, function_name: str, function_args: list[Any]
+) -> str:
     """
     Writes financial functions to Excel cells.
 
@@ -1063,7 +1057,7 @@ def write_financial_function(excel_path: str, sheet_name: str, cell: str, functi
         sheet_name: Name of the target sheet
         cell: Cell reference (e.g., 'A1')
         function_name: Name of the financial function
-        *params: Function parameters
+        function_args: Function arguments
 
     Returns:
         str: Excel file path
@@ -1079,11 +1073,11 @@ def write_financial_function(excel_path: str, sheet_name: str, cell: str, functi
         if function_name not in valid_functions:
             raise FormulaError(f"Invalid financial function: {function_name}")
 
-        if not params:
-            raise FormulaError(f"Financial function {function_name} requires parameters")
+        if not function_args:
+            raise FormulaError(f"Financial function {function_name} requires arguments")
 
-        params_str = ",".join(str(param) for param in params)
-        formula = f"{function_name}({params_str})"
+        args_str = ",".join(str(arg) for arg in function_args)
+        formula = f"{function_name}({args_str})"
 
         return _write_formula(excel_path, sheet_name, cell, formula)
 
@@ -1094,7 +1088,9 @@ def write_financial_function(excel_path: str, sheet_name: str, cell: str, functi
 
 
 # Logical Functions
-def write_logical_function(excel_path: str, sheet_name: str, cell: str, function_name: str, *conditions) -> str:
+def write_logical_function(
+    excel_path: str, sheet_name: str, cell: str, function_name: str, conditions: list[Any]
+) -> str:
     """
     Writes logical functions to Excel cells.
 
@@ -1105,7 +1101,7 @@ def write_logical_function(excel_path: str, sheet_name: str, cell: str, function
         sheet_name: Name of the target sheet
         cell: Cell reference (e.g., 'A1')
         function_name: Name of the logical function
-        *conditions: Function conditions/arguments
+        conditions: Function conditions/arguments
 
     Returns:
         str: Excel file path
@@ -1141,7 +1137,9 @@ def write_logical_function(excel_path: str, sheet_name: str, cell: str, function
 
 
 # Lookup Functions
-def write_lookup_function(excel_path: str, sheet_name: str, cell: str, function_name: str, *params) -> str:
+def write_lookup_function(
+    excel_path: str, sheet_name: str, cell: str, function_name: str, function_args: list[Any]
+) -> str:
     """
     Writes lookup functions to Excel cells.
 
@@ -1153,7 +1151,7 @@ def write_lookup_function(excel_path: str, sheet_name: str, cell: str, function_
         sheet_name: Name of the target sheet
         cell: Cell reference (e.g., 'A1')
         function_name: Name of the lookup function
-        *params: Function parameters
+        function_args: Function arguments
 
     Returns:
         str: Excel file path
@@ -1181,9 +1179,9 @@ def write_lookup_function(excel_path: str, sheet_name: str, cell: str, function_
         if function_name not in valid_functions:
             raise FormulaError(f"Invalid lookup function: {function_name}")
 
-        if params:
-            params_str = ",".join(str(param) for param in params)
-            formula = f"{function_name}({params_str})"
+        if function_args:
+            args_str = ",".join(str(arg) for arg in function_args)
+            formula = f"{function_name}({args_str})"
         else:
             formula = f"{function_name}()"
 
@@ -1196,7 +1194,9 @@ def write_lookup_function(excel_path: str, sheet_name: str, cell: str, function_
 
 
 # Math Functions
-def write_math_function(excel_path: str, sheet_name: str, cell: str, function_name: str, *values) -> str:
+def write_math_function(
+    excel_path: str, sheet_name: str, cell: str, function_name: str, function_args: list[Any]
+) -> str:
     """
     Writes math functions to Excel cells.
 
@@ -1212,7 +1212,7 @@ def write_math_function(excel_path: str, sheet_name: str, cell: str, function_na
         sheet_name: Name of the target sheet
         cell: Cell reference (e.g., 'A1')
         function_name: Name of the math function
-        *values: Function values/parameters
+        function_args: Function arguments
 
     Returns:
         str: Excel file path
@@ -1274,14 +1274,14 @@ def write_math_function(excel_path: str, sheet_name: str, cell: str, function_na
         no_param_functions = {"PI", "RAND"}
 
         if function_name in no_param_functions:
-            if values:
-                raise FormulaError(f"Function {function_name} takes no parameters")
+            if function_args:
+                raise FormulaError(f"Function {function_name} takes no arguments")
             formula = f"{function_name}()"
         else:
-            if not values:
-                raise FormulaError(f"Function {function_name} requires parameters")
-            values_str = ",".join(str(value) for value in values)
-            formula = f"{function_name}({values_str})"
+            if not function_args:
+                raise FormulaError(f"Function {function_name} requires arguments")
+            args_str = ",".join(str(arg) for arg in function_args)
+            formula = f"{function_name}({args_str})"
 
         return _write_formula(excel_path, sheet_name, cell, formula)
 
@@ -1292,7 +1292,9 @@ def write_math_function(excel_path: str, sheet_name: str, cell: str, function_na
 
 
 # Statistical Functions
-def write_statistical_function(excel_path: str, sheet_name: str, cell: str, function_name: str, *data) -> str:
+def write_statistical_function(
+    excel_path: str, sheet_name: str, cell: str, function_name: str, function_args: list[Any]
+) -> str:
     """
     Writes statistical functions to Excel cells.
 
@@ -1304,7 +1306,7 @@ def write_statistical_function(excel_path: str, sheet_name: str, cell: str, func
         sheet_name: Name of the target sheet
         cell: Cell reference (e.g., 'A1')
         function_name: Name of the statistical function
-        *data: Function data/parameters
+        function_args: Function data/arguments
 
     Returns:
         str: Excel file path
@@ -1339,7 +1341,7 @@ def write_statistical_function(excel_path: str, sheet_name: str, cell: str, func
         if not data:
             raise FormulaError(f"Statistical function {function_name} requires data")
 
-        data_str = ",".join(str(item) for item in data)
+        data_str = ",".join(str(item) for item in function_args)
         formula = f"{function_name}({data_str})"
 
         return _write_formula(excel_path, sheet_name, cell, formula)
@@ -1351,7 +1353,9 @@ def write_statistical_function(excel_path: str, sheet_name: str, cell: str, func
 
 
 # Text Functions
-def write_text_function(excel_path: str, sheet_name: str, cell: str, function_name: str, *text_args) -> str:
+def write_text_function(
+    excel_path: str, sheet_name: str, cell: str, function_name: str, function_args: list[Any]
+) -> str:
     """
     Writes text functions to Excel cells.
 
@@ -1364,7 +1368,7 @@ def write_text_function(excel_path: str, sheet_name: str, cell: str, function_na
         sheet_name: Name of the target sheet
         cell: Cell reference (e.g., 'A1')
         function_name: Name of the text function
-        *text_args: Function text arguments
+        function_args: Function text arguments
 
     Returns:
         str: Excel file path
@@ -1401,10 +1405,10 @@ def write_text_function(excel_path: str, sheet_name: str, cell: str, function_na
         if function_name not in valid_functions:
             raise FormulaError(f"Invalid text function: {function_name}")
 
-        if not text_args:
+        if not function_args:
             raise FormulaError(f"Text function {function_name} requires arguments")
 
-        args_str = ",".join(str(arg) for arg in text_args)
+        args_str = ",".join(str(arg) for arg in function_args)
         formula = f"{function_name}({args_str})"
 
         return _write_formula(excel_path, sheet_name, cell, formula)
@@ -1416,7 +1420,9 @@ def write_text_function(excel_path: str, sheet_name: str, cell: str, function_na
 
 
 # Info Functions
-def write_info_function(excel_path: str, sheet_name: str, cell: str, function_name: str, *args) -> str:
+def write_info_function(
+    excel_path: str, sheet_name: str, cell: str, function_name: str, function_args: list[Any]
+) -> str:
     """
     Writes info functions to Excel cells.
 
@@ -1427,7 +1433,7 @@ def write_info_function(excel_path: str, sheet_name: str, cell: str, function_na
         sheet_name: Name of the target sheet
         cell: Cell reference (e.g., 'A1')
         function_name: Name of the info function
-        *args: Function arguments
+        function_args: Function arguments
 
     Returns:
         str: Excel file path
@@ -1443,10 +1449,10 @@ def write_info_function(excel_path: str, sheet_name: str, cell: str, function_na
         if function_name not in valid_functions:
             raise FormulaError(f"Invalid info function: {function_name}")
 
-        if not args:
+        if not function_args:
             raise FormulaError(f"Info function {function_name} requires arguments")
 
-        args_str = ",".join(str(arg) for arg in args)
+        args_str = ",".join(str(arg) for arg in function_args)
         formula = f"{function_name}({args_str})"
 
         return _write_formula(excel_path, sheet_name, cell, formula)
@@ -2013,7 +2019,7 @@ def create_advanced_filter(
     sheet_name: str,
     data_range: str,
     criteria_range: str,
-    output_range: str = None,
+    output_range: str | None = None,
     unique_only: bool = False,
 ) -> str:
     """

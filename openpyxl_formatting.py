@@ -10,7 +10,7 @@ Author: Generated for DreamAI formatting needs
 
 import json
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from openpyxl import load_workbook
 from openpyxl.formatting.rule import CellIsRule, FormulaRule
@@ -38,7 +38,7 @@ class FormatError(Exception):
 
 
 # Helper Functions
-def _split_sheet_and_range(range_spec: str) -> tuple[Optional[str], str]:
+def _split_sheet_and_range(range_spec: str) -> tuple[str | None, str]:
     """
     Parse "Sheet1!A1:B2" or "A1:B2" -> (sheet_name or None, a1_range)
 
@@ -54,7 +54,7 @@ def _split_sheet_and_range(range_spec: str) -> tuple[Optional[str], str]:
     return None, range_spec.strip()
 
 
-def _rgb_from_google(color: Any) -> Optional[str]:
+def _rgb_from_google(color: Any) -> str | None:
     """
     Convert Google-style color to hex string.
 
@@ -178,7 +178,7 @@ def _extract_single_value(value: Any) -> Any:
 
 # Main Formatting Functions
 def apply_cell_formatting(
-    excel_path: str, range_spec: str, formatting: dict[str, Any], sheet_name: Optional[str] = None
+    excel_path: str, range_spec: str, formatting: dict[str, Any], sheet_name: str | None = None
 ) -> str:
     """
     Apply formatting to a cell range in an Excel file.
@@ -259,7 +259,7 @@ def apply_conditional_formatting(
     range_spec: str,
     condition: dict[str, Any],
     format_style: dict[str, Any],
-    sheet_name: Optional[str] = None,
+    sheet_name: str | None = None,
 ) -> str:
     """
     Apply conditional formatting to a cell range in an Excel file.
@@ -472,7 +472,7 @@ def list_formatting_presets() -> dict[str, dict[str, Any]]:
 
 
 def apply_preset_formatting(
-    excel_path: str, range_spec: str, preset_name: str, sheet_name: Optional[str] = None
+    excel_path: str, range_spec: str, preset_name: str, sheet_name: str | None = None
 ) -> str:
     """
     Apply a formatting preset to a cell range.
@@ -502,7 +502,7 @@ def apply_preset_formatting(
 
 
 # Utility Functions
-def clear_formatting(excel_path: str, range_spec: str, sheet_name: Optional[str] = None) -> str:
+def clear_formatting(excel_path: str, range_spec: str, sheet_name: str | None = None) -> str:
     """
     Clear all formatting from a cell range.
 
