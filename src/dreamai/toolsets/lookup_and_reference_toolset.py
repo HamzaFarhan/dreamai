@@ -5,7 +5,7 @@ import polars as pl
 from pydantic_ai import ModelRetry, RunContext
 
 from ..finn_deps import FinnDeps
-from .file_toolset import load_df
+from .file_toolset import load_file
 
 getcontext().prec = 28
 
@@ -37,7 +37,7 @@ def vlookup(
         "Bob"
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -90,7 +90,7 @@ def hlookup(
         20
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -146,7 +146,7 @@ def index_lookup(
         2
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     try:
@@ -194,7 +194,7 @@ def match_lookup(
         2
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     try:
@@ -251,7 +251,7 @@ def xlookup(
         "Bob"
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -299,7 +299,7 @@ def offset_range(
         [[5, 6], [8, 9]]
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -348,7 +348,7 @@ def indirect_reference(ctx: RunContext[FinnDeps], file_path: str, ref_text: str)
         2
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -396,7 +396,7 @@ def choose_value(
         50
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -450,7 +450,7 @@ def lookup_vector(
         "B"
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -548,7 +548,7 @@ def row_number(
         2
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -593,7 +593,7 @@ def column_number(
         2
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -626,7 +626,7 @@ def rows_count(ctx: RunContext[FinnDeps], file_path: str) -> int:
         5
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -652,7 +652,7 @@ def columns_count(ctx: RunContext[FinnDeps], file_path: str) -> int:
         3
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 

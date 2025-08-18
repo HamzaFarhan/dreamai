@@ -1,134 +1,72 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import logfire
 from dotenv import load_dotenv
-from pydantic_ai import ModelRetry
 from pydantic_ai.messages import ModelMessagesTypeAdapter
+from pydantic_ai.toolsets import FunctionToolset
 from pydantic_ai.usage import UsageLimits
 
-from .agent import AgentToolset, create_agent
+from .agent import AgentDeps, AgentToolset, create_agent
 from .finn_deps import DataDirs, FinnDeps
-from .toolsets.arithmetic_toolset import (
-    calculate_abs,
-    calculate_average,
-    calculate_cumprod,
-    calculate_cumsum,
-    calculate_exp,
-    calculate_geometric_mean,
-    calculate_harmonic_mean,
-    calculate_ln,
-    calculate_log,
-    calculate_max,
-    calculate_median,
-    calculate_min,
-    calculate_mod,
-    calculate_mode,
-    calculate_percentile,
-    calculate_power,
-    calculate_product,
-    calculate_round,
-    calculate_rounddown,
-    calculate_roundup,
-    calculate_sign,
-    calculate_sqrt,
-    calculate_sum,
-    calculate_variance_weighted,
-    calculate_weighted_average,
+from .toolsets.excel_charts_toolset import (
+    apply_chart_preset,
+    create_chart,
+    create_chart_preset,
+    create_matplotlib_chart,
+    delete_chart,
+    get_chart_types,
+    list_charts,
+    update_chart_data,
 )
-from .toolsets.conditional_toolset import (
-    aggregate,
-    averageif,
-    averageifs,
-    counta,
-    countblank,
-    countif,
-    countifs,
-    maxifs,
-    minifs,
-    subtotal,
-    sumif,
-    sumifs,
-    sumproduct,
+from .toolsets.excel_formatting_toolset import (
+    apply_cell_formatting,
+    apply_conditional_formatting,
+    apply_preset_formatting,
+    clear_formatting,
+    create_formatting_preset,
+    list_formatting_presets,
+    load_formatting_preset,
 )
-from .toolsets.date_and_time_toolset import (
-    create_date,
-    create_time,
-    date_range,
-    datedif,
-    edate,
-    eomonth,
-    extract_day,
-    extract_hour,
-    extract_minute,
-    extract_month,
-    extract_second,
-    extract_year,
-    networkdays,
-    now,
-    quarter,
-    today,
-    weekday,
-    workday,
-    yearfrac,
+from .toolsets.excel_formula_toolset import (
+    write_date_function,
+    write_financial_function,
+    write_formula_to_cell,
+    write_info_function,
+    write_logical_function,
+    write_lookup_function,
+    write_math_function,
+    write_multiple_formulas,
+    write_statistical_function,
+    write_text_function,
 )
-from .toolsets.file_toolset import describe_df, list_analysis_files, list_data_files, resolve_data_path
-from .toolsets.filtering_and_selection_toolset import (
-    bottom_n,
-    filter_by_date_range,
-    filter_by_multiple_conditions,
-    filter_by_value,
-    sample_data,
-    top_n,
-)
-from .toolsets.logical_and_errors_toolset import (
-    is_blank,
-    is_error,
-    is_number,
-    is_text,
-    logical_and,
-    logical_and_scalar,
-    logical_if,
-    logical_iferror,
-    logical_ifna,
-    logical_ifs,
-    logical_not,
-    logical_or,
-    logical_or_scalar,
-    logical_switch,
-    logical_xor,
-)
-from .toolsets.lookup_and_reference_toolset import (
-    address_cell,
-    choose_value,
-    column_number,
-    columns_count,
-    hlookup,
-    index_lookup,
-    indirect_reference,
-    lookup_vector,
-    match_lookup,
-    offset_range,
-    row_number,
-    rows_count,
-    vlookup,
-    xlookup,
-)
-from .toolsets.transformation_and_pivoting_toolset import (
-    concat_data,
+from .toolsets.excel_structure_toolset import (
+    add_sheet,
+    add_subtotals,
+    clear_sheet,
+    copy_sheet,
+    create_autofilter,
+    create_data_table,
+    create_excel_file,
     create_pivot_table,
-    cross_tabulation,
-    fill_forward,
-    group_by,
-    group_by_agg,
-    interpolate_values,
-    merge_data,
-    stack_data,
-    unpivot_data,
-    unstack_data,
+    csv_to_excel_sheet,
+    csvs_to_excel,
+    delete_sheet,
+    duplicate_sheet_to_file,
+    extract_sheet_to_csv,
+    get_cell_value,
+    get_sheet_info,
+    get_sheet_names,
+    get_spreadsheet_metadata,
+    merge_excel_files,
+    rename_sheet,
+    update_sheet_dimensions,
+    update_sheet_properties,
+    write_data_to_sheet,
+    write_value_to_cell,
 )
+from .toolsets.file_toolset import describe_file, list_data_files, list_result_files, resolve_file_path
 
 load_dotenv()
 
@@ -137,187 +75,94 @@ logfire.instrument_pydantic_ai()
 logfire.instrument_httpx(capture_all=True)
 
 
-def get_weather(location: str) -> dict[str, Any]:
-    """
-    Get the current weather for a specific location.
-
-    Args:
-        location (str): The location to get the weather for.
-    """
-    weather_map: dict[str, dict[str, Any]] = {
-        "New York": {"temperature": 72, "condition": "Sunny"},
-        "Los Angeles": {"temperature": 75, "condition": "Sunny"},
-        "Chicago": {"temperature": 68, "condition": "Cloudy"},
-    }
-    if location not in weather_map:
-        raise ModelRetry(
-            f"Weather data not found for location: {location}\nPossible locations are: {list(weather_map.keys())}"
-        )
-    return weather_map[location]
-
-
-weather_toolset = AgentToolset(
-    [get_weather], id="weather_toolset", max_retries=3, file_path_resolver=resolve_data_path
-)
-
-conditional_toolset = AgentToolset(
+excel_structure_toolset = AgentToolset(
     tools=[
-        sumif,
-        sumifs,
-        countif,
-        countifs,
-        averageif,
-        averageifs,
-        maxifs,
-        minifs,
-        sumproduct,
-        aggregate,
-        subtotal,
-        countblank,
-        counta,
-    ],
-    id="conditional_toolset",
-    max_retries=3,
-    file_path_resolver=resolve_data_path,
-)
-
-date_and_time_toolset = AgentToolset(
-    tools=[
-        today,
-        now,
-        create_date,
-        extract_year,
-        extract_month,
-        extract_day,
-        edate,
-        eomonth,
-        datedif,
-        yearfrac,
-        weekday,
-        quarter,
-        create_time,
-        extract_hour,
-        extract_minute,
-        extract_second,
-        date_range,
-        workday,
-        networkdays,
-    ],
-    id="date_and_time_toolset",
-    max_retries=3,
-    file_path_resolver=resolve_data_path,
-)
-
-logical_and_errors_toolset = AgentToolset(
-    tools=[
-        logical_if,
-        logical_iferror,
-        logical_ifna,
-        logical_ifs,
-        logical_and,
-        logical_or,
-        logical_not,
-        logical_switch,
-        logical_xor,
-        is_blank,
-        is_number,
-        is_text,
-        is_error,
-        logical_and_scalar,
-        logical_or_scalar,
-    ],
-    id="logical_and_errors_toolset",
-    max_retries=3,
-    file_path_resolver=resolve_data_path,
-)
-
-lookup_and_reference_toolset = AgentToolset(
-    tools=[
-        vlookup,
-        hlookup,
-        index_lookup,
-        match_lookup,
-        xlookup,
-        offset_range,
-        indirect_reference,
-        choose_value,
-        lookup_vector,
-        address_cell,
-        row_number,
-        column_number,
-        rows_count,
-        columns_count,
-    ],
-    id="lookup_and_reference_toolset",
-    max_retries=3,
-    file_path_resolver=resolve_data_path,
-)
-
-arithmetic_toolset = AgentToolset(
-    [
-        calculate_sum,
-        calculate_average,
-        calculate_min,
-        calculate_max,
-        calculate_product,
-        calculate_median,
-        calculate_mode,
-        calculate_percentile,
-        calculate_power,
-        calculate_sqrt,
-        calculate_exp,
-        calculate_ln,
-        calculate_log,
-        calculate_abs,
-        calculate_sign,
-        calculate_mod,
-        calculate_round,
-        calculate_roundup,
-        calculate_rounddown,
-        calculate_weighted_average,
-        calculate_geometric_mean,
-        calculate_harmonic_mean,
-        calculate_cumsum,
-        calculate_cumprod,
-        calculate_variance_weighted,
-    ],
-    id="arithmetic_toolset",
-    max_retries=3,
-    file_path_resolver=resolve_data_path,
-)
-
-file_toolset = AgentToolset(
-    [describe_df, list_data_files, list_analysis_files],
-    id="file_toolset",
-    max_retries=3,
-    file_path_resolver=resolve_data_path,
-)
-
-filtering_and_selection_toolset = AgentToolset(
-    [filter_by_date_range, filter_by_value, filter_by_multiple_conditions, top_n, bottom_n, sample_data],
-    id="filtering_and_selection_toolset",
-    max_retries=3,
-    file_path_resolver=resolve_data_path,
-)
-
-transformation_and_pivoting_toolset = AgentToolset(
-    tools=[
+        create_excel_file,
+        csv_to_excel_sheet,
+        csvs_to_excel,
+        add_sheet,
+        write_data_to_sheet,
+        get_sheet_names,
+        delete_sheet,
+        rename_sheet,
+        copy_sheet,
+        update_sheet_properties,
+        merge_excel_files,
+        extract_sheet_to_csv,
+        update_sheet_dimensions,
+        get_spreadsheet_metadata,
+        duplicate_sheet_to_file,
+        get_sheet_info,
         create_pivot_table,
-        unpivot_data,
-        group_by,
-        cross_tabulation,
-        group_by_agg,
-        stack_data,
-        unstack_data,
-        merge_data,
-        concat_data,
-        fill_forward,
-        interpolate_values,
+        write_value_to_cell,
+        get_cell_value,
+        clear_sheet,
+        create_autofilter,
+        add_subtotals,
+        create_data_table,
     ],
-    id="transformation_and_pivoting_toolset",
+    id="excel_structure_toolset",
     max_retries=3,
-    file_path_resolver=resolve_data_path,
+    file_path_resolver=resolve_file_path,
 )
+
+
+excel_formula_toolset = AgentToolset(
+    tools=[
+        write_date_function,
+        write_financial_function,
+        write_logical_function,
+        write_lookup_function,
+        write_math_function,
+        write_statistical_function,
+        write_text_function,
+        write_info_function,
+        write_formula_to_cell,
+        write_multiple_formulas,
+    ],
+    id="excel_formula_toolset",
+    max_retries=3,
+    file_path_resolver=resolve_file_path,
+)
+
+
+excel_formatting_toolset = AgentToolset(
+    tools=[
+        apply_cell_formatting,
+        apply_conditional_formatting,
+        create_formatting_preset,
+        load_formatting_preset,
+        list_formatting_presets,
+        apply_preset_formatting,
+        clear_formatting,
+    ],
+    id="excel_formatting_toolset",
+    max_retries=3,
+    file_path_resolver=resolve_file_path,
+)
+
+
+excel_charts_toolset = AgentToolset(
+    tools=[
+        create_chart,
+        create_matplotlib_chart,
+        list_charts,
+        delete_chart,
+        update_chart_data,
+        get_chart_types,
+        create_chart_preset,
+        apply_chart_preset,
+    ],
+    id="excel_charts_toolset",
+    max_retries=3,
+    file_path_resolver=resolve_file_path,
+)
+
+
+file_toolset = FunctionToolset[AgentDeps](
+    [describe_file, list_data_files, list_result_files], id="file_toolset", max_retries=3
+)
+
 
 agent = create_agent()
 
@@ -327,13 +172,10 @@ if __name__ == "__main__":
     agent_deps = FinnDeps(
         dirs=DataDirs(workspace_dir=workspace_dir, thread_dir=workspace_dir / "threads/1"),
         toolsets={
-            "arithmetic_toolset": arithmetic_toolset,
-            "conditional_toolset": conditional_toolset,
-            "date_and_time_toolset": date_and_time_toolset,
-            "logical_and_errors_toolset": logical_and_errors_toolset,
-            "lookup_and_reference_toolset": lookup_and_reference_toolset,
-            "filtering_and_selection_toolset": filtering_and_selection_toolset,
-            "transformation_and_pivoting_toolset": transformation_and_pivoting_toolset,
+            "excel_structure_toolset": excel_structure_toolset,
+            "excel_formula_toolset": excel_formula_toolset,
+            "excel_charts_toolset": excel_charts_toolset,
+            "excel_formatting_toolset": excel_formatting_toolset,
         },
     )
     while True:

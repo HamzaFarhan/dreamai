@@ -9,7 +9,7 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-from openpyxl_charts import (
+from excel_charts_toolset import (
     create_chart,
     create_data_table,
     create_matplotlib_chart,

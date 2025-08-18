@@ -4,7 +4,7 @@ import polars as pl
 from pydantic_ai import ModelRetry, RunContext
 
 from ..finn_deps import FinnDeps
-from .file_toolset import load_df, save_df_to_analysis_dir
+from .file_toolset import load_file, save_df_to_analysis_dir
 
 getcontext().prec = 28
 
@@ -25,7 +25,7 @@ def calculate_sum(ctx: RunContext[FinnDeps], file_path: str, column: str) -> Dec
         # Reads data.parquet and returns sum of sales column
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column).sum()).item()
@@ -48,7 +48,7 @@ def calculate_average(ctx: RunContext[FinnDeps], file_path: str, column: str) ->
         # Reads data.csv and returns average of sales column
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column).mean()).item()
@@ -71,7 +71,7 @@ def calculate_min(ctx: RunContext[FinnDeps], file_path: str, column: str) -> Dec
         # Reads data.csv and returns minimum of sales column
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column).min()).item()
@@ -94,7 +94,7 @@ def calculate_max(ctx: RunContext[FinnDeps], file_path: str, column: str) -> Dec
         # Reads data.csv and returns maximum of sales column
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column).max()).item()
@@ -117,7 +117,7 @@ def calculate_product(ctx: RunContext[FinnDeps], file_path: str, column: str) ->
         # Reads data.csv and returns product of column A
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column).product()).item()
@@ -140,7 +140,7 @@ def calculate_median(ctx: RunContext[FinnDeps], file_path: str, column: str) -> 
         # Reads data.csv and returns median of column A
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column).median()).item()
@@ -163,7 +163,7 @@ def calculate_mode(ctx: RunContext[FinnDeps], file_path: str, column: str) -> li
         # Reads data.csv and returns mode(s) of column A
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     modes = df.select(pl.col(column).mode()).to_series().to_list()
@@ -189,7 +189,7 @@ def calculate_percentile(ctx: RunContext[FinnDeps], file_path: str, column: str,
     if not 0 <= percentile <= 1:
         raise ModelRetry("Percentile must be between 0 and 1")
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column).quantile(percentile)).item()
@@ -220,7 +220,7 @@ def calculate_power(
         # Returns path to saved DataFrame with squared values
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column).pow(power)).to_series().to_list()
@@ -252,7 +252,7 @@ def calculate_sqrt(
         # Returns path to saved DataFrame with square root values
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column).sqrt()).to_series().to_list()
@@ -284,7 +284,7 @@ def calculate_exp(
         # Returns path to saved DataFrame with exponential values
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column).exp()).to_series().to_list()
@@ -316,7 +316,7 @@ def calculate_ln(
         # Returns path to saved DataFrame with natural log values
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column).log()).to_series().to_list()
@@ -350,7 +350,7 @@ def calculate_log(
         # Returns path to saved DataFrame with log base 10 values
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column).log(base)).to_series().to_list()
@@ -382,7 +382,7 @@ def calculate_abs(
         # Returns path to saved DataFrame with absolute values
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column).abs()).to_series().to_list()
@@ -414,7 +414,7 @@ def calculate_sign(
         # Returns path to saved DataFrame with sign values
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column).sign()).to_series().to_list()
@@ -448,7 +448,7 @@ def calculate_mod(
         # Returns path to saved DataFrame with modulus values
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column) % divisor).to_series().to_list()
@@ -482,7 +482,7 @@ def calculate_round(
         # Returns path to saved DataFrame with rounded values
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column)).to_series().to_list()
@@ -517,7 +517,7 @@ def calculate_roundup(
         # Returns path to saved DataFrame with rounded up values
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column)).to_series().to_list()
@@ -552,7 +552,7 @@ def calculate_rounddown(
         # Returns path to saved DataFrame with rounded down values
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column)).to_series().to_list()
@@ -585,7 +585,7 @@ def calculate_weighted_average(
         # Reads data.csv and returns weighted average
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select((pl.col(value_column) * pl.col(weight_column)).sum() / pl.col(weight_column).sum()).item()
@@ -608,7 +608,7 @@ def calculate_geometric_mean(ctx: RunContext[FinnDeps], file_path: str, column: 
         # Reads data.csv and returns geometric mean of column A
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.exp(pl.col(column).log().mean())).item()
@@ -631,7 +631,7 @@ def calculate_harmonic_mean(ctx: RunContext[FinnDeps], file_path: str, column: s
         # Reads data.csv and returns harmonic mean of column A
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     n = df.select(pl.col(column).count()).item()
@@ -661,7 +661,7 @@ def calculate_cumsum(
         # Returns path to saved DataFrame with cumulative sum values
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column).cum_sum()).to_series().to_list()
@@ -693,7 +693,7 @@ def calculate_cumprod(
         # Returns path to saved DataFrame with cumulative product values
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     result = df.select(pl.col(column).cum_prod()).to_series().to_list()
@@ -725,7 +725,7 @@ def calculate_variance_weighted(
         # Reads data.csv and returns weighted variance
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     wmean = df.select((pl.col(value_column) * pl.col(weight_column)).sum() / pl.col(weight_column).sum()).item()

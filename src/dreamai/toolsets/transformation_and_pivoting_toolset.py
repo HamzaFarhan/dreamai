@@ -5,7 +5,7 @@ import polars as pl
 from pydantic_ai import ModelRetry, RunContext
 
 from ..finn_deps import FinnDeps
-from .file_toolset import load_df, save_df_to_analysis_dir
+from .file_toolset import load_file, save_df_to_analysis_dir
 
 
 def create_pivot_table(
@@ -36,7 +36,7 @@ def create_pivot_table(
         # Returns path to saved pivot table
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
 
         # Create pivot table
         if value_cols:
@@ -84,7 +84,7 @@ def unpivot_data(
         # Returns path to saved unpivoted data
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
 
         # Unpivot the data
         result_df = df.unpivot(index=id_vars, on=value_vars, variable_name="variable", value_name="value")
@@ -118,7 +118,7 @@ def group_by(
         # Returns path to saved grouped data
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
 
         # Group and aggregate
         agg_exprs: list[pl.Expr] = []
@@ -159,7 +159,7 @@ def cross_tabulation(
         # Returns path to saved cross-tabulation table
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
 
         # Create cross-tabulation
         result_df = df.pivot(on=col_vars, index=row_vars, values=value_vars, aggregate_function="sum")
@@ -193,7 +193,7 @@ def group_by_agg(
         # Returns path to saved grouped aggregation results
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
 
         # Build aggregation expressions
         agg_map: dict[str, Callable[[str], pl.Expr]] = {
@@ -235,7 +235,7 @@ def stack_data(
         # Returns path to saved stacked data
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
 
         # Stack columns using unpivot
         id_vars = [col for col in df.columns if col not in columns_to_stack]
@@ -265,7 +265,7 @@ def unstack_data(
         # Returns path to saved unstacked data
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
 
         # Unstack by pivoting
         # Assuming the data has a value column and the level column to unstack
@@ -311,8 +311,8 @@ def merge_data(
         # Returns path to saved merged data
     """
     try:
-        left_df = load_df(ctx, left_path)
-        right_df = load_df(ctx, right_path)
+        left_df = load_file(ctx, left_path)
+        right_df = load_file(ctx, right_path)
 
         # Perform merge/join
         if isinstance(join_keys, str):
@@ -344,7 +344,7 @@ def concat_data(
         # Returns path to saved concatenated data
     """
     try:
-        dfs = [load_df(ctx, path) for path in file_paths]
+        dfs = [load_file(ctx, path) for path in file_paths]
 
         # Concatenate DataFrames
         if axis == 0:
@@ -376,7 +376,7 @@ def fill_forward(ctx: RunContext[FinnDeps], file_path: str, column: str, analysi
         # Returns path to saved data with forward filled values
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
 
         # Forward fill missing values in specified column
         result_df = df.with_columns(pl.col(column).forward_fill().alias(f"{column}_filled"))
@@ -410,7 +410,7 @@ def interpolate_values(
         # Returns path to saved data with interpolated values
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
 
         # Interpolate missing values in specified column
         if method == "linear":

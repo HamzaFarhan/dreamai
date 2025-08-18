@@ -6,7 +6,7 @@ import polars as pl
 from pydantic_ai import ModelRetry, RunContext
 
 from ..finn_deps import FinnDeps
-from .file_toolset import load_df, save_df_to_analysis_dir
+from .file_toolset import load_file, save_df_to_analysis_dir
 from .tool_exceptions import ConfigurationError, DataQualityError, ValidationError
 
 
@@ -159,7 +159,7 @@ def filter_by_date_range(
         ... )
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -229,7 +229,7 @@ def filter_by_value(
         ... )
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -279,7 +279,7 @@ def filter_by_multiple_conditions(
         ... )
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -373,7 +373,7 @@ def top_n(
         ... )
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -426,7 +426,7 @@ def bottom_n(ctx: RunContext[FinnDeps], file_path: str, *, column: str, n: int, 
         ... )
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -482,7 +482,7 @@ def sample_data(
         ... )
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 

@@ -9,10 +9,12 @@ from ..finn_deps import FinnDeps
 
 
 async def _list_files(
-    dir: Path, suffixes: str | list[str] = [".csv", ".parquet", ".xlsx"], exclude_in: list[str] | None = None
+    dir: Path,
+    suffixes: str | list[str] = [".csv", ".parquet", ".xlsx", ".xls", ".xlsb"],
+    exclude_in: list[str] | None = None,
 ) -> str:
     """
-    Lists all available in the `dir` and their summaries.
+    Lists all available in the `dir`.
     """
     dir_name = dir.name
     files = [file.expanduser().resolve() for file in Path(dir).glob("*")]
@@ -29,78 +31,63 @@ async def _list_files(
 
 async def list_data_files(ctx: RunContext[FinnDeps]) -> str:
     """
-    Lists all available csv files in the `data_dir`.
+    Lists all available files in the `data_dir`.
     """
     return await _list_files(dir=Path(ctx.deps.dirs.data_dir))
 
 
-async def list_analysis_files(ctx: RunContext[FinnDeps]) -> str:
+async def list_result_files(ctx: RunContext[FinnDeps]) -> str:
     """
-    Lists all the analysis csv files created so far in the `analysis_dir`.
+    Lists all the result files created so far in the `results_dir`.
+    All excel files should be created in the `results_dir`.
     """
-    return await _list_files(dir=Path(ctx.deps.dirs.analysis_dir))
+    return await _list_files(dir=Path(ctx.deps.dirs.results_dir))
 
 
-def resolve_data_path(
-    ctx: RunContext[FinnDeps], df_path: str | Path, suffixes: str | list[str] = [".parquet", ".csv", ".xlsx"]
+def resolve_file_path(
+    ctx: RunContext[FinnDeps],
+    file_path: str | Path,
+    suffixes: list[str] = [".xlsx", ".parquet", ".csv", ".xls", ".xlsb"],
 ) -> Path:
-    if isinstance(df_path, str):
-        df_path = Path(df_path)
+    if isinstance(file_path, str):
+        file_path = Path(file_path)
     paths_to_try: list[Path] = []
+    if file_path.suffix and file_path.suffix.lower() not in suffixes:
+        suffixes.insert(0, file_path.suffix.lower())
     for suffix in suffixes:
         paths_to_try += [
-            ctx.deps.dirs.analysis_dir / df_path.name,
-            (ctx.deps.dirs.analysis_dir / df_path.stem).with_suffix(suffix),
-            ctx.deps.dirs.data_dir / df_path.name,
-            (ctx.deps.dirs.data_dir / df_path.stem).with_suffix(suffix),
+            ctx.deps.dirs.results_dir / file_path.name,
+            (ctx.deps.dirs.results_dir / file_path.stem).with_suffix(suffix),
+            ctx.deps.dirs.data_dir / file_path.name,
+            (ctx.deps.dirs.data_dir / file_path.stem).with_suffix(suffix),
         ]
     for path in paths_to_try:
         if path.exists():
             return path
-    raise FileNotFoundError(
-        f"DataFrame file not found in expected locations: {paths_to_try}\n\n{list_analysis_files(ctx)}\n{list_data_files(ctx)}"
+    return (ctx.deps.dirs.results_dir / file_path.name).with_suffix(
+        file_path.suffix if file_path.suffix else ".xlsx"
     )
 
 
-def load_df(ctx: RunContext[FinnDeps], data: pl.DataFrame | str | Path) -> pl.DataFrame:
+def load_file(ctx: RunContext[FinnDeps], data: pl.DataFrame | str | Path) -> pl.DataFrame:
     if isinstance(data, pl.DataFrame):
         return data
-    df_path = resolve_data_path(ctx, data)
-    return pl.read_parquet(df_path) if df_path.suffix.lower() == ".parquet" else pl.read_csv(df_path)
-
-
-def load_file(ctx: RunContext[FinnDeps], file_path: str) -> pl.DataFrame:
-    df_path = resolve_data_path(ctx, file_path)
-    if df_path.parent != ctx.deps.dirs.analysis_dir:
-        raise ModelRetry(
-            "Can only load files from the analysis dir. Which are made by most tools after computation."
-        )
-    return pl.read_parquet(df_path) if df_path.suffix.lower() == ".parquet" else pl.read_csv(df_path)
-
-
-def df_path_to_analysis_df_path(ctx: RunContext[FinnDeps], df_path: str | Path) -> Path:
-    df_path = Path(df_path)
-    analysis_path = ctx.deps.dirs.analysis_dir / df_path.name
-    if analysis_path.suffix.lower() not in [".parquet", ".csv"]:
-        analysis_path = (ctx.deps.dirs.analysis_dir / df_path.stem).with_suffix(".parquet")
-    return analysis_path
-
-
-def save_df_to_analysis_dir(ctx: RunContext[FinnDeps], df: pl.DataFrame, analysis_result_file_name: str) -> str:
-    output_path = df_path_to_analysis_df_path(ctx, analysis_result_file_name)
-    if output_path.suffix.lower() == ".parquet":
-        df.write_parquet(output_path)
+    file_apth = resolve_file_path(ctx, data)
+    suffix = file_apth.suffix.lower()
+    if suffix == ".parquet":
+        return pl.read_parquet(file_apth)
+    elif suffix in [".xlsx", ".xls", ".xlsb"]:
+        return pl.read_excel(file_apth)
     else:
-        df.write_csv(output_path)
-    return str(output_path)
+        return pl.read_csv(file_apth)
 
 
-def describe_df(ctx: RunContext[FinnDeps], df_path: str | Path) -> dict[str, Any]:
+def describe_file(ctx: RunContext[FinnDeps], file_path: str) -> dict[str, Any]:
     """
-    Get the shape, schema, and description of the DataFrame at the given path.
+    Get the shape, schema, and description of a csv, excel, or parquet file at the given path.
     """
     try:
-        df = load_df(ctx, df_path)
+        df = load_file(ctx, file_path)
         res: dict[str, Any] = {"shape": {"rows": df.height, "columns": df.width}, "schema": str(df.schema)}
         try:
             res["description"] = df.describe().to_dicts()
@@ -108,18 +95,4 @@ def describe_df(ctx: RunContext[FinnDeps], df_path: str | Path) -> dict[str, Any
             logger.error(f"Error describing DataFrame: {e}")
         return res
     except Exception as e:
-        raise ModelRetry(f"Error in describe df: {e}")
-
-
-# if __name__ == "__main__":
-#     workspace_dir = Path("../../../workspaces/session/")
-#     ctx = RunContext(
-#         deps=FinnDeps(
-#             dirs=DataDirs(
-#                 workspace_dir=workspace_dir,
-#                 thread_dir=workspace_dir / "threads/1",
-#             )
-#         )
-#     )
-
-#     pprint(describe_df(ctx, "orders.csv"), indent=2, sort_dicts=False)
+        raise ModelRetry(f"Error in describe_file: {e}")

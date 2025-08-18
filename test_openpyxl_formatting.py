@@ -11,7 +11,7 @@ from pathlib import Path
 from openpyxl import Workbook
 
 # Import our formatting functions
-from openpyxl_formatting import (
+from excel_formatting_toolset import (
     apply_cell_formatting,
     apply_conditional_formatting,
     apply_preset_formatting,

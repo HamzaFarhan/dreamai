@@ -5,7 +5,7 @@ This demonstrates how to use the local Excel formatting functions
 instead of Google Sheets APIs.
 """
 
-from openpyxl_formatting import (
+from excel_formatting_toolset import (
     apply_cell_formatting,
     apply_conditional_formatting,
     apply_preset_formatting,

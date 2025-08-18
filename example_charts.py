@@ -4,7 +4,7 @@ Example usage of OpenPyXL Charts functionality
 """
 
 from openpyxl import Workbook
-from openpyxl_charts import create_chart, create_data_table, get_chart_types
+from excel_charts_toolset import create_chart, create_data_table, get_chart_types
 
 
 def create_sample_excel_with_charts():

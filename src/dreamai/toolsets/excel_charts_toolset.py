@@ -21,7 +21,6 @@ from openpyxl.chart.bar_chart import BarChart as ColumnChart
 from openpyxl.chart.reference import Reference
 from openpyxl.drawing.image import Image
 from openpyxl.utils import range_boundaries
-from openpyxl.worksheet.table import Table, TableStyleInfo
 
 
 # Custom Exceptions
@@ -104,7 +103,8 @@ def _validate_chart_type(chart_type: str) -> str:
 
     normalized = chart_type.lower().strip()
     if normalized not in valid_types:
-        raise ChartError(f"Invalid chart type '{chart_type}'. Valid types: {', '.join(valid_types)}")
+        valid_list = sorted(list(valid_types))
+        raise ChartError(f"Invalid chart type '{chart_type}'. Valid types are: {valid_list}")
 
     return normalized
 
@@ -287,142 +287,8 @@ def create_chart(
         raise FileOperationError(f"Failed to create chart: {e}")
 
 
-def create_pivot_table(
-    excel_path: str,
-    source_sheet: str,
-    data_range: str,
-    pivot_sheet: str,
-    values: dict[str, str],
-) -> str:
-    """
-    Create a basic pivot table structure from source data.
-
-    Note: This creates a simplified pivot table structure. For full pivot table
-    functionality, use Excel's native pivot table features after creating this structure.
-
-    Args:
-        excel_path: Path to the Excel file
-        source_sheet: Name of the source data sheet
-        data_range: Range of source data (e.g., 'A1:D100')
-        pivot_sheet: Name of the sheet for the pivot table
-        values: Dict mapping field names to aggregation types
-
-    Returns:
-        Path to the Excel file
-
-    Raises:
-        FileNotFoundError: If Excel file doesn't exist
-        SheetNotFoundError: If source sheet doesn't exist
-        DataError: If data range is invalid
-        FileOperationError: If operation fails
-    """
-    try:
-        excel_file = Path(excel_path).resolve()
-        if not excel_file.exists():
-            raise FileNotFoundError(f"Excel file not found: {excel_path}")
-
-        wb = load_workbook(excel_file)
-
-        if source_sheet not in wb.sheetnames:
-            raise SheetNotFoundError(f"Source sheet '{source_sheet}' not found")
-
-        # Create pivot sheet if it doesn't exist
-        if pivot_sheet not in wb.sheetnames:
-            wb.create_sheet(title=pivot_sheet)
-
-        pivot_ws = wb[pivot_sheet]
-
-        # Validate aggregation types
-        valid_aggregations = {"sum", "count", "average", "max", "min", "product", "stdDev", "var"}
-        for field_name, aggregation in values.items():
-            if aggregation not in valid_aggregations:
-                raise DataError(f"Invalid aggregation type '{aggregation}' for field '{field_name}'")
-
-        # Create a simple summary table instead of complex pivot table
-        # This provides basic pivot-like functionality that works reliably
-        pivot_ws.append(["Field", "Aggregation", "Formula"])
-        row = 2
-        for field_name, aggregation in values.items():
-            formula = f"={aggregation.upper()}({source_sheet}!{data_range})"
-            pivot_ws.append([field_name, aggregation, formula])
-            row += 1
-
-        wb.save(excel_file)
-        return str(excel_file)
-
-    except (FileNotFoundError, SheetNotFoundError, DataError):
-        raise
-    except Exception as e:
-        raise FileOperationError(f"Failed to create pivot table: {e}")
-
-
-def create_data_table(
-    excel_path: str,
-    sheet_name: str,
-    data_range: str,
-    table_name: str,
-    table_style: str = "TableStyleMedium9",
-) -> str:
-    """
-    Create a formatted data table from a range.
-
-    Args:
-        excel_path: Path to the Excel file
-        sheet_name: Name of the target sheet
-        data_range: Range to convert to table
-        table_name: Name for the table
-        table_style: Excel table style name
-
-    Returns:
-        Path to the Excel file
-
-    Raises:
-        FileNotFoundError: If Excel file doesn't exist
-        SheetNotFoundError: If sheet doesn't exist
-        DataError: If data range is invalid
-        FileOperationError: If operation fails
-    """
-    try:
-        excel_file = Path(excel_path).resolve()
-        if not excel_file.exists():
-            raise FileNotFoundError(f"Excel file not found: {excel_path}")
-
-        wb = load_workbook(excel_file)
-
-        if sheet_name not in wb.sheetnames:
-            raise SheetNotFoundError(f"Sheet '{sheet_name}' not found")
-
-        ws = wb[sheet_name]
-
-        # Validate range
-        try:
-            min_col, min_row, max_col, max_row = range_boundaries(data_range)
-        except ValueError as e:
-            raise DataError(f"Invalid range specification '{data_range}': {e}")
-
-        # Create table
-        table = Table(displayName=table_name, ref=data_range)
-
-        # Add table style
-        style = TableStyleInfo(
-            name=table_style,
-            showFirstColumn=False,
-            showLastColumn=False,
-            showRowStripes=True,
-            showColumnStripes=True,
-        )
-        table.tableStyleInfo = style
-
-        # Add table to worksheet
-        ws.add_table(table)
-
-        wb.save(excel_file)
-        return str(excel_file)
-
-    except (FileNotFoundError, SheetNotFoundError, DataError):
-        raise
-    except Exception as e:
-        raise FileOperationError(f"Failed to create data table: {e}")
+# Pivot table and data table functions have been moved to excel_structure_toolset.py
+# to avoid duplication and maintain clear separation of concerns.
 
 
 # Matplotlib Integration Functions
@@ -466,9 +332,6 @@ def create_matplotlib_chart(
         FileOperationError: If operation fails
     """
     try:
-        if not matplotlib_available:
-            raise ImportError("Matplotlib is required for this function")
-
         excel_file = Path(excel_path).resolve()
         if not excel_file.exists():
             raise FileNotFoundError(f"Excel file not found: {excel_path}")
@@ -483,7 +346,10 @@ def create_matplotlib_chart(
         if source_sheet_name is None:
             source_sheet_name = wb.sheetnames[0]
         elif source_sheet_name not in wb.sheetnames:
-            raise SheetNotFoundError(f"Sheet '{source_sheet_name}' not found")
+            available_sheets = wb.sheetnames
+            raise SheetNotFoundError(
+                f"Sheet '{source_sheet_name}' not found. Available sheets: {available_sheets}"
+            )
 
         ws = wb[source_sheet_name]
 
@@ -505,6 +371,9 @@ def create_matplotlib_chart(
         # Set matplotlib style
         if style and hasattr(style, "available") and style_name in style.available:
             style.use(style_name)
+        elif style and hasattr(style, "available") and style_name not in style.available:
+            available_styles = list(style.available)
+            raise ChartError(f"Invalid matplotlib style '{style_name}'. Available styles are: {available_styles}")
 
         # Import matplotlib here to avoid scope issues
         import matplotlib.pyplot as plt_local
@@ -567,7 +436,21 @@ def create_matplotlib_chart(
             plt_local.colorbar(im, ax=ax)
 
         else:
-            raise ChartError(f"Unsupported matplotlib chart type: {chart_type}")
+            valid_matplotlib_types = [
+                "line",
+                "bar",
+                "scatter",
+                "pie",
+                "histogram",
+                "box",
+                "heatmap",
+                "violin",
+                "density",
+                "subplots",
+            ]
+            raise ChartError(
+                f"Unsupported matplotlib chart type: '{chart_type}'. Valid types are: {valid_matplotlib_types}"
+            )
 
         ax.set_title(title)
         plt_local.tight_layout()
@@ -636,7 +519,8 @@ def list_charts(excel_path: str, sheet_name: str | None = None) -> dict[str, Any
 
         for sheet in sheets_to_check:
             if sheet not in wb.sheetnames:
-                raise SheetNotFoundError(f"Sheet '{sheet}' not found")
+                available_sheets = wb.sheetnames
+                raise SheetNotFoundError(f"Sheet '{sheet}' not found. Available sheets: {available_sheets}")
 
             ws = wb[sheet]
 
@@ -684,12 +568,16 @@ def delete_chart(excel_path: str, sheet_name: str, chart_index: int = 0) -> str:
         wb = load_workbook(excel_file)
 
         if sheet_name not in wb.sheetnames:
-            raise SheetNotFoundError(f"Sheet '{sheet_name}' not found")
+            available_sheets = wb.sheetnames
+            raise SheetNotFoundError(f"Sheet '{sheet_name}' not found. Available sheets: {available_sheets}")
 
         ws = wb[sheet_name]
 
         if chart_index >= len(ws._charts) or chart_index < 0:
-            raise ChartError(f"Chart index {chart_index} is invalid. Sheet has {len(ws._charts)} charts.")
+            valid_indices = list(range(len(ws._charts))) if ws._charts else []
+            raise ChartError(
+                f"Chart index {chart_index} is invalid. Sheet has {len(ws._charts)} charts. Valid indices are: {valid_indices}"
+            )
 
         # Remove chart
         del ws._charts[chart_index]
@@ -736,12 +624,16 @@ def update_chart_data(
         wb = load_workbook(excel_file)
 
         if sheet_name not in wb.sheetnames:
-            raise SheetNotFoundError(f"Sheet '{sheet_name}' not found")
+            available_sheets = wb.sheetnames
+            raise SheetNotFoundError(f"Sheet '{sheet_name}' not found. Available sheets: {available_sheets}")
 
         ws = wb[sheet_name]
 
         if chart_index >= len(ws._charts) or chart_index < 0:
-            raise ChartError(f"Chart index {chart_index} is invalid. Sheet has {len(ws._charts)} charts.")
+            valid_indices = list(range(len(ws._charts))) if ws._charts else []
+            raise ChartError(
+                f"Chart index {chart_index} is invalid. Sheet has {len(ws._charts)} charts. Valid indices are: {valid_indices}"
+            )
 
         chart = ws._charts[chart_index]
 
@@ -750,7 +642,10 @@ def update_chart_data(
         source_sheet_name = sheet_from_range or sheet_name
 
         if source_sheet_name not in wb.sheetnames:
-            raise SheetNotFoundError(f"Source sheet '{source_sheet_name}' not found")
+            available_sheets = wb.sheetnames
+            raise SheetNotFoundError(
+                f"Source sheet '{source_sheet_name}' not found. Available sheets: {available_sheets}"
+            )
 
         source_ws = wb[source_sheet_name]
         range_info = _parse_data_range(a1_range, source_ws)
@@ -810,10 +705,7 @@ def get_chart_types() -> dict[str, Any]:
             "violin",
             "density",
             "subplots",
-        ]
-        if matplotlib_available
-        else [],
-        "matplotlib_available": matplotlib_available,
+        ],
     }
 
 
@@ -887,7 +779,8 @@ def apply_chart_preset(
             presets = json.load(f)
 
         if preset_name not in presets:
-            raise KeyError(f"Preset '{preset_name}' not found")
+            available_presets = list(presets.keys())
+            raise KeyError(f"Preset '{preset_name}' not found. Available presets are: {available_presets}")
 
         # Get preset configuration
         config = presets[preset_name]["config"].copy()

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-from openpyxl_formatting import apply_conditional_formatting
+from excel_formatting_toolset import apply_conditional_formatting
 
 
 def test_between_condition():

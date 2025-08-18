@@ -4,7 +4,7 @@ import polars as pl
 from pydantic_ai import ModelRetry, RunContext
 
 from ..finn_deps import FinnDeps
-from .file_toolset import load_df, save_df_to_analysis_dir
+from .file_toolset import load_file, save_df_to_analysis_dir
 
 getcontext().prec = 28
 
@@ -40,7 +40,7 @@ def logical_if(
         # Returns path to saved DataFrame with conditional values
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -94,7 +94,7 @@ def logical_iferror(
         # Returns path to saved DataFrame with error handling
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -143,7 +143,7 @@ def logical_ifna(
         # Returns path to saved DataFrame with N/A handling
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -188,7 +188,7 @@ def logical_ifs(
         # Returns path to saved DataFrame with multiple condition results
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -232,7 +232,7 @@ def logical_and(
         # Returns path to saved DataFrame with AND operation results
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -274,7 +274,7 @@ def logical_or(
         # Returns path to saved DataFrame with OR operation results
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -316,7 +316,7 @@ def logical_not(
         # Returns path to saved DataFrame with NOT operation results
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -352,7 +352,7 @@ def logical_switch(
         # Returns path to saved DataFrame with switch operation results
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -399,7 +399,7 @@ def logical_xor(
         # Returns path to saved DataFrame with XOR operation results
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -438,7 +438,7 @@ def is_blank(
         # Returns path to saved DataFrame with blank check results
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -470,7 +470,7 @@ def is_number(
         # Returns path to saved DataFrame with number check results
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -506,7 +506,7 @@ def is_text(
         # Returns path to saved DataFrame with text check results
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -542,7 +542,7 @@ def is_error(
         # Returns path to saved DataFrame with error check results
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -567,7 +567,7 @@ def logical_and_scalar(ctx: RunContext[FinnDeps], file_path: str, logical_column
         True
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -598,7 +598,7 @@ def logical_or_scalar(ctx: RunContext[FinnDeps], file_path: str, logical_columns
         True
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 

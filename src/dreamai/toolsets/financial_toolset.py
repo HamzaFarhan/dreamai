@@ -6,7 +6,7 @@ import polars as pl
 from pydantic_ai import ModelRetry, RunContext
 
 from ..finn_deps import FinnDeps
-from .file_toolset import load_df
+from .file_toolset import load_file
 
 
 def calculate_npv(discount_rate: float, *cash_flows: float) -> float:
@@ -57,7 +57,7 @@ def calculate_irr(
         0.162
     """
     try:
-        df = load_df(ctx, data)
+        df = load_file(ctx, data)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -114,7 +114,7 @@ def calculate_xnpv(
         123.45
     """
     try:
-        df = load_df(ctx, data)
+        df = load_file(ctx, data)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -163,7 +163,7 @@ def calculate_xirr(
         0.162
     """
     try:
-        df = load_df(ctx, data)
+        df = load_file(ctx, data)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -1005,7 +1005,7 @@ def calculate_mirr(
         0.126
     """
     try:
-        df = load_df(ctx, data)
+        df = load_file(ctx, data)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 

@@ -4,7 +4,7 @@ import polars as pl
 from pydantic_ai import ModelRetry, RunContext
 
 from ..finn_deps import FinnDeps
-from .file_toolset import load_df, save_df_to_analysis_dir
+from .file_toolset import load_file, save_df_to_analysis_dir
 
 getcontext().prec = 28
 
@@ -35,7 +35,7 @@ def cohort_analysis(
         # Returns path to saved cohort metrics DataFrame
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         df = df.with_columns(pl.col(order_date_col).str.strptime(pl.Date, "%Y-%m-%d"))
 
         cohort_df = (
@@ -82,7 +82,7 @@ def retention_rate(
         # Returns path to saved retention rates DataFrame
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
 
         period_active = (
             df.group_by(period_col).agg(pl.col(active_col).sum().alias("active_count")).sort(period_col)
@@ -117,7 +117,7 @@ def churn_rate(ctx: RunContext[FinnDeps], file_path: str, churned_flag_col: str)
         # Returns churn rate
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         result = df.select(pl.col(churned_flag_col).mean()).item()
         return Decimal(str(result))
     except Exception as e:
@@ -166,7 +166,7 @@ def payback_period(
         # Returns period number
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         cash_flows = df.select(pl.col(cash_flow_col)).to_series().to_list()
         cumulative = 0
         for period, cf in enumerate(cash_flows, 1):
@@ -204,7 +204,7 @@ def assign_cohort(
         # Returns path to saved DataFrame with cohort column
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         df = df.with_columns(pl.col(date_col).str.strptime(pl.Date, "%Y-%m-%d"))
 
         first_dates = (

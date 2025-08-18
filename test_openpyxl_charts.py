@@ -10,7 +10,7 @@ from pathlib import Path
 # Add the current directory to Python path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from openpyxl_charts import (
+from excel_charts_toolset import (
     create_chart,
     create_data_table,
     create_pivot_table,
@@ -89,7 +89,7 @@ def test_chart_creation():
         # Test matplotlib chart if available
         if matplotlib_available:
             try:
-                from openpyxl_charts import create_matplotlib_chart
+                from excel_charts_toolset import create_matplotlib_chart
                 result = create_matplotlib_chart(
                     excel_path=test_file,
                     data_range="A1:C6",

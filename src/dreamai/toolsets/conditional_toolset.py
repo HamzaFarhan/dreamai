@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from pydantic_ai import ModelRetry, RunContext
 
 from ..finn_deps import FinnDeps
-from .file_toolset import load_df
+from .file_toolset import load_file
 
 getcontext().prec = 28
 
@@ -129,7 +129,7 @@ def sumif(
         # Reads data.csv and returns sum of sales where sales > 1000
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -167,7 +167,7 @@ def sumifs(
         300.0
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -207,7 +207,7 @@ def countif(
         2
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     try:
@@ -236,7 +236,7 @@ def countifs(ctx: RunContext[FinnDeps], file_path: str, conditions: list[Conditi
         1
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     try:
@@ -277,7 +277,7 @@ def averageif(
         250.0
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -315,7 +315,7 @@ def averageifs(
         300.0
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     try:
@@ -354,7 +354,7 @@ def maxifs(
         300.0
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     try:
@@ -393,7 +393,7 @@ def minifs(
         300.0
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
     try:
@@ -426,7 +426,7 @@ def sumproduct(ctx: RunContext[FinnDeps], file_path: str, *columns: str) -> Deci
         32.0  # (1*4) + (2*5) + (3*6) = 4 + 10 + 18 = 32
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -470,7 +470,7 @@ def aggregate(
         15.0
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -521,7 +521,7 @@ def subtotal(ctx: RunContext[FinnDeps], file_path: str, function_num: int, colum
         15.0
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -570,7 +570,7 @@ def countblank(ctx: RunContext[FinnDeps], file_path: str, column: str) -> int:
         2
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 
@@ -596,7 +596,7 @@ def counta(ctx: RunContext[FinnDeps], file_path: str, column: str) -> int:
         3
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
     except Exception as e:
         raise ModelRetry(f"Error loading DataFrame: {e}")
 

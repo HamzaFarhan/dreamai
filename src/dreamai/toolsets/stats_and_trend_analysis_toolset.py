@@ -5,7 +5,7 @@ import polars as pl
 from pydantic_ai import ModelRetry, RunContext
 
 from ..finn_deps import FinnDeps
-from .file_toolset import load_df, save_df_to_analysis_dir
+from .file_toolset import load_file, save_df_to_analysis_dir
 
 getcontext().prec = 28
 
@@ -25,7 +25,7 @@ def stdev_p(ctx: RunContext[FinnDeps], file_path: str, column: str) -> Decimal:
         =STDEV.P(data_range)
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         result = df.select(pl.col(column).std(ddof=0)).item()
         return Decimal(str(result))
     except Exception as e:
@@ -47,7 +47,7 @@ def stdev_s(ctx: RunContext[FinnDeps], file_path: str, column: str) -> Decimal:
         =STDEV.S(data_range)
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         result = df.select(pl.col(column).std(ddof=1)).item()
         return Decimal(str(result))
     except Exception as e:
@@ -69,7 +69,7 @@ def var_p(ctx: RunContext[FinnDeps], file_path: str, column: str) -> Decimal:
         =VAR.P(data_range)
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         result = df.select(pl.col(column).var(ddof=0)).item()
         return Decimal(str(result))
     except Exception as e:
@@ -91,7 +91,7 @@ def var_s(ctx: RunContext[FinnDeps], file_path: str, column: str) -> Decimal:
         =VAR.S(data_range)
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         result = df.select(pl.col(column).var(ddof=1)).item()
         return Decimal(str(result))
     except Exception as e:
@@ -113,7 +113,7 @@ def median(ctx: RunContext[FinnDeps], file_path: str, column: str) -> Decimal:
         =MEDIAN(data_range)
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         result = df.select(pl.col(column).median()).item()
         return Decimal(str(result))
     except Exception as e:
@@ -135,7 +135,7 @@ def mode(ctx: RunContext[FinnDeps], file_path: str, column: str) -> Decimal:
         =MODE(data_range)
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         result = df.select(pl.col(column).mode()).item(0, 0)
         return Decimal(str(result))
     except Exception as e:
@@ -158,7 +158,7 @@ def correl(ctx: RunContext[FinnDeps], file_path: str, column1: str, column2: str
         =CORREL(range1, range2)
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         result = df.select(pl.corr(column1, column2)).item()
         return Decimal(str(result))
     except Exception as e:
@@ -181,7 +181,7 @@ def covariance_p(ctx: RunContext[FinnDeps], file_path: str, column1: str, column
         =COVARIANCE.P(range1, range2)
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         result = df.select(pl.cov(column1, column2, ddof=0)).item()
         return Decimal(str(result))
     except Exception as e:
@@ -204,7 +204,7 @@ def covariance_s(ctx: RunContext[FinnDeps], file_path: str, column1: str, column
         =COVARIANCE.S(range1, range2)
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         result = df.select(pl.cov(column1, column2, ddof=1)).item()
         return Decimal(str(result))
     except Exception as e:
@@ -238,7 +238,7 @@ def trend(
         =TREND(known_y's, [known_x's], [new_x's])
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         y = df.select(pl.col(known_ys)).to_series().to_list()
         if known_xs:
             x = df.select(pl.col(known_xs)).to_series().to_list()
@@ -294,7 +294,7 @@ def forecast(
         =FORECAST(new_x, known_y's, known_x's)
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         y = df.select(pl.col(known_ys)).to_series().to_list()
         x = df.select(pl.col(known_xs)).to_series().to_list()
 
@@ -368,7 +368,7 @@ def growth(
     try:
         import math
 
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         y = [math.log(yi) for yi in df.select(pl.col(known_ys)).to_series().to_list() if yi > 0]
         if known_xs:
             x = df.select(pl.col(known_xs)).to_series().to_list()[: len(y)]
@@ -417,7 +417,7 @@ def slope(ctx: RunContext[FinnDeps], file_path: str, known_ys: str, known_xs: st
         SLOPE(B1:B10, A1:A10)
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         result = df.select(pl.cov(known_ys, known_xs, ddof=1) / pl.col(known_xs).var(ddof=1)).item()
         return Decimal(str(result))
     except Exception as e:
@@ -440,7 +440,7 @@ def intercept(ctx: RunContext[FinnDeps], file_path: str, known_ys: str, known_xs
         INTERCEPT(B1:B10, A1:A10)
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         slope_val = slope(ctx, file_path, known_ys, known_xs)
         mean_y = df.select(pl.col(known_ys).mean()).item()
         mean_x = df.select(pl.col(known_xs).mean()).item()
@@ -466,7 +466,7 @@ def rsq(ctx: RunContext[FinnDeps], file_path: str, known_ys: str, known_xs: str)
         RSQ(B1:B10, A1:A10)
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         result = df.select(pl.corr(known_ys, known_xs) ** 2).item()
         return Decimal(str(result))
     except Exception as e:
@@ -500,7 +500,7 @@ def linest(
         LINEST(B1:B10, A1:A10, TRUE, TRUE)
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         y = df.select(pl.col(known_ys)).to_series().to_list()
         x = df.select(pl.col(known_xs)).to_series().to_list()
 
@@ -575,7 +575,7 @@ def logest(
     try:
         import math
 
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         y_log = [math.log(yi) for yi in df.select(pl.col(known_ys)).to_series().to_list() if yi > 0]
         x = df.select(pl.col(known_xs)).to_series().to_list()[: len(y_log)]
 
@@ -634,7 +634,7 @@ def rank(
         RANK(85, A1:A10, 0)
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         descending = order == 0
         result = df.select(
             (
@@ -672,7 +672,7 @@ def percentrank(
         PERCENTRANK(A1:A10, 85)
     """
     try:
-        df = load_df(ctx, file_path)
+        df = load_file(ctx, file_path)
         array = df.select(pl.col(ref_column)).to_series().drop_nulls().sort().to_list()
         n = len(array)
         if n == 0:

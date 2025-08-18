@@ -1,13 +1,3 @@
-"""
-OpenPyXL Formatting Functions
-
-This module provides Excel file formatting using OpenPyXL.
-All functions take file_path as the first argument and return file paths.
-Functions apply formatting to Excel files and save them.
-
-Author: Generated for DreamAI formatting needs
-"""
-
 import json
 from pathlib import Path
 from typing import Any
@@ -214,7 +204,10 @@ def apply_cell_formatting(
         if target_sheet is None:
             target_sheet = wb.sheetnames[0]
         elif target_sheet not in wb.sheetnames:
-            raise SheetNotFoundError(f"Sheet '{target_sheet}' not found in {excel_path}")
+            available_sheets = list(wb.sheetnames)
+            raise SheetNotFoundError(
+                f"Sheet '{target_sheet}' not found in {excel_path}. Available sheets: {available_sheets}"
+            )
 
         ws = wb[target_sheet]
 
@@ -296,13 +289,29 @@ def apply_conditional_formatting(
         if target_sheet is None:
             target_sheet = wb.sheetnames[0]
         elif target_sheet not in wb.sheetnames:
-            raise SheetNotFoundError(f"Sheet '{target_sheet}' not found in {excel_path}")
+            available_sheets = list(wb.sheetnames)
+            raise SheetNotFoundError(
+                f"Sheet '{target_sheet}' not found in {excel_path}. Available sheets: {available_sheets}"
+            )
 
         ws = wb[target_sheet]
 
         # Map condition to openpyxl rule
         condition_type = condition.get("type", "").upper()
         condition_value = _extract_condition_value(condition)
+
+        # Define valid condition types
+        valid_condition_types = [
+            "GREATER_THAN",
+            "LESS_THAN",
+            "GREATER_THAN_EQ",
+            "LESS_THAN_EQ",
+            "EQUAL",
+            "NOT_EQUAL",
+            "TEXT_CONTAINS",
+            "BETWEEN",
+            "CUSTOM_FORMULA",
+        ]
 
         # Create formatting style
         mapped_style = _map_formatting_to_openpyxl(format_style)
@@ -356,9 +365,10 @@ def apply_conditional_formatting(
                     raise FormatError(f"BETWEEN condition requires two values, got: {values}")
         elif condition_type == "CUSTOM_FORMULA":
             rule = FormulaRule(formula=[condition_value], fill=fill, font=font)
+        elif condition_type == "":
+            raise FormatError(f"Condition type is required. Valid types: {valid_condition_types}")
         else:
-            # Default to formula rule
-            rule = FormulaRule(formula=[str(condition_value)], fill=fill, font=font)
+            raise FormatError(f"Unknown condition type '{condition_type}'. Valid types: {valid_condition_types}")
 
         if rule:
             ws.conditional_formatting.add(a1_range, rule)
@@ -495,7 +505,14 @@ def apply_preset_formatting(
         formatting = load_formatting_preset(preset_name)
         return apply_cell_formatting(excel_path, range_spec, formatting, sheet_name)
 
-    except (FileNotFoundError, KeyError):
+    except KeyError:
+        # Get available presets for error message
+        try:
+            available_presets = list(list_formatting_presets().keys())
+            raise KeyError(f"Preset '{preset_name}' not found. Available presets: {available_presets}")
+        except Exception:
+            raise KeyError(f"Preset '{preset_name}' not found and could not list available presets")
+    except (FileNotFoundError,):
         raise
     except Exception as e:
         raise FileOperationError(f"Failed to apply preset formatting: {e}")
@@ -535,7 +552,10 @@ def clear_formatting(excel_path: str, range_spec: str, sheet_name: str | None = 
         if target_sheet is None:
             target_sheet = wb.sheetnames[0]
         elif target_sheet not in wb.sheetnames:
-            raise SheetNotFoundError(f"Sheet '{target_sheet}' not found in {excel_path}")
+            available_sheets = list(wb.sheetnames)
+            raise SheetNotFoundError(
+                f"Sheet '{target_sheet}' not found in {excel_path}. Available sheets: {available_sheets}"
+            )
 
         ws = wb[target_sheet]
 
