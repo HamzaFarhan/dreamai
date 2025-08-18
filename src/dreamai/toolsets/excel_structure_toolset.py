@@ -109,15 +109,28 @@ def csv_to_excel_sheet(csv_path: str, excel_path: str, sheet_name: str | None = 
 
         # Read CSV and write to sheet
         with open(csv_path, "r", encoding="utf-8") as csvfile:
-            # Try to detect delimiter
+            # Try to detect delimiter with fallback
             sample = csvfile.read(1024)
             csvfile.seek(0)
-            sniffer = csv.Sniffer()
-            delimiter = sniffer.sniff(sample).delimiter
+
+            delimiter = ","  # Default fallback
+            try:
+                sniffer = csv.Sniffer()
+                delimiter = sniffer.sniff(sample, delimiters=",;\t|").delimiter
+            except csv.Error:
+                # If sniffer fails, try common delimiters in order of preference
+                for test_delimiter in [",", ";", "\t", "|"]:
+                    if test_delimiter in sample:
+                        delimiter = test_delimiter
+                        break
 
             reader = csv.reader(csvfile, delimiter=delimiter)
             for row_idx, row in enumerate(reader, 1):
                 for col_idx, value in enumerate(row, 1):
+                    # Skip empty values
+                    if not value or value.strip() == "":
+                        continue
+
                     # Try to convert to number if possible
                     try:
                         if "." in value:
@@ -186,12 +199,25 @@ def csvs_to_excel(csv_paths: list[str], excel_path: str) -> str:
             with open(csv_path, "r", encoding="utf-8") as csvfile:
                 sample = csvfile.read(1024)
                 csvfile.seek(0)
-                sniffer = csv.Sniffer()
-                delimiter = sniffer.sniff(sample).delimiter
+
+                delimiter = ","  # Default fallback
+                try:
+                    sniffer = csv.Sniffer()
+                    delimiter = sniffer.sniff(sample, delimiters=",;\t|").delimiter
+                except csv.Error:
+                    # If sniffer fails, try common delimiters in order of preference
+                    for test_delimiter in [",", ";", "\t", "|"]:
+                        if test_delimiter in sample:
+                            delimiter = test_delimiter
+                            break
 
                 reader = csv.reader(csvfile, delimiter=delimiter)
                 for row_idx, row in enumerate(reader, 1):
                     for col_idx, value in enumerate(row, 1):
+                        # Skip empty values
+                        if not value or value.strip() == "":
+                            continue
+
                         try:
                             if "." in value:
                                 ws.cell(row=row_idx, column=col_idx, value=float(value))

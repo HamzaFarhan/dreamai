@@ -13,6 +13,7 @@ from pydantic_ai.messages import (
     RetryPromptPart,
     ToolCallPart,
     ToolReturnPart,
+    UserPromptPart,
 )
 
 EditFuncParams = ParamSpec("EditFuncParams")
@@ -151,13 +152,18 @@ def add_reminder_since_tool_call(
     if not isinstance(message_history[-1], ModelRequest):
         return message_history
     messages_since_tool = 0
+    has_used_tool_or_been_reminded = False
     for message in message_history[::-1]:
-        if any(isinstance(part, ToolReturnPart) and part.tool_name == tool_name for part in message.parts):
+        for part in message.parts:
+            if (isinstance(part, ToolCallPart) and part.tool_name == tool_name) or (
+                isinstance(part, UserPromptPart) and part.content == reminder
+            ):
+                has_used_tool_or_been_reminded = True
+                break
+        if has_used_tool_or_been_reminded:
             break
         messages_since_tool += 1
-        if messages_since_tool >= reminder_interval:
-            break
-    if messages_since_tool >= reminder_interval:
+    if messages_since_tool >= reminder_interval and has_used_tool_or_been_reminded:
         message_history.append(
             ModelRequest.user_text_prompt(reminder, instructions=message_history[-1].instructions)
         )
