@@ -44,13 +44,15 @@ def create_test_excel():
     ws2["B3"] = 25
 
     ws3 = wb.create_sheet("Results")
+    wb.create_sheet("orders")
+    wb.create_sheet("analysis")
 
     wb.save("test_validation.xlsx")
     print("✓ Created test Excel file with sheets: Sheet1, Data, Results")
     return "test_validation.xlsx"
 
 
-def test_valid_formulas(excel_path):
+def test_valid_formulas(excel_path: str):
     """Test valid formulas that should work."""
     print("\n=== Testing Valid Formulas ===")
 
@@ -170,7 +172,7 @@ def test_valid_formulas(excel_path):
         print(f"✗ Cross-sheet reference failed: {e}")
 
 
-def test_invalid_formulas(excel_path):
+def test_invalid_formulas(excel_path: str):
     """Test invalid formulas that should raise errors."""
     print("\n=== Testing Invalid Formulas (Should Raise Errors) ===")
 
@@ -229,7 +231,7 @@ def test_invalid_formulas(excel_path):
         print(f"✗ Unexpected error: {e}")
 
 
-def test_edge_cases(excel_path):
+def test_edge_cases(excel_path: str):
     """Test edge cases and complex formulas."""
     print("\n=== Testing Edge Cases ===")
 
@@ -268,6 +270,57 @@ def test_edge_cases(excel_path):
         print(f"✗ COUNTIFS failed: {e}")
 
 
+def test_malformed_range(excel_path: str):
+    """Test malformed range references."""
+    print("\n=== Testing Malformed Range References ===")
+
+    # Test malformed range like C:(C)
+    try:
+        write_math_function(excel_path, "Sheet1", "Z7", "SUM", ["C:(C)"])
+        print("✗ Should have failed: Malformed range C:(C) not caught")
+    except FormulaError as e:
+        print(f"✓ Correctly caught malformed range: {e}")
+    except Exception as e:
+        print(f"✗ Unexpected error: {e}")
+
+    # Test malformed range with sheet name
+    try:
+        write_math_function(excel_path, "Sheet1", "Z8", "SUM", ["Data.G:(G)"])
+        print("✗ Should have failed: Malformed range Data.G:(G) not caught")
+    except FormulaError as e:
+        print(f"✓ Correctly caught malformed range with sheet: {e}")
+    except Exception as e:
+        print(f"✗ Unexpected error: {e}")
+
+    # Test the user's specific failing formula
+    try:
+        formula = '=SUMIFS(orders.G:(G),orders.D:(D),">="&DATE(2023,1,1),orders.D:(D),"<="&DATE(2023,12,31))/SUMPRODUCT((orders.D:(D)>=DATE(2023,1,1))*(orders.D:(D)<=DATE(2023,12,31))*(COUNTIFS(orders.B:(B),orders.B:(B),orders.D:(D),">="&DATE(2023,1,1),orders.D:(D),"<="&DATE(2023,12,31))=1))'
+        # We need to use a function that takes a raw formula, or adapt one.
+        # For now, we'll simulate the call that would happen inside _write_formula
+        from src.dreamai.toolsets.excel_formula_toolset import _validate_formula
+
+        _validate_formula(excel_path, "analysis", "C5", formula)
+        print("✗ Should have failed: User's complex formula with malformed ranges not caught")
+    except FormulaError as e:
+        print(f"✓ Correctly caught user's complex formula error: {e}")
+    except Exception as e:
+        print(f"✗ Unexpected error in user's formula test: {e}")
+
+
+def test_invalid_sheet_separator(excel_path: str):
+    """Test formulas with invalid sheet separators."""
+    print("\n=== Testing Invalid Sheet Separator ===")
+
+    # Test formula with "sheet.range"
+    try:
+        write_math_function(excel_path, "Results", "D1", "SUM", ["Sheet1.A1"])
+        print("✗ Should have failed: Invalid sheet separator '.' not caught")
+    except FormulaError as e:
+        print(f"✓ Correctly caught invalid sheet separator: {e}")
+    except Exception as e:
+        print(f"✗ Unexpected error: {e}")
+
+
 def cleanup():
     """Clean up test files."""
     test_file = Path("test_validation.xlsx")
@@ -290,6 +343,8 @@ def main():
         test_valid_formulas(excel_path)
         test_invalid_formulas(excel_path)
         test_edge_cases(excel_path)
+        test_malformed_range(excel_path)
+        test_invalid_sheet_separator(excel_path)
 
         print("\n" + "=" * 60)
         print("TEST SUITE COMPLETED")

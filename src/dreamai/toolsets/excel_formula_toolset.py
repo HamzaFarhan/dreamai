@@ -3,7 +3,7 @@ import warnings
 from pathlib import Path
 from typing import Any
 
-import formulas
+import formulas  # type: ignore
 from openpyxl import load_workbook
 
 
@@ -56,12 +56,13 @@ def _validate_formula(excel_path: str, sheet_name: str, cell_ref: str, formula: 
         available_sheets = wb.sheetnames
 
         # Create a dictionary of sheet data for formula evaluation
-        sheets_data = {}
+        sheets_data: dict[str, dict[str, Any]] = {}
         for sheet in available_sheets:
             ws = wb[sheet]
-            sheet_data = {}
-            # Load cell values (limited to avoid memory issues)
-            for row in ws.iter_rows(max_row=1000, max_col=100):
+            sheet_data: dict[str, Any] = {}
+            # Load all cell values from the sheet for full validation.
+            # WARNING: This can be slow and memory-intensive for large Excel files.
+            for row in ws.iter_rows():
                 for cell in row:
                     if cell.value is not None:
                         sheet_data[cell.coordinate] = cell.value
@@ -74,8 +75,8 @@ def _validate_formula(excel_path: str, sheet_name: str, cell_ref: str, formula: 
 
         try:
             # Parse the formula
-            ast = parser.ast(formula)
-            if ast is None or len(ast) < 2:
+            ast = parser.ast(formula)  # type: ignore
+            if ast is None or len(ast) < 2:  # type: ignore
                 raise FormulaError(f"Invalid formula syntax: {formula}")
         except SyntaxError as e:
             # Handle specific syntax errors
@@ -114,13 +115,45 @@ def _validate_formula(excel_path: str, sheet_name: str, cell_ref: str, formula: 
                     f"Available sheets: {', '.join(available_sheets)}"
                 )
 
+        # Step 2b: Validate range syntax
+        # Regex to find malformed ranges like C:(C) or orders.G:(G)
+        malformed_range_pattern = r"([A-Za-z_][\w\s]*\.)?([A-Z]{1,3}):\(\2\)"
+        malformed_matches = re.finditer(malformed_range_pattern, formula)
+
+        for match in malformed_matches:
+            full_match = match.group(0)
+            sheet_part = match.group(1) if match.group(1) else ""
+            col_part = match.group(2)
+            correct_range = f"{sheet_part}{col_part}:{col_part}"
+            raise FormulaError(f"Malformed range reference '{full_match}' found. Did you mean '{correct_range}'?")
+
+        # Step 2c: Validate sheet separator
+        # Check for sheet.range syntax and suggest sheet!range
+        for sheet in available_sheets:
+            # Look for "sheet." followed by a cell/range reference. This now handles A1, A:A, and A1:A10 style ranges.
+            pattern = rf"\b{re.escape(sheet)}\.([A-Z]{{1,3}}(?:\d{{1,7}})?(?::[A-Z]{{1,3}}(?:\d{{1,7}})?)?)\b"
+            matches = re.finditer(pattern, formula)
+            for match in matches:
+                raise FormulaError(
+                    f"Unsupported sheet reference '{match.group(0)}' found. "
+                    f"Please use the standard '!' separator (e.g., '{sheet}!{match.group(1)}')."
+                )
+
         # Step 3: Validate Excel function names
-        # Extract function names from the formula
-        function_pattern = r"\b([A-Z][A-Z0-9]*)\s*\("
+        # Extract function names from the formula (allow special characters like #)
+        function_pattern = r"\b([A-Z][A-Z0-9#]*)\s*\("
         function_matches = re.findall(function_pattern, formula.upper())
 
-        # Common Excel functions (expanded list)
+        # Common Excel functions (expanded list, including functions with #)
         valid_excel_functions = {
+            # Add functions with special characters
+            "XLOOKUP#",
+            "LET#",
+            "FILTER#",
+            "UNIQUE#",
+            "SORT#",
+            "SEQUENCE#",
+            "LAMBDA#",
             # Math & Trig
             "ABS",
             "ACOS",
@@ -311,6 +344,14 @@ def _validate_formula(excel_path: str, sheet_name: str, cell_ref: str, formula: 
             "MMULT",
             "MINVERSE",
             "MDETERM",
+            # Modern Excel functions with special characters
+            "XLOOKUP#",
+            "LET#",
+            "FILTER#",
+            "UNIQUE#",
+            "SORT#",
+            "SEQUENCE#",
+            "LAMBDA#",
         }
 
         for func_name in function_matches:
@@ -374,35 +415,40 @@ def _validate_formula(excel_path: str, sheet_name: str, cell_ref: str, formula: 
         # Step 6: Try to evaluate the formula to catch runtime errors
         try:
             # Create an Excel model for evaluation
-            xl_model = formulas.ExcelModel()
+            xl_model = formulas.ExcelModel()  # type: ignore
 
             # Add the current sheet's data
             if sheet_name in sheets_data:
                 for cell_addr, value in sheets_data[sheet_name].items():
-                    xl_model.set_cell_value(f"{sheet_name}!{cell_addr}", value)
+                    xl_model.set_cell_value(f"{sheet_name}!{cell_addr}", value)  # type: ignore
 
             # Add other sheets' data with sheet prefix
             for other_sheet, sheet_data in sheets_data.items():
                 if other_sheet != sheet_name:
                     for cell_addr, value in sheet_data.items():
-                        xl_model.set_cell_value(f"{other_sheet}!{cell_addr}", value)
+                        xl_model.set_cell_value(f"{other_sheet}!{cell_addr}", value)  # type: ignore
 
             # Set the formula in the model
             full_cell_ref = f"{sheet_name}!{cell_ref}"
-            xl_model.set_cell_value(full_cell_ref, formula)
+            xl_model.set_cell_value(full_cell_ref, formula)  # type: ignore
 
             # Try to calculate the formula
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")  # Ignore warnings during evaluation
-                result = xl_model.calculate(outputs=[full_cell_ref])
+                result = xl_model.calculate(outputs=[full_cell_ref])  # type: ignore
 
                 # Check if the result is an error
+                if full_cell_ref in result:  # type: ignore
+                    cell_value = result[full_cell_ref]  # type: ignore
+
+                # Check if the result is an error
+                # type: ignore[operator]
                 if full_cell_ref in result:
-                    cell_value = result[full_cell_ref]
+                    cell_value = result[full_cell_ref]  # type: ignore
 
                     # Check for Excel errors
                     if isinstance(cell_value, formulas.tokens.operand.XlError):
-                        error_type = str(cell_value)
+                        error_type = str(cell_value)  # type: ignore
                         if "#DIV/0!" in error_type:
                             raise FormulaError(
                                 "Formula will result in #DIV/0! error. Check for division by zero or empty cells."
