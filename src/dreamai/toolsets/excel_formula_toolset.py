@@ -449,11 +449,11 @@ def _validate_formula(excel_path: str, sheet_name: str, cell_ref: str, formula: 
                     # Check for Excel errors
                     if isinstance(cell_value, formulas.tokens.operand.XlError):
                         error_type = str(cell_value)  # type: ignore
-                        if "#DIV/0!" in error_type:
-                            raise FormulaError(
-                                "Formula will result in #DIV/0! error. Check for division by zero or empty cells."
-                            )
-                        elif "#NAME?" in error_type:
+                        # if "#DIV/0!" in error_type:
+                        #     raise FormulaError(
+                        #         "Formula will result in #DIV/0! error. Check for division by zero or empty cells."
+                        #     )
+                        if "#NAME?" in error_type:
                             raise FormulaError(
                                 "Formula will result in #NAME? error. Check function names and defined names."
                             )
@@ -492,8 +492,8 @@ def _validate_formula(excel_path: str, sheet_name: str, cell_ref: str, formula: 
             elif "not found" in error_str or "undefined" in error_str:
                 # This might be due to missing data, which is okay
                 pass
-            elif "division" in error_str or "zero" in error_str:
-                raise FormulaError(f"Formula may cause division by zero: {e}")
+            # elif "division" in error_str or "zero" in error_str:
+            # raise FormulaError(f"Formula may cause division by zero: {e}")
             else:
                 # Other evaluation errors might be due to incomplete data, so we'll pass
                 pass
