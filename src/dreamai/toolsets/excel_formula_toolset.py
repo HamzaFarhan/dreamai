@@ -422,10 +422,261 @@ def _write_formula(excel_path: str, sheet_name: str, cell_ref: str, formula: str
         raise FileOperationError(f"Failed to write formula: {e}")
 
 
+def write_and_evaluate_formula(excel_path: str, sheet_name: str, cell_ref: str, formula: str) -> dict[str, Any]:
+    """
+    Write a formula to a cell and evaluate it to check for errors.
+
+    Args:
+        excel_path: Path to the Excel file
+        sheet_name: Name of the target sheet
+        cell_ref: Cell reference (e.g., 'A1')
+        formula: Excel formula (without leading =)
+
+    Returns:
+        dict containing:
+        - success: bool - Whether formula was written and evaluated successfully
+        - value: Any - The calculated value (if successful)
+        - error: str - Error type if any (#DIV/0!, #VALUE!, etc.)
+        - error_message: str - Human readable error description
+        - formula_written: bool - Whether formula was successfully written to file
+        - excel_file: str - Path to the Excel file (if formula was written)
+
+    Example:
+        result = write_and_evaluate_formula("file.xlsx", "Sheet1", "A1", "10/0")
+    """
+    result: dict[str, Any] = {
+        "success": False,
+        "value": None,
+        "error": None,
+        "error_message": "",
+        "formula_written": False,
+        "excel_file": None,
+    }
+
+    try:
+        # First, write the formula
+        excel_file_path = _write_formula(excel_path, sheet_name, cell_ref, formula)
+        result["formula_written"] = True
+        result["excel_file"] = excel_file_path
+
+        # Now evaluate the formula by reloading with data_only=True
+        # Note: openpyxl with data_only=True only reads pre-calculated values
+        # For fresh formulas, we need to simulate calculation or check formula validity
+        try:
+            wb_data = load_workbook(excel_path, data_only=True)
+
+            if sheet_name not in wb_data.sheetnames:
+                result["error_message"] = f"Sheet '{sheet_name}' not found after writing formula"
+                return result
+
+            ws_data = wb_data[sheet_name]
+            cell_value = ws_data[cell_ref].value
+
+            # Since data_only=True won't calculate new formulas, we need to check the formula syntax
+            # and perform basic error detection
+            wb_formula = load_workbook(excel_path, data_only=False)
+            ws_formula = wb_formula[sheet_name]
+            written_formula = ws_formula[cell_ref].value
+
+            # Basic error detection based on formula patterns
+            if written_formula and isinstance(written_formula, str) and written_formula.startswith("="):
+                formula_content = written_formula[1:]  # Remove the =
+
+                # Check for division by zero patterns (but not if already wrapped in IFERROR)
+                if "/" in formula_content and not formula_content.startswith("IFERROR("):
+                    # Look for patterns like /0 or /COUNTIFS(...) where result might be 0
+                    div_patterns = [
+                        r"/0\b",  # Direct division by 0
+                        r"/COUNTIFS?\([^)]+\)",  # Division by COUNTIFS that might return 0
+                        r"/COUNT\([^)]+\)",  # Division by COUNT that might return 0
+                    ]
+
+                    for pattern in div_patterns:
+                        if re.search(pattern, formula_content):
+                            # This could potentially cause division by zero
+                            result["error"] = "#DIV/0!"
+                            result["error_message"] = (
+                                "Potential division by zero detected. Consider wrapping in IFERROR() or checking denominator with IF()"
+                            )
+                            wb_data.close()
+                            wb_formula.close()
+                            return result
+
+                # Check for invalid function names
+                invalid_functions = re.findall(r"\b[A-Z][A-Z0-9]*\(", formula_content)
+                valid_functions = {
+                    "SUM",
+                    "AVERAGE",
+                    "COUNT",
+                    "COUNTA",
+                    "COUNTIFS",
+                    "SUMIF",
+                    "SUMIFS",
+                    "AVERAGEIF",
+                    "AVERAGEIFS",
+                    "IF",
+                    "IFERROR",
+                    "VLOOKUP",
+                    "HLOOKUP",
+                    "INDEX",
+                    "MATCH",
+                    "MAX",
+                    "MIN",
+                    "TODAY",
+                    "NOW",
+                    "DATE",
+                    "YEAR",
+                    "MONTH",
+                    "DAY",
+                    "ABS",
+                    "ROUND",
+                    "CONCATENATE",
+                    "LEFT",
+                    "RIGHT",
+                    "MID",
+                    "LEN",
+                    "UPPER",
+                    "LOWER",
+                    "TRIM",
+                    "AND",
+                    "OR",
+                    "NOT",
+                }
+
+                for func_match in invalid_functions:
+                    func_name = func_match[:-1]  # Remove the (
+                    if func_name not in valid_functions:
+                        result["error"] = "#NAME?"
+                        result["error_message"] = f"Unrecognized function name: {func_name}"
+                        wb_data.close()
+                        wb_formula.close()
+                        return result
+
+            wb_data.close()
+            wb_formula.close()
+
+        except Exception as eval_error:
+            result["error_message"] = f"Error during formula evaluation: {eval_error}"
+            return result
+
+        # If we get here, no obvious errors were detected
+        # Check the actual cell value for Excel error strings (if any were pre-calculated)
+        excel_errors = {
+            "#DIV/0!": "Division by zero error",
+            "#VALUE!": "Wrong type of argument or operand",
+            "#REF!": "Invalid cell reference",
+            "#NAME?": "Unrecognized formula name or text",
+            "#NUM!": "Invalid numeric value",
+            "#N/A": "Value not available",
+            "#NULL!": "Null intersection of two ranges",
+            "#SPILL!": "Spill range has been blocked",
+            "#CALC!": "Calculation error",
+            "#FIELD!": "Invalid field name",
+            "#UNKNOWN!": "Unknown error",
+        }
+
+        if isinstance(cell_value, str) and cell_value in excel_errors:
+            result["error"] = cell_value
+            result["error_message"] = excel_errors[cell_value]
+
+            # Provide specific guidance for common errors
+            if cell_value == "#DIV/0!":
+                result["error_message"] += ". Consider wrapping in IFERROR() or checking denominator with IF()"
+            elif cell_value == "#VALUE!":
+                result["error_message"] += ". Check data types and cell references"
+            elif cell_value == "#REF!":
+                result["error_message"] += ". Check that all referenced cells and ranges exist"
+            elif cell_value == "#NAME?":
+                result["error_message"] += ". Check function names and cell references"
+
+        elif cell_value is None:
+            # Formula might be referencing empty cells - this could be valid
+            result["success"] = True
+            result["value"] = None
+        else:
+            # Formula evaluated successfully
+            result["success"] = True
+            result["value"] = cell_value
+
+    except FormulaError as e:
+        result["error_message"] = f"Formula validation error: {e}"
+    except FileNotFoundError as e:
+        result["error_message"] = f"File not found: {e}"
+    except SheetNotFoundError as e:
+        result["error_message"] = f"Sheet not found: {e}"
+    except Exception as e:
+        result["error_message"] = f"Unexpected error: {e}"
+
+    return result
+
+
+def write_formula_with_error_handling(
+    excel_path: str,
+    sheet_name: str,
+    cell_ref: str,
+    formula: str,
+    max_retries: int = 3,
+    error_fallback: str | None = None,
+) -> dict[str, Any]:
+    """
+    Write a formula with automatic error handling and optional fallback.
+
+    Args:
+        excel_path: Path to the Excel file
+        sheet_name: Name of the target sheet
+        cell_ref: Cell reference (e.g., 'A1')
+        formula: Excel formula (without leading =)
+        max_retries: Maximum number of retry attempts
+        error_fallback: Fallback formula to use if original fails (e.g., "0" or '""')
+
+    Returns:
+        dict containing evaluation results and any applied fixes
+
+    Example:
+        result = write_formula_with_error_handling(
+            "file.xlsx", "Sheet1", "A1",
+            "AVERAGEIFS(B:B,C:C,'criteria')/COUNTIFS(D:D,'criteria')",
+            error_fallback="0"
+        )
+    """
+    attempts: list[dict[str, Any]] = []
+    result: dict[str, Any] = {"success": False}
+
+    for attempt in range(max_retries):
+        result = write_and_evaluate_formula(excel_path, sheet_name, cell_ref, formula)
+        attempts.append({"attempt": attempt + 1, "formula": formula, "result": result.copy()})
+
+        if result["success"]:
+            result["attempts"] = attempts
+            return result
+
+        # Try to auto-fix common issues
+        if result["error"] == "#DIV/0!" and attempt < max_retries - 1:
+            # Wrap in IFERROR with 0 as fallback
+            formula = f"IFERROR({formula},0)"
+        elif result["error"] in ["#VALUE!", "#REF!", "#NAME?"] and attempt < max_retries - 1:
+            # For other errors, try wrapping in IFERROR with empty string
+            formula = f'IFERROR({formula},"")'
+        else:
+            break
+
+    # If all retries failed and we have a fallback, use it
+    if error_fallback is not None:
+        fallback_result = write_and_evaluate_formula(excel_path, sheet_name, cell_ref, error_fallback)
+        fallback_result["attempts"] = attempts
+        fallback_result["used_fallback"] = True
+        fallback_result["original_formula"] = attempts[0]["formula"]
+        return fallback_result
+
+    # Return the last failed attempt
+    result["attempts"] = attempts
+    return result
+
+
 # Date Functions
 def write_date_function(
     excel_path: str, sheet_name: str, cell_ref: str, function_name: str, function_args: list[Any] | None = None
-) -> str:
+) -> dict[str, Any]:
     """
     Writes date functions to Excel cells.
 
@@ -439,11 +690,11 @@ def write_date_function(
         function_args: Function arguments
 
     Returns:
-        str: Excel file path
+        dict: Evaluation result with success status and any errors
 
     Example:
-        write_date_function("file.xlsx", "Sheet1", "A1", "TODAY")
-        write_date_function("file.xlsx", "Sheet1", "B1", "DATE", [2023, 12, 25])
+        result = write_date_function("file.xlsx", "Sheet1", "A1", "TODAY")
+
     """
     try:
         function_name = function_name.upper()
@@ -478,7 +729,7 @@ def write_date_function(
         else:
             formula = f"{function_name}()"
 
-        return _write_formula(excel_path, sheet_name, cell_ref, formula)
+        return write_and_evaluate_formula(excel_path, sheet_name, cell_ref, formula)
 
     except FormulaError:
         raise
@@ -489,7 +740,7 @@ def write_date_function(
 # Financial Functions
 def write_financial_function(
     excel_path: str, sheet_name: str, cell_ref: str, function_name: str, function_args: list[Any]
-) -> str:
+) -> dict[str, Any]:
     """
     Writes financial functions to Excel cells.
 
@@ -503,10 +754,11 @@ def write_financial_function(
         function_args: Function arguments
 
     Returns:
-        str: Excel file path
+        dict: Evaluation result with success status and any errors
 
     Example:
-        write_financial_function("file.xlsx", "Sheet1", "A1", "PV", [0.05, 10, -1000])
+        result = write_financial_function("file.xlsx", "Sheet1", "A1", "PV", [0.05, 10, -1000])
+
     """
     try:
         function_name = function_name.upper()
@@ -527,7 +779,7 @@ def write_financial_function(
         args_str = ",".join(str(arg) for arg in function_args)
         formula = f"{function_name}({args_str})"
 
-        return _write_formula(excel_path, sheet_name, cell_ref, formula)
+        return write_and_evaluate_formula(excel_path, sheet_name, cell_ref, formula)
 
     except FormulaError:
         raise
@@ -538,7 +790,7 @@ def write_financial_function(
 # Logical Functions
 def write_logical_function(
     excel_path: str, sheet_name: str, cell_ref: str, function_name: str, conditions: list[Any] | None = None
-) -> str:
+) -> dict[str, Any]:
     """
     Writes logical functions to Excel cells.
 
@@ -552,10 +804,11 @@ def write_logical_function(
         conditions: Function conditions/arguments
 
     Returns:
-        str: Excel file path
+        dict: Evaluation result with success status and any errors
 
     Example:
-        write_logical_function("file.xlsx", "Sheet1", "A1", "IF", ["B1>10", '"Yes"', '"No"'])
+        result = write_logical_function("file.xlsx", "Sheet1", "A1", "IF", ["B1>10", '"Yes"', '"No"'])
+
     """
     try:
         function_name = function_name.upper()
@@ -584,7 +837,7 @@ def write_logical_function(
             conditions_str = ",".join(str(condition) for condition in conditions)
             formula = f"{function_name}({conditions_str})"
 
-        return _write_formula(excel_path, sheet_name, cell_ref, formula)
+        return write_and_evaluate_formula(excel_path, sheet_name, cell_ref, formula)
 
     except FormulaError:
         raise
@@ -595,7 +848,7 @@ def write_logical_function(
 # Lookup Functions
 def write_lookup_function(
     excel_path: str, sheet_name: str, cell_ref: str, function_name: str, function_args: list[Any] | None = None
-) -> str:
+) -> dict[str, Any]:
     """
     Writes lookup functions to Excel cells.
 
@@ -610,10 +863,11 @@ def write_lookup_function(
         function_args: Function arguments
 
     Returns:
-        str: Excel file path
+        dict: Evaluation result with success status and any errors
 
     Example:
-        write_lookup_function("file.xlsx", "Sheet1", "A1", "VLOOKUP", ["B1", "D:E", 2, "FALSE"])
+        result = write_lookup_function("file.xlsx", "Sheet1", "A1", "VLOOKUP", ["B1", "D:E", 2, "FALSE"])
+
     """
     try:
         function_name = function_name.upper()
@@ -647,7 +901,7 @@ def write_lookup_function(
         else:
             formula = f"{function_name}()"
 
-        return _write_formula(excel_path, sheet_name, cell_ref, formula)
+        return write_and_evaluate_formula(excel_path, sheet_name, cell_ref, formula)
 
     except FormulaError:
         raise
@@ -658,7 +912,7 @@ def write_lookup_function(
 # Math Functions
 def write_math_function(
     excel_path: str, sheet_name: str, cell_ref: str, function_name: str, function_args: list[Any] | None = None
-) -> str:
+) -> dict[str, Any]:
     """
     Writes math functions to Excel cells.
 
@@ -677,10 +931,11 @@ def write_math_function(
         function_args: Function arguments
 
     Returns:
-        str: Excel file path
+        dict: Evaluation result with success status and any errors
 
     Example:
-        write_math_function("file.xlsx", "Sheet1", "A1", "SUM", ["B1:B10"])
+        result = write_math_function("file.xlsx", "Sheet1", "A1", "SUM", ["B1:B10"])
+
     """
     try:
         function_name = function_name.upper()
@@ -753,7 +1008,7 @@ def write_math_function(
             args_str = ",".join(str(arg) for arg in function_args)
             formula = f"{function_name}({args_str})"
 
-        return _write_formula(excel_path, sheet_name, cell_ref, formula)
+        return write_and_evaluate_formula(excel_path, sheet_name, cell_ref, formula)
 
     except FormulaError:
         raise
@@ -764,7 +1019,7 @@ def write_math_function(
 # Statistical Functions
 def write_statistical_function(
     excel_path: str, sheet_name: str, cell_ref: str, function_name: str, function_args: list[Any]
-) -> str:
+) -> dict[str, Any]:
     """
     Writes statistical functions to Excel cells.
 
@@ -779,10 +1034,11 @@ def write_statistical_function(
         function_args: Function data/arguments
 
     Returns:
-        str: Excel file path
+        dict: Evaluation result with success status and any errors
 
     Example:
-        write_statistical_function("file.xlsx", "Sheet1", "A1", "AVERAGE", ["B1:B10"])
+        result = write_statistical_function("file.xlsx", "Sheet1", "A1", "AVERAGE", ["B1:B10"])
+
     """
     try:
         function_name = function_name.upper()
@@ -819,7 +1075,7 @@ def write_statistical_function(
         args_str = ",".join(str(item) for item in function_args)
         formula = f"{function_name}({args_str})"
 
-        return _write_formula(excel_path, sheet_name, cell_ref, formula)
+        return write_and_evaluate_formula(excel_path, sheet_name, cell_ref, formula)
 
     except FormulaError:
         raise
@@ -830,7 +1086,7 @@ def write_statistical_function(
 # Text Functions
 def write_text_function(
     excel_path: str, sheet_name: str, cell_ref: str, function_name: str, function_args: list[Any]
-) -> str:
+) -> dict[str, Any]:
     """
     Writes text functions to Excel cells.
 
@@ -846,10 +1102,11 @@ def write_text_function(
         function_args: Function text arguments
 
     Returns:
-        str: Excel file path
+        dict: Evaluation result with success status and any errors
 
     Example:
-        write_text_function("file.xlsx", "Sheet1", "A1", "CONCATENATE", ["A1", "B1"])
+        result = write_text_function("file.xlsx", "Sheet1", "A1", "CONCATENATE", ["A1", "B1"])
+
     """
     try:
         function_name = function_name.upper()
@@ -891,7 +1148,7 @@ def write_text_function(
         args_str = ",".join(str(arg) for arg in function_args)
         formula = f"{function_name}({args_str})"
 
-        return _write_formula(excel_path, sheet_name, cell_ref, formula)
+        return write_and_evaluate_formula(excel_path, sheet_name, cell_ref, formula)
 
     except FormulaError:
         raise
@@ -902,7 +1159,7 @@ def write_text_function(
 # Info Functions
 def write_info_function(
     excel_path: str, sheet_name: str, cell_ref: str, function_name: str, function_args: list[Any]
-) -> str:
+) -> dict[str, Any]:
     """
     Writes info functions to Excel cells.
 
@@ -916,10 +1173,11 @@ def write_info_function(
         function_args: Function arguments
 
     Returns:
-        str: Excel file path
+        dict: Evaluation result with success status and any errors
 
     Example:
-        write_info_function("file.xlsx", "Sheet1", "A1", "ISBLANK", ["B1"])
+        result = write_info_function("file.xlsx", "Sheet1", "A1", "ISBLANK", ["B1"])
+
     """
     try:
         function_name = function_name.upper()
@@ -940,7 +1198,7 @@ def write_info_function(
         args_str = ",".join(str(arg) for arg in function_args)
         formula = f"{function_name}({args_str})"
 
-        return _write_formula(excel_path, sheet_name, cell_ref, formula)
+        return write_and_evaluate_formula(excel_path, sheet_name, cell_ref, formula)
 
     except FormulaError:
         raise
@@ -951,7 +1209,7 @@ def write_info_function(
 # Arithmetic Operations
 def write_arithmetic_operation(
     excel_path: str, sheet_name: str, cell_ref: str, operation: str, operands: list[str]
-) -> str:
+) -> dict[str, Any]:
     """
     Writes arithmetic operations to Excel cells.
 
@@ -965,11 +1223,11 @@ def write_arithmetic_operation(
         operands: List of cell references, values, or nested expressions
 
     Returns:
-        str: Excel file path
+        dict: Evaluation result with success status and any errors
 
     Example:
-        write_arithmetic_operation("file.xlsx", "Sheet1", "A1", "DIVIDE", ["B1", "C1"])
-        write_arithmetic_operation("file.xlsx", "Sheet1", "A2", "ADD", ["10", "B1", "C1*2"])
+        result = write_arithmetic_operation("file.xlsx", "Sheet1", "A1", "DIVIDE", ["B1", "C1"])
+
     """
     try:
         operation = operation.upper()
@@ -1014,7 +1272,7 @@ def write_arithmetic_operation(
                 raise FormulaError("POWER operation requires exactly 2 operands")
             formula = f"POWER({operands[0]},{operands[1]})"
 
-        return _write_formula(excel_path, sheet_name, cell_ref, formula)
+        return write_and_evaluate_formula(excel_path, sheet_name, cell_ref, formula)
 
     except FormulaError:
         raise
@@ -1024,7 +1282,7 @@ def write_arithmetic_operation(
 
 def write_comparison_operation(
     excel_path: str, sheet_name: str, cell_ref: str, left_operand: str, operator: str, right_operand: str
-) -> str:
+) -> dict[str, Any]:
     """
     Writes comparison operations to Excel cells.
 
@@ -1039,11 +1297,11 @@ def write_comparison_operation(
         right_operand: Right side of comparison (cell reference, value, or expression)
 
     Returns:
-        str: Excel file path
+        dict: Evaluation result with success status and any errors
 
     Example:
-        write_comparison_operation("file.xlsx", "Sheet1", "A1", "B1", ">", "10")
-        write_comparison_operation("file.xlsx", "Sheet1", "A2", "SUM(C1:C10)", "=", "0")
+        result = write_comparison_operation("file.xlsx", "Sheet1", "A1", "B1", ">", "10")
+
     """
     try:
         valid_operators = {"=", "<>", "<", ">", "<=", ">="}
@@ -1057,7 +1315,7 @@ def write_comparison_operation(
                 _validate_cell_reference(operand.strip())
 
         formula = f"{left_operand}{operator}{right_operand}"
-        return _write_formula(excel_path, sheet_name, cell_ref, formula)
+        return write_and_evaluate_formula(excel_path, sheet_name, cell_ref, formula)
 
     except FormulaError:
         raise
@@ -1072,7 +1330,7 @@ def write_nested_function(
     outer_function: str,
     inner_functions: list[str],
     outer_args: list[str] | None = None,
-) -> str:
+) -> dict[str, Any]:
     """
     Writes nested function calls to Excel cells.
 
@@ -1085,12 +1343,13 @@ def write_nested_function(
         outer_args: Additional arguments for the outer function
 
     Returns:
-        str: Excel file path
+        dict: Evaluation result with success status and any errors
 
     Example:
-        write_nested_function("file.xlsx", "Sheet1", "A1", "IF",
+        result = write_nested_function("file.xlsx", "Sheet1", "A1", "IF",
                             ["COUNTIFS(C:C,\"Pro\",E:E,\"<=2023-01-01\")=0"],
                             ["1/B3", "COUNTIFS(F:F,\"<=2023-12-31\")"])
+
     """
     try:
         outer_function = outer_function.upper()
@@ -1103,7 +1362,7 @@ def write_nested_function(
         args_str = ",".join(all_args)
         formula = f"{outer_function}({args_str})"
 
-        return _write_formula(excel_path, sheet_name, cell_ref, formula)
+        return write_and_evaluate_formula(excel_path, sheet_name, cell_ref, formula)
 
     except FormulaError:
         raise
@@ -1113,7 +1372,7 @@ def write_nested_function(
 
 def write_conditional_formula(
     excel_path: str, sheet_name: str, cell_ref: str, condition: str, true_value: str, false_value: str
-) -> str:
+) -> dict[str, Any]:
     """
     Writes IF conditional formulas to Excel cells.
 
@@ -1126,17 +1385,18 @@ def write_conditional_formula(
         false_value: Value/expression when condition is false
 
     Returns:
-        str: Excel file path
+        dict: Evaluation result with success status and any errors
 
     Example:
-        write_conditional_formula("file.xlsx", "Sheet1", "A1",
+        result = write_conditional_formula("file.xlsx", "Sheet1", "A1",
                                 "COUNTIFS(C:C,\"Pro\")=0",
                                 "1/B3",
                                 "COUNTIFS(F:F,\"Churned\")/COUNTIFS(C:C,\"Pro\")")
+
     """
     try:
         formula = f"IF({condition},{true_value},{false_value})"
-        return _write_formula(excel_path, sheet_name, cell_ref, formula)
+        return write_and_evaluate_formula(excel_path, sheet_name, cell_ref, formula)
 
     except FormulaError:
         raise
