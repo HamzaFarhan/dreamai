@@ -195,7 +195,7 @@ if __name__ == "__main__":
         res = agent.run_sync(
             user_prompt,
             deps=agent_deps,
-            usage_limits=UsageLimits(request_limit=200),
+            usage_limits=UsageLimits(request_limit=500),
             message_history=ModelMessagesTypeAdapter.validate_json(Path("message_history.json").read_bytes())
             if Path("message_history.json").exists()
             else None,

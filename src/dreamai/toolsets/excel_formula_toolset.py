@@ -26,6 +26,32 @@ class FileOperationError(Exception):
     pass
 
 
+# Formula Sanitization Functions
+def _fix_worksheet_references(formula: str) -> str:
+    """
+    Convert dot notation sheet references to proper Excel format.
+
+    Args:
+        formula: Formula that may contain dot notation references
+
+    Returns:
+        str: Formula with proper sheet references
+    """
+    # Convert Sheet.Range to 'Sheet'!Range
+    pattern = r"([A-Za-z_][A-Za-z0-9_]*\.)([A-Z]+:?[A-Z]*\d*:?[A-Z]*\d*)"
+
+    def replace_ref(match: re.Match[str]) -> str:
+        sheet_name = match.group(1)[:-1]  # Remove the dot
+        range_ref = match.group(2)
+        # Add quotes if sheet name contains spaces or special chars
+        if " " in sheet_name or any(c in sheet_name for c in ["!", "'", '"']):
+            return f"'{sheet_name}'!{range_ref}"
+        else:
+            return f"{sheet_name}!{range_ref}"
+
+    return re.sub(pattern, replace_ref, formula)
+
+
 # Formula Validation Functions
 def _validate_cell_reference(cell_ref: str) -> None:
     """
@@ -402,6 +428,9 @@ def _write_formula(excel_path: str, sheet_name: str, cell_ref: str, formula: str
         if not formula.startswith("="):
             formula = "=" + formula
 
+        # Sanitize formula for compatibility
+        formula = _fix_worksheet_references(formula)
+
         # Validate formula syntax
         _validate_formula_syntax(formula)
 
@@ -607,69 +636,6 @@ def write_and_evaluate_formula(excel_path: str, sheet_name: str, cell_ref: str, 
     except Exception as e:
         result["error_message"] = f"Unexpected error: {e}"
 
-    return result
-
-
-def write_formula_with_error_handling(
-    excel_path: str,
-    sheet_name: str,
-    cell_ref: str,
-    formula: str,
-    max_retries: int = 3,
-    error_fallback: str | None = None,
-) -> dict[str, Any]:
-    """
-    Write a formula with automatic error handling and optional fallback.
-
-    Args:
-        excel_path: Path to the Excel file
-        sheet_name: Name of the target sheet
-        cell_ref: Cell reference (e.g., 'A1')
-        formula: Excel formula (without leading =)
-        max_retries: Maximum number of retry attempts
-        error_fallback: Fallback formula to use if original fails (e.g., "0" or '""')
-
-    Returns:
-        dict containing evaluation results and any applied fixes
-
-    Example:
-        result = write_formula_with_error_handling(
-            "file.xlsx", "Sheet1", "A1",
-            "AVERAGEIFS(B:B,C:C,'criteria')/COUNTIFS(D:D,'criteria')",
-            error_fallback="0"
-        )
-    """
-    attempts: list[dict[str, Any]] = []
-    result: dict[str, Any] = {"success": False}
-
-    for attempt in range(max_retries):
-        result = write_and_evaluate_formula(excel_path, sheet_name, cell_ref, formula)
-        attempts.append({"attempt": attempt + 1, "formula": formula, "result": result.copy()})
-
-        if result["success"]:
-            result["attempts"] = attempts
-            return result
-
-        # Try to auto-fix common issues
-        if result["error"] == "#DIV/0!" and attempt < max_retries - 1:
-            # Wrap in IFERROR with 0 as fallback
-            formula = f"IFERROR({formula},0)"
-        elif result["error"] in ["#VALUE!", "#REF!", "#NAME?"] and attempt < max_retries - 1:
-            # For other errors, try wrapping in IFERROR with empty string
-            formula = f'IFERROR({formula},"")'
-        else:
-            break
-
-    # If all retries failed and we have a fallback, use it
-    if error_fallback is not None:
-        fallback_result = write_and_evaluate_formula(excel_path, sheet_name, cell_ref, error_fallback)
-        fallback_result["attempts"] = attempts
-        fallback_result["used_fallback"] = True
-        fallback_result["original_formula"] = attempts[0]["formula"]
-        return fallback_result
-
-    # Return the last failed attempt
-    result["attempts"] = attempts
     return result
 
 
