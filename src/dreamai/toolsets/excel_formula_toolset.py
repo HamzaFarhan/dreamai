@@ -1,6 +1,9 @@
+import re
+import warnings
 from pathlib import Path
 from typing import Any
 
+import formulas
 from openpyxl import load_workbook
 
 
@@ -21,6 +24,439 @@ class FileOperationError(Exception):
     """Raised when file operations fail."""
 
     pass
+
+
+def _validate_formula(excel_path: str, sheet_name: str, cell_ref: str, formula: str) -> None:
+    """
+    Comprehensive formula validation using the formulas library.
+
+    This function validates Excel formulas by:
+    1. Parsing the formula for syntax errors
+    2. Checking sheet references exist
+    3. Validating function names
+    4. Detecting division by zero
+    5. Evaluating the formula to catch runtime errors
+
+    Args:
+        excel_path: Path to the Excel file
+        sheet_name: Name of the sheet containing the formula
+        cell_ref: Cell reference where formula will be placed (e.g., 'A1')
+        formula: Excel formula (with or without leading =)
+
+    Raises:
+        FormulaError: If formula has any validation errors
+    """
+    # Ensure formula starts with =
+    if not formula.startswith("="):
+        formula = "=" + formula
+
+    try:
+        # Load the workbook to get available sheets and data
+        wb = load_workbook(excel_path, data_only=False)
+        available_sheets = wb.sheetnames
+
+        # Create a dictionary of sheet data for formula evaluation
+        sheets_data = {}
+        for sheet in available_sheets:
+            ws = wb[sheet]
+            sheet_data = {}
+            # Load cell values (limited to avoid memory issues)
+            for row in ws.iter_rows(max_row=1000, max_col=100):
+                for cell in row:
+                    if cell.value is not None:
+                        sheet_data[cell.coordinate] = cell.value
+            sheets_data[sheet] = sheet_data
+
+        wb.close()
+
+        # Step 1: Parse the formula for syntax errors
+        parser = formulas.Parser()
+
+        try:
+            # Parse the formula
+            ast = parser.ast(formula)
+            if ast is None or len(ast) < 2:
+                raise FormulaError(f"Invalid formula syntax: {formula}")
+        except SyntaxError as e:
+            # Handle specific syntax errors
+            error_msg = str(e).lower()
+            if "parenthes" in error_msg or "paren" in error_msg:
+                # Count parentheses
+                open_count = formula.count("(")
+                close_count = formula.count(")")
+                if open_count != close_count:
+                    raise FormulaError(
+                        f"Mismatched parentheses in formula: {formula} "
+                        f"(found {open_count} '(' and {close_count} ')')"
+                    )
+                else:
+                    raise FormulaError(f"Invalid parentheses structure in formula: {formula}")
+            elif "unexpected" in error_msg:
+                raise FormulaError(f"Unexpected token in formula: {formula} - {e}")
+            else:
+                raise FormulaError(f"Formula syntax error: {e}")
+        except Exception as e:
+            error_str = str(e).lower()
+            if "token" in error_str:
+                raise FormulaError(f"Invalid token in formula: {formula}")
+            raise FormulaError(f"Formula parsing error: {e}")
+
+        # Step 2: Validate sheet references
+        # Extract sheet references (handles both 'Sheet Name'!A1 and SheetName!A1)
+        sheet_pattern = r"(?:'([^']+)'|([A-Za-z_][\w\s]*))!"
+        sheet_refs = re.findall(sheet_pattern, formula)
+
+        for quoted_sheet, unquoted_sheet in sheet_refs:
+            sheet_to_check = quoted_sheet if quoted_sheet else unquoted_sheet
+            if sheet_to_check not in available_sheets:
+                raise FormulaError(
+                    f"Formula references non-existent sheet '{sheet_to_check}'. "
+                    f"Available sheets: {', '.join(available_sheets)}"
+                )
+
+        # Step 3: Validate Excel function names
+        # Extract function names from the formula
+        function_pattern = r"\b([A-Z][A-Z0-9]*)\s*\("
+        function_matches = re.findall(function_pattern, formula.upper())
+
+        # Common Excel functions (expanded list)
+        valid_excel_functions = {
+            # Math & Trig
+            "ABS",
+            "ACOS",
+            "ACOSH",
+            "ASIN",
+            "ASINH",
+            "ATAN",
+            "ATAN2",
+            "ATANH",
+            "CEILING",
+            "COMBIN",
+            "COS",
+            "COSH",
+            "DEGREES",
+            "EVEN",
+            "EXP",
+            "FACT",
+            "FLOOR",
+            "GCD",
+            "INT",
+            "LCM",
+            "LN",
+            "LOG",
+            "LOG10",
+            "MOD",
+            "ODD",
+            "PI",
+            "POWER",
+            "PRODUCT",
+            "QUOTIENT",
+            "RADIANS",
+            "RAND",
+            "RANDBETWEEN",
+            "ROUND",
+            "ROUNDDOWN",
+            "ROUNDUP",
+            "SIGN",
+            "SIN",
+            "SINH",
+            "SQRT",
+            "SUM",
+            "SUMIF",
+            "SUMIFS",
+            "SUMPRODUCT",
+            "TAN",
+            "TANH",
+            "TRUNC",
+            # Statistical
+            "AVERAGE",
+            "AVERAGEIF",
+            "AVERAGEIFS",
+            "COUNT",
+            "COUNTA",
+            "COUNTBLANK",
+            "COUNTIF",
+            "COUNTIFS",
+            "LARGE",
+            "MAX",
+            "MEDIAN",
+            "MIN",
+            "MODE",
+            "PERCENTILE",
+            "QUARTILE",
+            "RANK",
+            "SMALL",
+            "STDEV",
+            "STDEVP",
+            "VAR",
+            "VARP",
+            # Text
+            "CHAR",
+            "CLEAN",
+            "CODE",
+            "CONCATENATE",
+            "EXACT",
+            "FIND",
+            "LEFT",
+            "LEN",
+            "LOWER",
+            "MID",
+            "PROPER",
+            "REPLACE",
+            "REPT",
+            "RIGHT",
+            "SEARCH",
+            "SUBSTITUTE",
+            "TEXT",
+            "TRIM",
+            "UPPER",
+            "VALUE",
+            # Date & Time
+            "DATE",
+            "DATEVALUE",
+            "DAY",
+            "DAYS",
+            "HOUR",
+            "MINUTE",
+            "MONTH",
+            "NOW",
+            "SECOND",
+            "TIME",
+            "TIMEVALUE",
+            "TODAY",
+            "WEEKDAY",
+            "YEAR",
+            # Lookup & Reference
+            "ADDRESS",
+            "CHOOSE",
+            "COLUMN",
+            "COLUMNS",
+            "HLOOKUP",
+            "INDEX",
+            "INDIRECT",
+            "LOOKUP",
+            "MATCH",
+            "OFFSET",
+            "ROW",
+            "ROWS",
+            "VLOOKUP",
+            # Logical
+            "AND",
+            "FALSE",
+            "IF",
+            "IFERROR",
+            "IFNA",
+            "IFS",
+            "NOT",
+            "OR",
+            "TRUE",
+            "XOR",
+            "SWITCH",
+            # Information
+            "CELL",
+            "ERROR.TYPE",
+            "INFO",
+            "ISBLANK",
+            "ISERR",
+            "ISERROR",
+            "ISEVEN",
+            "ISLOGICAL",
+            "ISNA",
+            "ISNONTEXT",
+            "ISNUMBER",
+            "ISODD",
+            "ISREF",
+            "ISTEXT",
+            "N",
+            "NA",
+            "TYPE",
+            # Financial
+            "FV",
+            "IRR",
+            "MIRR",
+            "NPER",
+            "NPV",
+            "PMT",
+            "PPMT",
+            "PV",
+            "RATE",
+            # Database
+            "DAVERAGE",
+            "DCOUNT",
+            "DCOUNTA",
+            "DGET",
+            "DMAX",
+            "DMIN",
+            "DPRODUCT",
+            "DSTDEV",
+            "DSTDEVP",
+            "DSUM",
+            "DVAR",
+            "DVARP",
+            # Engineering
+            "BIN2DEC",
+            "BIN2HEX",
+            "BIN2OCT",
+            "DEC2BIN",
+            "DEC2HEX",
+            "DEC2OCT",
+            "HEX2BIN",
+            "HEX2DEC",
+            "HEX2OCT",
+            "OCT2BIN",
+            "OCT2DEC",
+            "OCT2HEX",
+            # Array formulas
+            "TRANSPOSE",
+            "MMULT",
+            "MINVERSE",
+            "MDETERM",
+        }
+
+        for func_name in function_matches:
+            if func_name not in valid_excel_functions:
+                # Check if it might be a custom function or typo
+                suggestions = [f for f in valid_excel_functions if f.startswith(func_name[:2])]
+                if suggestions:
+                    raise FormulaError(
+                        f"Unknown function '{func_name}' in formula. "
+                        f"Did you mean one of: {', '.join(suggestions[:5])}?"
+                    )
+                else:
+                    raise FormulaError(
+                        f"Unknown function '{func_name}' in formula. This is not a valid Excel function."
+                    )
+
+        # Step 4: Check for obvious division by zero
+        if "/0" in formula.replace(" ", ""):
+            raise FormulaError("Formula contains division by zero: /0")
+
+        # Check for division patterns that might cause errors
+        div_patterns = [
+            r"/\s*\(\s*\)",  # Division by empty parentheses
+            r"/\s*\(\s*0\s*\)",  # Division by (0)
+            r"/\s*\(\s*0\.0*\s*\)",  # Division by (0.0)
+        ]
+        for pattern in div_patterns:
+            if re.search(pattern, formula):
+                raise FormulaError("Formula contains division by zero or empty value")
+
+        # Step 5: Validate cell references
+        # Check for invalid cell references
+        cell_pattern = r"\b([A-Z]{1,3}\d{1,7})\b"
+        cell_refs = re.findall(cell_pattern, formula.upper())
+
+        for cell_ref_check in cell_refs:
+            # Validate column (A-XFD)
+            col_match = re.match(r"^([A-Z]{1,3})(\d+)$", cell_ref_check)
+            if col_match:
+                col_letters, row_num = col_match.groups()
+                row_num = int(row_num)
+
+                # Excel has max 16384 columns (XFD) and 1048576 rows
+                if row_num < 1 or row_num > 1048576:
+                    raise FormulaError(
+                        f"Invalid row number {row_num} in cell reference {cell_ref_check}. "
+                        f"Excel supports rows 1-1048576."
+                    )
+
+                # Convert column letters to number
+                col_num = 0
+                for char in col_letters:
+                    col_num = col_num * 26 + (ord(char) - ord("A") + 1)
+
+                if col_num > 16384:
+                    raise FormulaError(
+                        f"Invalid column {col_letters} in cell reference {cell_ref_check}. "
+                        f"Excel supports columns A-XFD (1-16384)."
+                    )
+
+        # Step 6: Try to evaluate the formula to catch runtime errors
+        try:
+            # Create an Excel model for evaluation
+            xl_model = formulas.ExcelModel()
+
+            # Add the current sheet's data
+            if sheet_name in sheets_data:
+                for cell_addr, value in sheets_data[sheet_name].items():
+                    xl_model.set_cell_value(f"{sheet_name}!{cell_addr}", value)
+
+            # Add other sheets' data with sheet prefix
+            for other_sheet, sheet_data in sheets_data.items():
+                if other_sheet != sheet_name:
+                    for cell_addr, value in sheet_data.items():
+                        xl_model.set_cell_value(f"{other_sheet}!{cell_addr}", value)
+
+            # Set the formula in the model
+            full_cell_ref = f"{sheet_name}!{cell_ref}"
+            xl_model.set_cell_value(full_cell_ref, formula)
+
+            # Try to calculate the formula
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")  # Ignore warnings during evaluation
+                result = xl_model.calculate(outputs=[full_cell_ref])
+
+                # Check if the result is an error
+                if full_cell_ref in result:
+                    cell_value = result[full_cell_ref]
+
+                    # Check for Excel errors
+                    if isinstance(cell_value, formulas.tokens.operand.XlError):
+                        error_type = str(cell_value)
+                        if "#DIV/0!" in error_type:
+                            raise FormulaError(
+                                "Formula will result in #DIV/0! error. Check for division by zero or empty cells."
+                            )
+                        elif "#NAME?" in error_type:
+                            raise FormulaError(
+                                "Formula will result in #NAME? error. Check function names and defined names."
+                            )
+                        elif "#REF!" in error_type:
+                            raise FormulaError(
+                                "Formula will result in #REF! error. Check cell and sheet references."
+                            )
+                        elif "#VALUE!" in error_type:
+                            raise FormulaError(
+                                "Formula will result in #VALUE! error. Check data types and function arguments."
+                            )
+                        elif "#N/A" in error_type:
+                            raise FormulaError(
+                                "Formula will result in #N/A error. Check lookup functions and data availability."
+                            )
+                        elif "#NUM!" in error_type:
+                            raise FormulaError(
+                                "Formula will result in #NUM! error. "
+                                "Check numeric calculations and function arguments."
+                            )
+                        elif "#NULL!" in error_type:
+                            raise FormulaError(
+                                "Formula will result in #NULL! error. Check range references and intersections."
+                            )
+                        else:
+                            raise FormulaError(f"Formula will result in Excel error: {error_type}")
+
+        except FormulaError:
+            # Re-raise FormulaError as is
+            raise
+        except Exception as e:
+            # Log evaluation errors but don't fail if it's just missing data
+            error_str = str(e).lower()
+            if "circular" in error_str:
+                raise FormulaError(f"Formula contains circular reference: {e}")
+            elif "not found" in error_str or "undefined" in error_str:
+                # This might be due to missing data, which is okay
+                pass
+            elif "division" in error_str or "zero" in error_str:
+                raise FormulaError(f"Formula may cause division by zero: {e}")
+            else:
+                # Other evaluation errors might be due to incomplete data, so we'll pass
+                pass
+
+    except FormulaError:
+        raise
+    except Exception as e:
+        # Catch any other validation errors
+        raise FormulaError(f"Formula validation failed: {e}")
 
 
 def _write_formula(excel_path: str, sheet_name: str, cell_ref: str, formula: str) -> str:
@@ -55,6 +491,9 @@ def _write_formula(excel_path: str, sheet_name: str, cell_ref: str, formula: str
 
         if sheet_name not in wb.sheetnames:
             raise SheetNotFoundError(f"Sheet '{sheet_name}' not found")
+
+        # Validate the formula before writing
+        _validate_formula(excel_path, sheet_name, cell_ref, formula)
 
         ws = wb[sheet_name]
         ws[cell_ref] = formula
