@@ -1360,15 +1360,14 @@ def create_pivot_table(
 
 
 # Utility Functions
-def write_value_to_cell(excel_path: str, sheet_name: str, cell: str, value: Any) -> str:
+def write_values_to_cells(excel_path: str, sheet_name: str, cell_values: dict[str, Any]) -> str:
     """
-    Writes a value to a cell.
+    Writes values to multiple cells.
 
     Args:
         excel_path: Path to the Excel file
         sheet_name: Name of the target sheet
-        cell: Cell reference (e.g., 'A1')
-        value: Value to write
+        cell_values: Dictionary of cell references and their corresponding values. For example: {'A1': 10, 'B1': 20}
 
     Returns:
         str: Excel file path
@@ -1384,7 +1383,8 @@ def write_value_to_cell(excel_path: str, sheet_name: str, cell: str, value: Any)
             raise SheetNotFoundError(f"Sheet '{sheet_name}' not found")
 
         ws = wb[sheet_name]
-        ws[cell] = value
+        for cell, value in cell_values.items():
+            ws[cell] = value
         wb.save(excel_path)
 
         return str(excel_file.absolute())
@@ -1392,7 +1392,7 @@ def write_value_to_cell(excel_path: str, sheet_name: str, cell: str, value: Any)
     except (FileNotFoundError, SheetNotFoundError):
         raise
     except Exception as e:
-        raise FileOperationError(f"Failed to write value to cell: {e}")
+        raise FileOperationError(f"Failed to write values to cells: {e}")
 
 
 def get_cell_value(excel_path: str, sheet_name: str, cell: str) -> Any:

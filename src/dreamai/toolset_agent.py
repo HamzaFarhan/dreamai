@@ -67,7 +67,7 @@ from .toolsets.excel_structure_toolset import (
     rename_sheet,
     update_sheet_dimensions,
     update_sheet_properties,
-    write_value_to_cell,
+    write_values_to_cells,
 )
 from .toolsets.file_toolset import describe_file, list_data_files, list_result_files, resolve_file_path
 
@@ -96,7 +96,7 @@ excel_structure_toolset = AgentToolset(
         duplicate_sheet_to_file,
         get_sheet_info,
         create_pivot_table,
-        write_value_to_cell,
+        write_values_to_cells,
         get_cell_value,
         clear_sheet,
         create_autofilter,
