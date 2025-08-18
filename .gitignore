@@ -12,3 +12,4 @@ wheels/
 message_history.json
 workspaces/
 *.xlsx
+plan.md

@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai import Agent, ModelRetry, RunContext, ToolOutput
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
+from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import Tool, ToolDefinition, ToolFuncEither
 from pydantic_ai.toolsets import AbstractToolset, FunctionToolset, ToolsetTool
 from pydantic_ai.toolsets.function import FunctionToolsetTool
@@ -372,7 +373,7 @@ def create_agent(retries: int = 3) -> Agent[AgentDeps, str | TaskResult]:
                     "describe_df": truncate_tool_return,
                     "load_plan_steps": truncate_tool_return,
                     "update_plan_steps": truncate_update_call,
-                    "write_data_to_sheet": truncate_data_call,
+                    # "write_data_to_sheet": truncate_data_call,
                 },
             ),
             partial(
@@ -382,4 +383,5 @@ def create_agent(retries: int = 3) -> Agent[AgentDeps, str | TaskResult]:
             ),
         ],
         retries=retries,
+        model_settings=ModelSettings(parallel_tool_calls=False),
     )
