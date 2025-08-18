@@ -324,13 +324,22 @@ truncate_tool_return = ToolEdit(
     lifespan=10,
 )
 
+truncate_data_call = ToolEdit(
+    edit_func=partial(
+        edit_tool_call_part,
+        content="[Truncated to save tokens] data was added successfully",
+        thresh=200,
+    ),
+    lifespan=5,
+)
+
 truncate_update_call = ToolEdit(
     edit_func=partial(
         edit_tool_call_part,
         content="[Truncated to save tokens] Your updates were made and you can use `load_plan_steps` to see the full plan.",
         thresh=200,
     ),
-    lifespan=5,
+    lifespan=10,
 )
 
 
@@ -363,6 +372,7 @@ def create_agent(retries: int = 3) -> Agent[AgentDeps, str | TaskResult]:
                     "describe_df": truncate_tool_return,
                     "load_plan_steps": truncate_tool_return,
                     "update_plan_steps": truncate_update_call,
+                    "write_data_to_sheet": truncate_data_call,
                 },
             ),
             partial(

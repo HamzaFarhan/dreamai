@@ -158,6 +158,8 @@ def add_reminder_since_tool_call(
         if messages_since_tool >= reminder_interval:
             break
     if messages_since_tool >= reminder_interval:
-        message_history.append(ModelRequest.user_text_prompt(reminder))
+        message_history.append(
+            ModelRequest.user_text_prompt(reminder, instructions=message_history[-1].instructions)
+        )
         logger.info(f"Added reminder for tool '{tool_name}': {reminder}")
     return message_history

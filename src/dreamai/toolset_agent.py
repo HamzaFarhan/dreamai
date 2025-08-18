@@ -63,7 +63,6 @@ from .toolsets.excel_structure_toolset import (
     rename_sheet,
     update_sheet_dimensions,
     update_sheet_properties,
-    write_data_to_sheet,
     write_value_to_cell,
 )
 from .toolsets.file_toolset import describe_file, list_data_files, list_result_files, resolve_file_path
@@ -81,7 +80,6 @@ excel_structure_toolset = AgentToolset(
         csv_to_excel_sheet,
         csvs_to_excel,
         add_sheet,
-        write_data_to_sheet,
         get_sheet_names,
         delete_sheet,
         rename_sheet,
