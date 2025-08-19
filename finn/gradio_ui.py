@@ -51,13 +51,13 @@ class FinnUI:
         data_dir = self.workspace_dir / "data"
         if not data_dir.exists():
             return []
-        files = []
+        files: list[str] = []
         for file in data_dir.iterdir():
             if file.suffix.lower() in [".csv", ".parquet"]:
-                files.append(f"{file.name}")
+                files.append(str(file.name))
         return files
 
-    def _load_chat_history(self, project_name: str) -> list[dict]:
+    def _load_chat_history(self, project_name: str) -> list[dict[str, str]]:
         """Load chat history for a project"""
         chat_file = self.workspace_dir / f"threads/{project_name}/chat_message_history.json"
         if chat_file.exists():
@@ -67,7 +67,7 @@ class FinnUI:
                 return []
         return []
 
-    def _save_chat_history(self, project_name: str, history: list[dict]):
+    def _save_chat_history(self, project_name: str, history: list[dict[str, str]]):
         """Save chat history for a project"""
         chat_file = self.workspace_dir / f"threads/{project_name}/chat_message_history.json"
         chat_file.parent.mkdir(parents=True, exist_ok=True)
@@ -93,18 +93,18 @@ class FinnUI:
         # Get the most recent file
         latest_file = max(xlsx_files, key=lambda f: f.stat().st_mtime)
         try:
-            df = pd.read_excel(latest_file)
+            df: pd.DataFrame = pd.read_excel(latest_file)
             return df, str(latest_file)
         except Exception:
             return None, str(latest_file)
 
-    async def _process_message(self, message: str, project_name: str) -> tuple[str, list[dict]]:
+    async def _process_message(self, message: str, project_name: str) -> tuple[str, list[dict[str, str]]]:
         """Process user message and return response with updated history"""
         if not message.strip():
             return "", self._load_chat_history(project_name)
 
         # Load current history
-        history = self._load_chat_history(project_name)
+        history: list[dict[str, str]] = self._load_chat_history(project_name)
 
         # Add user message
         history.append({"user": message})
@@ -112,7 +112,7 @@ class FinnUI:
         # Get agent response
         agent_deps = self._create_agent_deps(project_name)
         try:
-            response = await run_agent(message, agent_deps)
+            response: str = await run_agent(message, agent_deps)
             history.append({"finn": response})
         except Exception as e:
             response = f"Error: {str(e)}"
@@ -123,9 +123,9 @@ class FinnUI:
 
         return "", history
 
-    def _format_chat_history(self, history: list[dict]) -> list[dict]:
+    def _format_chat_history(self, history: list[dict[str, str]]) -> list[dict[str, str]]:
         """Format chat history for Gradio Chatbot component"""
-        formatted = []
+        formatted: list[dict[str, str]] = []
         for msg in history:
             if "user" in msg:
                 formatted.append({"role": "user", "content": msg["user"]})
@@ -137,7 +137,7 @@ class FinnUI:
         """Create the main Gradio interface"""
 
         with gr.Blocks(
-            title="Finn AI Agent",
+            title="finn",
             theme=gr.themes.Default(primary_hue="gray", secondary_hue="gray", neutral_hue="gray").set(
                 body_background_fill="white",
                 block_background_fill="#f8f9fa",
@@ -158,7 +158,7 @@ class FinnUI:
 
             # Header
             with gr.Row():
-                gr.HTML("<h1 style='text-align: center; margin: 0;'>🤖 Finn AI Agent</h1>")
+                gr.HTML("<h1 style='text-align: center; margin: 0;'>finn</h1>")
 
             with gr.Row():
                 project_name_display = gr.HTML(
@@ -178,12 +178,6 @@ class FinnUI:
                             )
                             create_project_btn = gr.Button("Create Project", variant="primary")
 
-                        # Current Project Section
-                        with gr.Group():
-                            gr.Markdown("### Current Project")
-                            current_project_display = gr.Textbox(
-                                value=self.current_project, label="Active Project", interactive=False
-                            )
 
                         # Previous Projects Section
                         with gr.Group():
@@ -358,10 +352,14 @@ class FinnUI:
 
             def update_workbook_content(current_project: str, last_modified: float):
                 """Update workbook content if new file is available"""
-                _, file_path = self._get_latest_workbook(current_project)
+                df, file_path = self._get_latest_workbook(current_project)
 
                 if file_path is None:
-                    return last_modified, "", gr.File(visible=False)
+                    return (
+                        last_modified, 
+                        "", 
+                        gr.File(visible=False),
+                    )
 
                 current_modified = Path(file_path).stat().st_mtime
                 if current_modified > last_modified:
@@ -373,9 +371,20 @@ class FinnUI:
                     }
                     </style>
                     '''
-                    return (current_modified, indicator, gr.File(value=file_path, visible=True))
+                    
+                  
+                    
+                    return (
+                        current_modified, 
+                        indicator, 
+                        gr.File(value=file_path, visible=True),
+                    )
 
-                return gr.skip(), "", gr.skip()
+                return (
+                    gr.skip(), 
+                    "", 
+                    gr.skip()
+                )
 
             # Bind event handlers
             create_project_btn.click(
@@ -383,7 +392,6 @@ class FinnUI:
                 inputs=[new_project_name, current_project_state],
                 outputs=[
                     current_project_state,
-                    current_project_display,
                     projects_list,
                     project_name_display,
                     chatbot,
