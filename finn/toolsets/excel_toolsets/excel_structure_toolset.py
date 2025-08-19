@@ -118,6 +118,17 @@ def _write_polars_to_excel(df: pl.DataFrame, ws: Any, start_row: int = 1, start_
             excel_value = _polars_to_excel_value(value)
             ws.cell(row=start_row + row_idx + 1, column=start_col + col_idx, value=excel_value)
 
+    # Auto-size columns to prevent ##### display issues
+    for col_idx, header in enumerate(headers):
+        column_letter = ws.cell(row=start_row, column=start_col + col_idx).column_letter
+        ws.column_dimensions[column_letter].auto_size = True
+
+        # Set minimum width for date/datetime columns to prevent ##### display
+        col_data_types = df.dtypes[col_idx]
+        if col_data_types in [pl.Date, pl.Datetime]:
+            # Set minimum width for date columns (enough for "YYYY-MM-DD HH:MM:SS")
+            ws.column_dimensions[column_letter].width = max(15, ws.column_dimensions[column_letter].width or 13)
+
 
 # Core File Operations
 def create_excel_file(file_path: str) -> str:
