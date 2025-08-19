@@ -57,6 +57,21 @@ class FinnUI:
                 files.append(str(file.name))
         return files
 
+    def _format_data_files_html(self) -> str:
+        """Format data files as HTML list"""
+        files = self._get_data_files()
+        if not files:
+            return "<p style='color: #666; font-style: italic;'>No data files available</p>"
+        
+        file_items = "".join([f"<li style='padding: 2px 0;'>{file}</li>" for file in files])
+        return f"""
+        <div style='max-height: 35vh; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px;'>
+            <ul style='margin: 0; padding-left: 20px;'>
+                {file_items}
+            </ul>
+        </div>
+        """
+
     def _load_chat_history(self, project_name: str) -> list[dict[str, str]]:
         """Load chat history for a project"""
         chat_file = self.workspace_dir / f"threads/{project_name}/chat_message_history.json"
@@ -196,11 +211,10 @@ class FinnUI:
                                 file_types=[".csv", ".parquet"],
                                 label="Upload CSV/Parquet Files",
                             )
-                            data_files_list = gr.Dropdown(
-                                choices=self._get_data_files(),
+                            data_files_list = gr.HTML(
+                                value=self._format_data_files_html(),
                                 label="Available Data Files",
-                                multiselect=True,
-                                max_choices=10,
+                            
                             )
 
                 # Center Panel - Chat
@@ -268,6 +282,7 @@ class FinnUI:
                         current_project,
                         [],
                         gr.HTML(f"<h3 style='text-align: center; color: #666;'>Project: {current_project}</h3>"),
+                        gr.HTML(value=self._format_data_files_html()),  # Refresh data files list
                     )
 
                 self.current_project = selected_project
@@ -281,12 +296,13 @@ class FinnUI:
                     selected_project,
                     formatted_history,
                     gr.HTML(f"<h3 style='text-align: center; color: #666;'>Project: {selected_project}</h3>"),
+                    gr.HTML(value=self._format_data_files_html()),  # Refresh data files list
                 )
 
             def handle_file_upload(files):
                 """Handle uploaded data files"""
                 if not files:
-                    return gr.Dropdown(choices=self._get_data_files())
+                    return gr.HTML(value=self._format_data_files_html())
 
                 data_dir = self.workspace_dir / "data"
                 data_dir.mkdir(parents=True, exist_ok=True)
@@ -298,7 +314,7 @@ class FinnUI:
                         dest_path = data_dir / file_path.name
                         dest_path.write_bytes(file_path.read_bytes())
 
-                return gr.Dropdown(choices=self._get_data_files())
+                return gr.HTML(value=self._format_data_files_html())
 
             def send_message(message: str, history, current_project: str):
                 """Handle sending a message to the agent"""
@@ -402,7 +418,7 @@ class FinnUI:
             projects_list.change(
                 switch_project,
                 inputs=[projects_list, current_project_state],
-                outputs=[current_project_state, chatbot, project_name_display],
+                outputs=[current_project_state, chatbot, project_name_display, data_files_list],  # Add data_files_list to outputs
             )
 
             upload_files.upload(handle_file_upload, inputs=[upload_files], outputs=[data_files_list])
