@@ -22,8 +22,34 @@ class FinnUI:
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize with default project
-        self.current_project = "default"
+        self.current_project = self._load_last_project()
         self.current_agent_deps = self._create_agent_deps(self.current_project)
+
+    def _load_last_project(self) -> str:
+        """Load the last selected project from persistence"""
+        settings_file = self.workspace_dir / "settings.json"
+        if settings_file.exists():
+            try:
+                settings = json.loads(settings_file.read_text())
+                last_project = settings.get("last_project", "default")
+                # Verify the project still exists
+                if last_project in self._get_projects_list():
+                    return last_project
+            except Exception:
+                pass
+        return "default"
+
+    def _save_last_project(self, project_name: str):
+        """Save the current project as the last selected"""
+        settings_file = self.workspace_dir / "settings.json"
+        settings = {}
+        if settings_file.exists():
+            try:
+                settings = json.loads(settings_file.read_text())
+            except Exception:
+                pass
+        settings["last_project"] = project_name
+        settings_file.write_text(json.dumps(settings, indent=2))
 
     def _create_agent_deps(self, project_name: str) -> FinnDeps:
         """Create AgentDeps for a given project"""
@@ -263,6 +289,7 @@ class FinnUI:
                 new_project = project_name.strip()
                 self.current_project = new_project
                 self.current_agent_deps = self._create_agent_deps(new_project)
+                self._save_last_project(new_project)
 
                 # Update UI
                 updated_projects = self._get_projects_list()
@@ -287,6 +314,7 @@ class FinnUI:
 
                 self.current_project = selected_project
                 self.current_agent_deps = self._create_agent_deps(selected_project)
+                self._save_last_project(selected_project)
 
                 # Load chat history for the selected project
                 history = self._load_chat_history(selected_project)
