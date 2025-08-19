@@ -7,10 +7,12 @@ from dotenv import load_dotenv
 from pydantic_ai.messages import ModelMessagesTypeAdapter
 from pydantic_ai.toolsets import FunctionToolset
 from pydantic_ai.usage import UsageLimits
+from tenacity import retry, stop_after_attempt, wait_random
 
-from .agent import AgentDeps, AgentToolset, create_agent
+from dreamai.agent import AgentDeps, AgentToolset, create_agent
+
 from .finn_deps import DataDirs, FinnDeps
-from .toolsets.excel_charts_toolset import (
+from .toolsets.excel_toolsets.excel_charts_toolset import (
     apply_chart_preset,
     create_chart,
     create_chart_preset,
@@ -20,7 +22,7 @@ from .toolsets.excel_charts_toolset import (
     list_charts,
     update_chart_data,
 )
-from .toolsets.excel_formatting_toolset import (
+from .toolsets.excel_toolsets.excel_formatting_toolset import (
     apply_cell_formatting,
     apply_conditional_formatting,
     apply_preset_formatting,
@@ -29,7 +31,7 @@ from .toolsets.excel_formatting_toolset import (
     list_formatting_presets,
     load_formatting_preset,
 )
-from .toolsets.excel_formula_toolset import (
+from .toolsets.excel_toolsets.excel_formula_toolset import (
     build_countifs_expression,
     build_division_expression,
     write_arithmetic_operation,
@@ -45,7 +47,7 @@ from .toolsets.excel_formula_toolset import (
     write_statistical_function,
     write_text_function,
 )
-from .toolsets.excel_structure_toolset import (
+from .toolsets.excel_toolsets.excel_structure_toolset import (
     add_sheet,
     add_subtotals,
     clear_sheet,
@@ -69,7 +71,12 @@ from .toolsets.excel_structure_toolset import (
     update_sheet_properties,
     write_values_to_cells,
 )
-from .toolsets.file_toolset import describe_file, list_data_files, list_result_files, resolve_file_path
+from .toolsets.polars_toolsets.file_toolset import (
+    describe_file,
+    list_data_files,
+    list_result_files,
+    resolve_file_path,
+)
 
 load_dotenv()
 
@@ -170,13 +177,29 @@ file_toolset = FunctionToolset[AgentDeps](
 )
 
 
-agent = create_agent()
+@retry(stop=stop_after_attempt(3), wait=wait_random(min=1, max=3))
+async def run_agent(user_prompt: str, agent_deps: FinnDeps) -> str:
+    agent = create_agent()
+    res = await agent.run(
+        user_prompt,
+        deps=agent_deps,
+        usage_limits=UsageLimits(request_limit=500),
+        message_history=ModelMessagesTypeAdapter.validate_json(agent_deps.dirs.message_history_path.read_bytes())
+        if agent_deps.dirs.message_history_path.exists()
+        else None,
+        toolsets=[file_toolset],
+    )
+    agent_deps.dirs.message_history_path.write_bytes(res.all_messages_json())
+    return res.output if isinstance(res.output, str) else res.output.message
 
 
 if __name__ == "__main__":
+    import asyncio
+
     workspace_dir = Path("/Users/hamza/dev/dreamai/workspaces/session")
+    thread_id = "1"
     agent_deps = FinnDeps(
-        dirs=DataDirs(workspace_dir=workspace_dir, thread_dir=workspace_dir / "threads/1"),
+        dirs=DataDirs(workspace_dir=workspace_dir, thread_dir=workspace_dir / f"threads/{thread_id}"),
         toolsets={
             "excel_structure_toolset": excel_structure_toolset,
             "excel_formula_toolset": excel_formula_toolset,
@@ -192,14 +215,5 @@ if __name__ == "__main__":
             user_prompt = Path(user_prompt.strip()).read_text()
         except Exception:
             pass
-        res = agent.run_sync(
-            user_prompt,
-            deps=agent_deps,
-            usage_limits=UsageLimits(request_limit=500),
-            message_history=ModelMessagesTypeAdapter.validate_json(Path("message_history.json").read_bytes())
-            if Path("message_history.json").exists()
-            else None,
-            toolsets=[file_toolset],
-        )
-        Path("message_history.json").write_bytes(res.all_messages_json())
-        print("\n-------------\n", res.output, "\n-------------\n")
+        res = asyncio.run(run_agent(user_prompt, agent_deps))
+        print("\n-------------\n", res, "\n-------------\n")
