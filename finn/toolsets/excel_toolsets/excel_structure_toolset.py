@@ -2,6 +2,8 @@ import csv
 from pathlib import Path
 from typing import Any
 
+import polars as pl
+from loguru import logger
 from openpyxl import Workbook, load_workbook
 from openpyxl.pivot.cache import CacheDefinition, WorksheetSource
 
@@ -23,6 +25,98 @@ class FileOperationError(Exception):
     """Raised when file operations fail."""
 
     pass
+
+
+# Helper functions for data type detection and conversion
+def _detect_and_convert_data_types(df: pl.DataFrame) -> pl.DataFrame:
+    """
+    Detect and convert data types in a Polars DataFrame, with special handling for dates.
+
+    Args:
+        df: Input Polars DataFrame
+
+    Returns:
+        pl.DataFrame: DataFrame with properly typed columns
+    """
+    try:
+        # Try to infer schema with better type detection
+        converted_df = df.with_columns(
+            [
+                # Try to parse as date first, then datetime, then keep as string
+                pl.when(
+                    pl.col(col).str.contains(r"^\d{4}-\d{2}-\d{2}$").fill_null(False)
+                    | pl.col(col).str.contains(r"^\d{2}/\d{2}/\d{4}$").fill_null(False)
+                    | pl.col(col).str.contains(r"^\d{2}-\d{2}-\d{4}$").fill_null(False)
+                    | pl.col(col).str.contains(r"^\d{1,2}/\d{1,2}/\d{4}$").fill_null(False)
+                )
+                .then(pl.col(col).str.to_date(format=None, strict=False))
+                .when(
+                    pl.col(col).str.contains(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}").fill_null(False)
+                    | pl.col(col).str.contains(r"^\d{2}/\d{2}/\d{4} \d{2}:\d{2}").fill_null(False)
+                )
+                .then(pl.col(col).str.to_datetime(format=None, strict=False))
+                .otherwise(
+                    # Try numeric conversion
+                    pl.when(pl.col(col).str.contains(r"^\d+\.?\d*$").fill_null(False))
+                    .then(pl.col(col).cast(pl.Float64, strict=False))
+                    .otherwise(pl.col(col))
+                )
+                .alias(col)
+                for col in df.columns
+                if df[col].dtype == pl.String
+            ]
+        )
+
+        return converted_df
+    except Exception:
+        # If conversion fails, return original dataframe
+        return df
+
+
+def _polars_to_excel_value(value: Any) -> Any:
+    """
+    Convert Polars values to Excel-compatible values.
+
+    Args:
+        value: Value from Polars DataFrame
+
+    Returns:
+        Excel-compatible value
+    """
+    if value is None:
+        return ""
+    elif isinstance(value, (pl.Date, pl.Datetime)):
+        # Convert to Python datetime for Excel
+        return value.to_python() if hasattr(value, "to_python") else value
+    elif isinstance(value, str) and value.strip() == "":
+        return ""
+    else:
+        return value
+
+
+def _write_polars_to_excel(df: pl.DataFrame, ws: Any, start_row: int = 1, start_col: int = 1):
+    """
+    Write Polars DataFrame to Excel worksheet with proper type handling.
+
+    Args:
+        df: Polars DataFrame
+        ws: Excel worksheet
+        start_row: Starting row (1-based)
+        start_col: Starting column (1-based)
+    """
+    # Convert to list of lists for writing
+    data = df.to_numpy().tolist()
+    headers = df.columns
+
+    # Write headers
+    for col_idx, header in enumerate(headers):
+        ws.cell(row=start_row, column=start_col + col_idx, value=header)
+
+    # Write data with proper type conversion
+    for row_idx, row in enumerate(data):
+        for col_idx, value in enumerate(row):
+            excel_value = _polars_to_excel_value(value)
+            ws.cell(row=start_row + row_idx + 1, column=start_col + col_idx, value=excel_value)
 
 
 # Core File Operations
@@ -107,38 +201,43 @@ def csv_to_excel_sheet(csv_path: str, excel_path: str, sheet_name: str | None = 
 
         ws = wb.create_sheet(title=sheet_name)
 
-        # Read CSV and write to sheet
-        with open(csv_path, "r", encoding="utf-8") as csvfile:
-            # Try to detect delimiter with fallback
-            sample = csvfile.read(1024)
-            csvfile.seek(0)
+        # Use Polars to read and process CSV with better type detection
+        try:
+            df = pl.read_csv(csv_path, infer_schema_length=1000, try_parse_dates=True)
+            df = _detect_and_convert_data_types(df)
+            _write_polars_to_excel(df, ws)
+        except Exception:
+            # Fallback to original CSV reading method
+            logger.warning(f"Polars failed to read {csv_path}, falling back to CSV reader.")
+            with open(csv_path, "r", encoding="utf-8") as csvfile:
+                sample = csvfile.read(1024)
+                csvfile.seek(0)
 
-            delimiter = ","  # Default fallback
-            try:
-                sniffer = csv.Sniffer()
-                delimiter = sniffer.sniff(sample, delimiters=",;\t|").delimiter
-            except csv.Error:
-                # If sniffer fails, try common delimiters in order of preference
-                for test_delimiter in [",", ";", "\t", "|"]:
-                    if test_delimiter in sample:
-                        delimiter = test_delimiter
-                        break
+                delimiter = ","  # Default fallback
+                try:
+                    sniffer = csv.Sniffer()
+                    delimiter = sniffer.sniff(sample, delimiters=",;\t|").delimiter
+                except csv.Error:
+                    for test_delimiter in [",", ";", "\t", "|"]:
+                        if test_delimiter in sample:
+                            delimiter = test_delimiter
+                            break
 
-            reader = csv.reader(csvfile, delimiter=delimiter)
-            for row_idx, row in enumerate(reader, 1):
-                for col_idx, value in enumerate(row, 1):
-                    # Skip empty values
-                    if not value or value.strip() == "":
-                        continue
+                reader = csv.reader(csvfile, delimiter=delimiter)
+                for row_idx, row in enumerate(reader, 1):
+                    for col_idx, value in enumerate(row, 1):
+                        # Skip empty values
+                        if not value or value.strip() == "":
+                            continue
 
-                    # Try to convert to number if possible
-                    try:
-                        if "." in value:
-                            ws.cell(row=row_idx, column=col_idx, value=float(value))
-                        else:
-                            ws.cell(row=row_idx, column=col_idx, value=int(value))
-                    except (ValueError, TypeError):
-                        ws.cell(row=row_idx, column=col_idx, value=value)
+                        # Try to convert to number if possible
+                        try:
+                            if "." in value:
+                                ws.cell(row=row_idx, column=col_idx, value=float(value))
+                            else:
+                                ws.cell(row=row_idx, column=col_idx, value=int(value))
+                        except (ValueError, TypeError):
+                            ws.cell(row=row_idx, column=col_idx, value=value)
 
         wb.save(excel_path)
         return str(excel_file.absolute())
@@ -195,36 +294,41 @@ def csvs_to_excel(csv_paths: list[str], excel_path: str) -> str:
 
             ws = wb.create_sheet(title=sheet_name)
 
-            # Read CSV and write to sheet
-            with open(csv_path, "r", encoding="utf-8") as csvfile:
-                sample = csvfile.read(1024)
-                csvfile.seek(0)
+            # Use Polars to read and process CSV with better type detection
+            try:
+                df = pl.read_csv(csv_path, infer_schema_length=1000, try_parse_dates=True)
+                df = _detect_and_convert_data_types(df)
+                _write_polars_to_excel(df, ws)
+            except Exception:
+                # Fallback to original CSV reading method
+                with open(csv_path, "r", encoding="utf-8") as csvfile:
+                    sample = csvfile.read(1024)
+                    csvfile.seek(0)
 
-                delimiter = ","  # Default fallback
-                try:
-                    sniffer = csv.Sniffer()
-                    delimiter = sniffer.sniff(sample, delimiters=",;\t|").delimiter
-                except csv.Error:
-                    # If sniffer fails, try common delimiters in order of preference
-                    for test_delimiter in [",", ";", "\t", "|"]:
-                        if test_delimiter in sample:
-                            delimiter = test_delimiter
-                            break
+                    delimiter = ","  # Default fallback
+                    try:
+                        sniffer = csv.Sniffer()
+                        delimiter = sniffer.sniff(sample, delimiters=",;\t|").delimiter
+                    except csv.Error:
+                        for test_delimiter in [",", ";", "\t", "|"]:
+                            if test_delimiter in sample:
+                                delimiter = test_delimiter
+                                break
 
-                reader = csv.reader(csvfile, delimiter=delimiter)
-                for row_idx, row in enumerate(reader, 1):
-                    for col_idx, value in enumerate(row, 1):
-                        # Skip empty values
-                        if not value or value.strip() == "":
-                            continue
+                    reader = csv.reader(csvfile, delimiter=delimiter)
+                    for row_idx, row in enumerate(reader, 1):
+                        for col_idx, value in enumerate(row, 1):
+                            # Skip empty values
+                            if not value or value.strip() == "":
+                                continue
 
-                        try:
-                            if "." in value:
-                                ws.cell(row=row_idx, column=col_idx, value=float(value))
-                            else:
-                                ws.cell(row=row_idx, column=col_idx, value=int(value))
-                        except (ValueError, TypeError):
-                            ws.cell(row=row_idx, column=col_idx, value=value)
+                            try:
+                                if "." in value:
+                                    ws.cell(row=row_idx, column=col_idx, value=float(value))
+                                else:
+                                    ws.cell(row=row_idx, column=col_idx, value=int(value))
+                            except (ValueError, TypeError):
+                                ws.cell(row=row_idx, column=col_idx, value=value)
 
         wb.save(excel_path)
         return str(excel_file.absolute())
@@ -312,9 +416,30 @@ def write_data_to_sheet(
 
         ws = wb[sheet_name]
 
-        for row_idx, row in enumerate(data):
-            for col_idx, value in enumerate(row):
-                ws.cell(row=start_row + row_idx, column=start_col + col_idx, value=value)
+        # Convert data to Polars DataFrame for better type detection if it has headers
+        if len(data) > 1:
+            try:
+                # Assume first row is headers
+                headers = data[0]
+                rows = data[1:]
+
+                # Create DataFrame and detect types
+                df = pl.DataFrame(dict(zip(headers, zip(*rows))))
+                df = _detect_and_convert_data_types(df)
+
+                # Write using Polars helper
+                _write_polars_to_excel(df, ws, start_row, start_col)
+
+            except Exception:
+                # Fallback to original method
+                for row_idx, row in enumerate(data):
+                    for col_idx, value in enumerate(row):
+                        ws.cell(row=start_row + row_idx, column=start_col + col_idx, value=value)
+        else:
+            # Single row, use original method
+            for row_idx, row in enumerate(data):
+                for col_idx, value in enumerate(row):
+                    ws.cell(row=start_row + row_idx, column=start_col + col_idx, value=value)
 
         wb.save(excel_path)
         return str(excel_file.absolute())
