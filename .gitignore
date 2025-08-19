@@ -10,6 +10,6 @@ wheels/
 .venv
 .env
 message_history.json
-workspaces/
+*workspace*
 *.xlsx
 plan.md
