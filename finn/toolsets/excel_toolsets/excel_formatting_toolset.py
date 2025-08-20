@@ -37,11 +37,31 @@ def _split_sheet_and_range(range_spec: str) -> tuple[str | None, str]:
 
     Returns:
         Tuple of (sheet_name, a1_range)
+
+    Raises:
+        FormatError: If range specification is invalid
     """
+    if not range_spec or not range_spec.strip():
+        raise FormatError("Range specification cannot be empty")
+
+    range_spec = range_spec.strip()
+
     if "!" in range_spec:
-        sheet, a1 = range_spec.split("!", 1)
-        return sheet.strip().strip("'\""), a1.strip()
-    return None, range_spec.strip()
+        parts = range_spec.split("!", 1)
+        if len(parts) != 2:
+            raise FormatError(f"Invalid sheet!range format: '{range_spec}'")
+        sheet, a1 = parts
+        sheet = sheet.strip().strip("'\"")
+        a1 = a1.strip()
+
+        if not sheet:
+            raise FormatError(f"Sheet name cannot be empty in: '{range_spec}'")
+        if not a1:
+            raise FormatError(f"Range cannot be empty after sheet name in: '{range_spec}'")
+
+        return sheet, a1
+
+    return None, range_spec
 
 
 def _rgb_from_google(color: Any) -> str | None:
@@ -59,15 +79,30 @@ def _rgb_from_google(color: Any) -> str | None:
 
     if isinstance(color, str):
         if color.startswith("#"):
-            return color.lstrip("#").upper()
-        return color.upper() if len(color) == 6 else None
+            hex_part = color.lstrip("#").upper()
+            # Validate hex characters and length
+            if len(hex_part) == 6 and all(c in "0123456789ABCDEF" for c in hex_part):
+                return hex_part
+            return None
+        # Check if it's a valid 6-character hex string
+        if len(color) == 6 and all(c in "0123456789ABCDEFabcdef" for c in color):
+            return color.upper()
+        return None
 
     if isinstance(color, dict):
         try:
-            r = int(color.get("red", 0) * 255)
-            g = int(color.get("green", 0) * 255)
-            b = int(color.get("blue", 0) * 255)
-            return f"{r:02X}{g:02X}{b:02X}"
+            r = color.get("red", 0)
+            g = color.get("green", 0)
+            b = color.get("blue", 0)
+
+            # Validate range (0-1)
+            if not (0 <= r <= 1 and 0 <= g <= 1 and 0 <= b <= 1):
+                return None
+
+            r_int = int(r * 255)
+            g_int = int(g * 255)
+            b_int = int(b * 255)
+            return f"{r_int:02X}{g_int:02X}{b_int:02X}"
         except (ValueError, TypeError):
             return None
 
