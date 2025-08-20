@@ -26,17 +26,17 @@ class FinnUI:
         self.current_agent_deps = self._create_agent_deps(self.current_project)
 
     def _load_last_project(self) -> str:
-        """Load the last selected project from persistence"""
-        settings_file = self.workspace_dir / "settings.json"
-        if settings_file.exists():
-            try:
-                settings = json.loads(settings_file.read_text())
-                last_project = settings.get("last_project", "default")
-                # Verify the project still exists
-                if last_project in self._get_projects_list():
-                    return last_project
-            except Exception:
-                pass
+        # """Load the last selected project from persistence"""
+        # settings_file = self.workspace_dir / "settings.json"
+        # if settings_file.exists():
+        #     try:
+        #         settings = json.loads(settings_file.read_text())
+        #         last_project = settings.get("last_project", "default")
+        #         # Verify the project still exists
+        #         if last_project in self._get_projects_list():
+        #             return last_project
+        #     except Exception:
+        #         pass
         return "default"
 
     def _save_last_project(self, project_name: str):
@@ -88,7 +88,7 @@ class FinnUI:
         files = self._get_data_files()
         if not files:
             return "<p style='color: #666; font-style: italic;'>No data files available</p>"
-        
+
         file_items = "".join([f"<li style='padding: 2px 0;'>{file}</li>" for file in files])
         return f"""
         <div style='max-height: 35vh; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px;'>
@@ -153,8 +153,9 @@ class FinnUI:
         # Get agent response
         agent_deps = self._create_agent_deps(project_name)
         try:
-            response: str = await run_agent(message, agent_deps)
-            history.append({"finn": response})
+            response = await run_agent(message, agent_deps)
+            if isinstance(response, str):
+                history.append({"finn": response})
         except Exception as e:
             response = f"Error: {str(e)}"
             history.append({"finn": response})
@@ -219,7 +220,6 @@ class FinnUI:
                             )
                             create_project_btn = gr.Button("Create Project", variant="primary")
 
-
                         # Previous Projects Section
                         with gr.Group():
                             gr.Markdown("### Previous Projects")
@@ -240,20 +240,12 @@ class FinnUI:
                             data_files_list = gr.HTML(
                                 value=self._format_data_files_html(),
                                 label="Available Data Files",
-                            
                             )
 
                 # Center Panel - Chat
                 with gr.Column(scale=4):
-                    gr.Markdown("### Chat with Finn")
-
                     chatbot = gr.Chatbot(
-                        value=[], 
-                        show_label=False, 
-                        type="messages",
-                        height="70vh",
-                        container=True,
-                        autoscroll=True
+                        value=[], show_label=False, type="messages", height="70vh", container=True, autoscroll=True
                     )
 
                     with gr.Row():
@@ -289,12 +281,11 @@ class FinnUI:
                 new_project = project_name.strip()
                 self.current_project = new_project
                 self.current_agent_deps = self._create_agent_deps(new_project)
-                self._save_last_project(new_project)
+                # self._save_last_project(new_project)
 
                 # Update UI
                 updated_projects = self._get_projects_list()
                 return (
-                    new_project,
                     new_project,
                     gr.Dropdown(choices=updated_projects, value=new_project),
                     gr.HTML(f"<h3 style='text-align: center; color: #666;'>Project: {new_project}</h3>"),
@@ -314,7 +305,7 @@ class FinnUI:
 
                 self.current_project = selected_project
                 self.current_agent_deps = self._create_agent_deps(selected_project)
-                self._save_last_project(selected_project)
+                # self._save_last_project(selected_project)
 
                 # Load chat history for the selected project
                 history = self._load_chat_history(selected_project)
@@ -383,13 +374,13 @@ class FinnUI:
                 if current_modified > last_modified:
                     content = agent_deps.plan_path.read_text()
                     # Use CSS to make the Plan tab text yellow
-                    indicator = '''
+                    indicator = """
                     <style>
                     button[id*="plan_tab"] {
                         color: #fbbf24 !important;
                     }
                     </style>
-                    '''
+                    """
                     return content, current_modified, indicator
 
                 return gr.skip(), last_modified, ""
@@ -400,35 +391,29 @@ class FinnUI:
 
                 if file_path is None:
                     return (
-                        last_modified, 
-                        "", 
+                        last_modified,
+                        "",
                         gr.File(visible=False),
                     )
 
                 current_modified = Path(file_path).stat().st_mtime
                 if current_modified > last_modified:
                     # Use CSS to make the Workbook tab text yellow
-                    indicator = '''
+                    indicator = """
                     <style>
                     button[id*="workbook_tab"] {
                         color: #fbbf24 !important;
                     }
                     </style>
-                    '''
-                    
-                  
-                    
+                    """
+
                     return (
-                        current_modified, 
-                        indicator, 
+                        current_modified,
+                        indicator,
                         gr.File(value=file_path, visible=True),
                     )
 
-                return (
-                    gr.skip(), 
-                    "", 
-                    gr.skip()
-                )
+                return (gr.skip(), "", gr.skip())
 
             # Bind event handlers
             create_project_btn.click(
@@ -446,7 +431,12 @@ class FinnUI:
             projects_list.change(
                 switch_project,
                 inputs=[projects_list, current_project_state],
-                outputs=[current_project_state, chatbot, project_name_display, data_files_list],  # Add data_files_list to outputs
+                outputs=[
+                    current_project_state,
+                    chatbot,
+                    project_name_display,
+                    data_files_list,
+                ],  # Add data_files_list to outputs
             )
 
             upload_files.upload(handle_file_upload, inputs=[upload_files], outputs=[data_files_list])

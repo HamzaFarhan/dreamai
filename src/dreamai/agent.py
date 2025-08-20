@@ -68,7 +68,10 @@ class AgentToolset(FunctionToolset[AgentDeps]):
             raise ModelRetry(f"Error calling tool {name}: {e}")
 
 
-async def create_plan_steps(ctx: RunContext[AgentDeps], plan: str) -> str:
+class PlanCreated(BaseModel): ...
+
+
+async def create_plan_steps(ctx: RunContext[AgentDeps], plan: str) -> PlanCreated:
     """
     Creates a new sequential markdown plan with systematic steps and presents it to the user.
     These steps are the atomic, unambiguous, sequential steps that you will follow to complete the task.
@@ -89,7 +92,7 @@ async def create_plan_steps(ctx: RunContext[AgentDeps], plan: str) -> str:
     """
     ctx.deps.mode = Mode.PLAN
     ctx.deps.update_plan(plan)
-    return plan
+    return PlanCreated()
 
 
 async def update_plan_steps(ctx: RunContext[AgentDeps], old_text: str, new_text: str):
@@ -344,7 +347,7 @@ truncate_update_call = ToolEdit(
 )
 
 
-def create_agent(retries: int = 3) -> Agent[AgentDeps, str | TaskResult]:
+def create_agent(retries: int = 3) -> Agent[AgentDeps, str | PlanCreated | TaskResult]:
     return Agent(
         model=OpenAIModel("anthropic/claude-sonnet-4", provider=OpenRouterProvider()),
         deps_type=AgentDeps,

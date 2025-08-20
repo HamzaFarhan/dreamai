@@ -369,11 +369,14 @@ def create_matplotlib_chart(
             raise DataError("No data found in specified range")
 
         # Set matplotlib style
-        if style and hasattr(style, "available") and style_name in style.available:
-            style.use(style_name)
-        elif style and hasattr(style, "available") and style_name not in style.available:
-            available_styles = list(style.available)
-            raise ChartError(f"Invalid matplotlib style '{style_name}'. Available styles are: {available_styles}")
+        if style and hasattr(style, "available") and style_name != "default":
+            if style_name in style.available:
+                style.use(style_name)
+            else:
+                available_styles = list(style.available)
+                raise ChartError(
+                    f"Invalid matplotlib style '{style_name}'. Available styles are: {available_styles}"
+                )
 
         # Import matplotlib here to avoid scope issues
         import matplotlib.pyplot as plt_local
@@ -525,9 +528,32 @@ def list_charts(excel_path: str, sheet_name: str | None = None) -> dict[str, Any
             ws = wb[sheet]
 
             for chart in ws._charts:
+                # Extract title text - simplified approach
+                title_text = "Untitled"
+                try:
+                    if hasattr(chart, "title") and chart.title is not None:
+                        # Try to extract text from the title
+                        title_str = str(chart.title)
+                        if "Chart" in title_str or any(c.isalnum() for c in title_str[:50]):
+                            # If it looks like it might contain the actual title, try to parse it
+                            lines = title_str.split("\n")
+                            for line in lines:
+                                if "Chart" in line and "=" not in line and "object" not in line:
+                                    title_text = line.strip()
+                                    break
+                            else:
+                                # Fallback: look for text after t='
+                                import re
+
+                                match = re.search(r"t='([^']*)'", title_str)
+                                if match:
+                                    title_text = match.group(1)
+                except Exception:
+                    title_text = "Untitled"
+
                 chart_info = {
                     "sheet": sheet,
-                    "title": getattr(chart, "title", "Untitled"),
+                    "title": title_text,
                     "type": type(chart).__name__,
                     "position": getattr(chart, "anchor", "Unknown"),
                 }

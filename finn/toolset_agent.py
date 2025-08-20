@@ -9,7 +9,7 @@ from pydantic_ai.toolsets import FunctionToolset
 from pydantic_ai.usage import UsageLimits
 from tenacity import retry, stop_after_attempt, wait_random
 
-from dreamai.agent import AgentDeps, AgentToolset, create_agent
+from dreamai.agent import AgentDeps, AgentToolset, PlanCreated, create_agent
 
 from .finn_deps import DataDirs, FinnDeps
 from .toolsets.excel_toolsets.excel_charts_toolset import (
@@ -178,7 +178,7 @@ file_toolset = FunctionToolset[AgentDeps](
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_random(min=1, max=3))
-async def run_agent(user_prompt: str, agent_deps: FinnDeps) -> str:
+async def run_agent(user_prompt: str, agent_deps: FinnDeps) -> str | PlanCreated:
     agent = create_agent()
     res = await agent.run(
         user_prompt,
@@ -190,7 +190,12 @@ async def run_agent(user_prompt: str, agent_deps: FinnDeps) -> str:
         toolsets=[file_toolset],
     )
     agent_deps.dirs.message_history_path.write_bytes(res.all_messages_json())
-    return res.output if isinstance(res.output, str) else res.output.message
+    output = res.output
+    if isinstance(output, str):
+        return output
+    if isinstance(output, PlanCreated):
+        return output
+    return output.message
 
 
 if __name__ == "__main__":
