@@ -20,8 +20,7 @@ from openpyxl.chart import (
 from openpyxl.chart.bar_chart import BarChart as ColumnChart
 from openpyxl.chart.reference import Reference
 from openpyxl.drawing.image import Image
-from openpyxl.drawing.spreadsheet_drawing import TwoCellAnchor
-from openpyxl.utils import coordinate_to_tuple, range_boundaries
+from openpyxl.utils import range_boundaries
 
 
 # Custom Exceptions
@@ -143,35 +142,22 @@ def _get_chart_class(chart_type: str) -> Any:
     return chart_classes[chart_type]
 
 
-def _calculate_chart_anchor(position: str, width: int, height: int) -> TwoCellAnchor:
+def _set_chart_size(chart: Any, width: int, height: int) -> None:
     """
-    Calculate chart anchor based on position and desired dimensions.
+    Set chart size using width and height properties.
 
     Args:
-        position: Starting cell position (e.g., "E2")
-        width: Desired width in columns (approximate)
-        height: Desired height in rows (approximate)
-
-    Returns:
-        TwoCellAnchor object for chart positioning
+        chart: Chart object from openpyxl
+        width: Desired width in Excel units (characters/columns)
+        height: Desired height in Excel units (rows)
     """
-    # Parse starting position
-    col, row = coordinate_to_tuple(position)
+    # Convert from character/row units to points (Excel internal units)
+    # Standard Excel column width is about 8.43 characters = 64 pixels
+    # Standard Excel row height is about 15 points = 20 pixels
 
-    # Calculate end position based on width/height
-    # Each column is roughly 64 pixels, each row is roughly 20 pixels
-    # Adjust these ratios as needed for better sizing
-    end_col = col + max(1, width // 4)  # Rough approximation
-    end_row = row + max(1, height // 2)  # Rough approximation
-
-    # Create anchor
-    anchor = TwoCellAnchor()
-    anchor._from.col = col - 1  # 0-based indexing
-    anchor._from.row = row - 1  # 0-based indexing
-    anchor.to.col = end_col - 1
-    anchor.to.row = end_row - 1
-
-    return anchor
+    # Convert to points (1 point = 1/72 inch)
+    chart.width = width * 64  # pixels, roughly 8-10 pixels per character
+    chart.height = height * 20  # pixels, roughly 20 pixels per row
 
 
 def _parse_data_range(data_range: str, source_sheet: Any) -> dict[str, Any]:
@@ -282,9 +268,8 @@ def create_chart(
         chart = chart_class()
         chart.title = title
 
-        # Note: chart.width and chart.height don't work properly in openpyxl
-        # Instead, we'll use anchor positioning for proper sizing
-        anchor = _calculate_chart_anchor(position, width, height)
+        # Set chart size properly
+        _set_chart_size(chart, width, height)
 
         # Create data reference
         data = Reference(
@@ -308,8 +293,8 @@ def create_chart(
             )
             chart.set_categories(categories)
 
-        # Add chart to worksheet with anchor for proper sizing
-        chart.anchor = anchor
+        # Add chart to worksheet at specified position
+        chart.anchor = position
         chart_ws.add_chart(chart)
 
         # Save workbook
