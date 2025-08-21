@@ -13,14 +13,14 @@ from openpyxl.chart import (
     LineChart,
     PieChart,
     RadarChart,
-    ScatterChart,
     StockChart,
     SurfaceChart,
 )
 from openpyxl.chart.bar_chart import BarChart as ColumnChart
 from openpyxl.chart.reference import Reference
 from openpyxl.drawing.image import Image
-from openpyxl.utils import range_boundaries
+from openpyxl.drawing.spreadsheet_drawing import TwoCellAnchor
+from openpyxl.utils import coordinate_to_tuple, range_boundaries
 
 
 # Custom Exceptions
@@ -50,10 +50,10 @@ class DataError(Exception):
 
 # Type definitions
 ChartType = Literal[
-    "column", "bar", "line", "pie", "scatter", "area", "doughnut", "radar", "bubble", "stock", "surface"
+    "column", "bar", "line", "pie", "area", "doughnut", "radar", "bubble", "stock", "surface"
 ]
 MatplotlibChartType = Literal[
-    "line", "bar", "scatter", "pie", "histogram", "box", "heatmap", "violin", "density", "subplots"
+    "line", "bar", "pie", "histogram", "box", "heatmap", "violin", "density", "subplots"
 ]
 
 
@@ -92,7 +92,6 @@ def _validate_chart_type(chart_type: str) -> str:
         "bar",
         "line",
         "pie",
-        "scatter",
         "area",
         "doughnut",
         "radar",
@@ -127,7 +126,6 @@ def _get_chart_class(chart_type: str) -> Any:
         "bar": BarChart,
         "line": LineChart,
         "pie": PieChart,
-        "scatter": ScatterChart,
         "area": AreaChart,
         "doughnut": DoughnutChart,
         "radar": RadarChart,
@@ -142,22 +140,31 @@ def _get_chart_class(chart_type: str) -> Any:
     return chart_classes[chart_type]
 
 
-def _set_chart_size(chart: Any, width: int, height: int) -> None:
+def _create_chart_anchor(position: str, width: int, height: int) -> TwoCellAnchor:
     """
-    Set chart size using width and height properties.
+    Create a TwoCellAnchor for chart positioning and sizing.
 
     Args:
-        chart: Chart object from openpyxl
-        width: Desired width in Excel units (characters/columns)
-        height: Desired height in Excel units (rows)
-    """
-    # Convert from character/row units to points (Excel internal units)
-    # Standard Excel column width is about 8.43 characters = 64 pixels
-    # Standard Excel row height is about 15 points = 20 pixels
+        position: Starting cell for the chart (e.g., "E2").
+        width: Desired width in number of columns.
+        height: Desired height in number of rows.
 
-    # Convert to points (1 point = 1/72 inch)
-    chart.width = width * 64  # pixels, roughly 8-10 pixels per character
-    chart.height = height * 20  # pixels, roughly 20 pixels per row
+    Returns:
+        A TwoCellAnchor object.
+    """
+    start_col, start_row = coordinate_to_tuple(position)
+
+    # Simple addition to define the chart's span
+    end_col = start_col + width
+    end_row = start_row + height
+
+    anchor = TwoCellAnchor()
+    anchor._from.col = start_col - 1
+    anchor._from.row = start_row - 1
+    anchor.to.col = end_col - 1
+    anchor.to.row = end_row - 1
+
+    return anchor
 
 
 def _parse_data_range(data_range: str, source_sheet: Any) -> dict[str, Any]:
@@ -268,34 +275,65 @@ def create_chart(
         chart = chart_class()
         chart.title = title
 
-        # Set chart size properly
-        _set_chart_size(chart, width, height)
+        # Create a reliable anchor for sizing and positioning
+        anchor = _create_chart_anchor(position, width, height)
 
-        # Create data reference
-        data = Reference(
-            source_ws,
-            min_col=range_info["min_col"],
-            min_row=range_info["min_row"],
-            max_col=range_info["max_col"],
-            max_row=range_info["max_row"],
-        )
+        # Add data to chart based on chart type
+        if validated_chart_type in ["pie", "doughnut"]:
+            # For pie charts, we need labels and values
+            if range_info["max_col"] - range_info["min_col"] + 1 < 2:
+                raise DataError(
+                    f"{validated_chart_type.capitalize()} chart requires at least 2 columns (labels and values)"
+                )
 
-        # Add data to chart
-        chart.add_data(data, titles_from_data=range_info["has_headers"])
+            # Use first column for labels, remaining for values
+            labels_col = range_info["min_col"]
+            values_col = range_info["min_col"] + 1
 
-        # Set categories if we have multiple columns
-        if range_info["max_col"] > range_info["min_col"]:
-            categories = Reference(
+            # Create references
+            labels = Reference(
                 source_ws,
-                min_col=range_info["min_col"],
+                min_col=labels_col,
                 min_row=range_info["min_row"] + 1,
                 max_row=range_info["max_row"],
             )
-            chart.set_categories(categories)
 
-        # Add chart to worksheet at specified position
-        chart.anchor = position
+            values = Reference(
+                source_ws,
+                min_col=values_col,
+                min_row=range_info["min_row"],  # include header
+                max_row=range_info["max_row"],
+            )
+
+            # Add data and categories
+            chart.add_data(values, titles_from_data=True)
+            chart.set_categories(labels)
+
+        else:
+            # General case for other chart types
+            data = Reference(
+                source_ws,
+                min_col=range_info["min_col"],
+                min_row=range_info["min_row"],
+                max_col=range_info["max_col"],
+                max_row=range_info["max_row"],
+            )
+
+            chart.add_data(data, titles_from_data=range_info["has_headers"])
+
+            # Set categories for charts with multiple columns
+            if range_info["max_col"] > range_info["min_col"]:
+                categories = Reference(
+                    source_ws,
+                    min_col=range_info["min_col"],
+                    min_row=range_info["min_row"] + 1,
+                    max_row=range_info["max_row"],
+                )
+                chart.set_categories(categories)
+
+        # Add chart to worksheet using the anchor
         chart_ws.add_chart(chart)
+        chart.anchor = anchor  # Set the anchor on the chart itself
 
         # Save workbook
         wb.save(excel_file)
@@ -417,13 +455,6 @@ def create_matplotlib_chart(
             ax.set_xlabel(headers[0])
             ax.set_ylabel(headers[1])
 
-        elif chart_type == "scatter":
-            x_data = [row[0] for row in data if row[0] is not None]
-            y_data = [row[1] for row in data if row[1] is not None]
-            ax.scatter(x_data, y_data)
-            ax.set_xlabel(headers[0])
-            ax.set_ylabel(headers[1])
-
         elif chart_type == "pie":
             labels = [row[0] for row in data]
             sizes = [row[1] for row in data if row[1] is not None]
@@ -462,7 +493,6 @@ def create_matplotlib_chart(
             valid_matplotlib_types = [
                 "line",
                 "bar",
-                "scatter",
                 "pie",
                 "histogram",
                 "box",
@@ -732,7 +762,6 @@ def get_chart_types() -> dict[str, Any]:
             "bar",
             "line",
             "pie",
-            "scatter",
             "area",
             "doughnut",
             "radar",
@@ -743,7 +772,6 @@ def get_chart_types() -> dict[str, Any]:
         "matplotlib_charts": [
             "line",
             "bar",
-            "scatter",
             "pie",
             "histogram",
             "box",
@@ -797,6 +825,61 @@ def create_chart_preset(name: str, chart_config: dict[str, Any]) -> str:
 
 def apply_chart_preset(
     excel_path: str, data_range: str, preset_name: str, override_params: dict[str, Any] | None = None
+) -> str:
+    """
+    Apply a chart preset with optional parameter overrides.
+
+    Args:
+        excel_path: Path to the Excel file
+        data_range: Data range for the chart
+        preset_name: Name of the preset to apply
+        override_params: Parameters to override from preset
+
+    Returns:
+        Path to the Excel file
+
+    Raises:
+        FileNotFoundError: If presets file or Excel file doesn't exist
+        KeyError: If preset name not found
+        FileOperationError: If operation fails
+    """
+    try:
+        presets_file = Path.cwd() / ".dreamai_chart_presets.json"
+
+        if not presets_file.exists():
+            raise FileNotFoundError("No chart presets file found")
+
+        with presets_file.open("r") as f:
+            presets = json.load(f)
+
+        if preset_name not in presets:
+            available_presets = list(presets.keys())
+            raise KeyError(f"Preset '{preset_name}' not found. Available presets are: {available_presets}")
+
+        # Get preset configuration
+        config = presets[preset_name]["config"].copy()
+
+        # Apply overrides
+        if override_params:
+            config.update(override_params)
+
+        # Determine chart creation function based on config
+        if config.get("matplotlib", False):
+            return create_matplotlib_chart(excel_path, data_range, **config)
+        else:
+            return create_chart(excel_path, data_range, **config)
+
+    except (FileNotFoundError, KeyError):
+        raise
+    except Exception as e:
+        raise FileOperationError(f"Failed to apply chart preset: {e}")
+
+
+if __name__ == "__main__":
+    # Example usage
+    pass
+    # Example usage
+    pass
 ) -> str:
     """
     Apply a chart preset with optional parameter overrides.
