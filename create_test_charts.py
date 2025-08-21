@@ -116,19 +116,6 @@ def create_sample_excel_with_charts():
         )
         charts_created.append("Area Chart - Sales vs Expenses")
 
-        # 6. Scatter plot for market share vs revenue
-        result = create_chart(
-            excel_path=str(excel_path),
-            data_range="Quarterly_Data!B1:C5",
-            chart_type="scatter",
-            title="Revenue vs Market Share",
-            chart_sheet="Quarterly_Data",
-            position="E18",
-            width=12,
-            height=8,
-        )
-        charts_created.append("Scatter Plot - Revenue vs Market Share")
-
         print("\n✅ Successfully created charts:")
         for i, chart in enumerate(charts_created, 1):
             print(f"   {i}. {chart}")

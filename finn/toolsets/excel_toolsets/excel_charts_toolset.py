@@ -49,12 +49,8 @@ class DataError(Exception):
 
 
 # Type definitions
-ChartType = Literal[
-    "column", "bar", "line", "pie", "area", "doughnut", "radar", "bubble", "stock", "surface"
-]
-MatplotlibChartType = Literal[
-    "line", "bar", "pie", "histogram", "box", "heatmap", "violin", "density", "subplots"
-]
+ChartType = Literal["column", "bar", "line", "pie", "area", "doughnut", "radar", "bubble", "stock", "surface"]
+MatplotlibChartType = Literal["line", "bar", "pie", "histogram", "box", "heatmap", "violin", "density", "subplots"]
 
 
 # Helper Functions
@@ -873,63 +869,3 @@ def apply_chart_preset(
         raise
     except Exception as e:
         raise FileOperationError(f"Failed to apply chart preset: {e}")
-
-
-if __name__ == "__main__":
-    # Example usage
-    pass
-    # Example usage
-    pass
-) -> str:
-    """
-    Apply a chart preset with optional parameter overrides.
-
-    Args:
-        excel_path: Path to the Excel file
-        data_range: Data range for the chart
-        preset_name: Name of the preset to apply
-        override_params: Parameters to override from preset
-
-    Returns:
-        Path to the Excel file
-
-    Raises:
-        FileNotFoundError: If presets file or Excel file doesn't exist
-        KeyError: If preset name not found
-        FileOperationError: If operation fails
-    """
-    try:
-        presets_file = Path.cwd() / ".dreamai_chart_presets.json"
-
-        if not presets_file.exists():
-            raise FileNotFoundError("No chart presets file found")
-
-        with presets_file.open("r") as f:
-            presets = json.load(f)
-
-        if preset_name not in presets:
-            available_presets = list(presets.keys())
-            raise KeyError(f"Preset '{preset_name}' not found. Available presets are: {available_presets}")
-
-        # Get preset configuration
-        config = presets[preset_name]["config"].copy()
-
-        # Apply overrides
-        if override_params:
-            config.update(override_params)
-
-        # Determine chart creation function based on config
-        if config.get("matplotlib", False):
-            return create_matplotlib_chart(excel_path, data_range, **config)
-        else:
-            return create_chart(excel_path, data_range, **config)
-
-    except (FileNotFoundError, KeyError):
-        raise
-    except Exception as e:
-        raise FileOperationError(f"Failed to apply chart preset: {e}")
-
-
-if __name__ == "__main__":
-    # Example usage
-    pass
