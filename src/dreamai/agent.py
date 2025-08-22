@@ -1,4 +1,3 @@
-from collections.abc import Callable, Sequence
 from enum import StrEnum
 from functools import partial
 from pathlib import Path
@@ -9,9 +8,8 @@ from pydantic_ai import Agent, ModelRetry, RunContext, ToolOutput
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.settings import ModelSettings
-from pydantic_ai.tools import Tool, ToolDefinition, ToolFuncEither
-from pydantic_ai.toolsets import AbstractToolset, FunctionToolset, ToolsetTool
-from pydantic_ai.toolsets.function import FunctionToolsetTool
+from pydantic_ai.tools import ToolDefinition
+from pydantic_ai.toolsets import AbstractToolset, FunctionToolset
 
 from .history_processors import (
     ToolEdit,
@@ -41,31 +39,6 @@ class AgentDeps(BaseModel):
     @property
     def plan(self) -> str | None:
         return self.plan_path.read_text().strip() if self.plan_path.exists() else None
-
-
-class AgentToolset(FunctionToolset[AgentDeps]):
-    def __init__(
-        self,
-        tools: Sequence[Tool[AgentDeps] | ToolFuncEither[AgentDeps, ...]] = [],
-        max_retries: int = 1,
-        *,
-        id: str | None = None,
-        file_path_resolver: Callable[[RunContext[AgentDeps], str | Path], str | Path],
-    ):
-        super().__init__(tools=tools, max_retries=max_retries, id=id)
-        self.file_path_resolver = file_path_resolver
-
-    async def call_tool(
-        self, name: str, tool_args: dict[str, Any], ctx: RunContext[AgentDeps], tool: ToolsetTool[AgentDeps]
-    ) -> Any:
-        assert isinstance(tool, FunctionToolsetTool)
-        try:
-            for arg in tool_args:
-                if "path" in arg:
-                    tool_args[arg] = str(self.file_path_resolver(ctx, tool_args[arg]))
-            return await tool.call_func(tool_args, ctx)
-        except Exception as e:
-            raise ModelRetry(f"Error calling tool {name}: {e}")
 
 
 class PlanCreated(BaseModel): ...
@@ -347,7 +320,13 @@ truncate_update_call = ToolEdit(
 )
 
 
-def create_agent(retries: int = 3) -> Agent[AgentDeps, str | PlanCreated | TaskResult]:
+def create_agent(
+    retries: int = 3, instructions: list[str] | str | None = None
+) -> Agent[AgentDeps, str | PlanCreated | TaskResult]:
+    if instructions is not None:
+        instructions = [instructions] if isinstance(instructions, str) else instructions
+    else:
+        instructions = []
     return Agent(
         model=OpenAIModel("anthropic/claude-sonnet-4", provider=OpenRouterProvider()),
         deps_type=AgentDeps,
@@ -360,6 +339,7 @@ def create_agent(retries: int = 3) -> Agent[AgentDeps, str | PlanCreated | TaskR
                 "5. Keep updating the plan after every step.\n"
                 "6. Use task_result to end the process.\n"
             ),
+            *instructions,
             toolset_defs_instructions,
         ],
         toolsets=[post_plan_toolset, act_toolset, step_toolset],
@@ -376,6 +356,7 @@ def create_agent(retries: int = 3) -> Agent[AgentDeps, str | PlanCreated | TaskR
                     "describe_df": truncate_tool_return,
                     "load_plan_steps": truncate_tool_return,
                     "update_plan_steps": truncate_update_call,
+                    "get_spreadsheet_metadata": truncate_tool_return,
                     # "write_data_to_sheet": truncate_data_call,
                 },
             ),
