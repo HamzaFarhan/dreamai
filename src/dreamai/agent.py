@@ -201,7 +201,11 @@ def fetch_toolset(ctx: RunContext[AgentDeps], toolset_name: str) -> str:
     return f"Loading {toolset_name}. Remember to update the plan after completing any step."
 
 
-def user_interaction(message: str) -> str:
+class UserInteraction(BaseModel):
+    message: str
+
+
+def user_interaction(message: str) -> UserInteraction:
     """
     Interacts with the user. Could be:
     - A question
@@ -213,7 +217,7 @@ def user_interaction(message: str) -> str:
     Args:
         message: The message to display to the user.
     """
-    return message
+    return UserInteraction(message=message)
 
 
 class AllStepsMarkedCompleted(BaseModel):
@@ -322,7 +326,7 @@ truncate_update_call = ToolEdit(
 
 def create_agent(
     retries: int = 3, instructions: list[str] | str | None = None
-) -> Agent[AgentDeps, str | PlanCreated | TaskResult]:
+) -> Agent[AgentDeps, UserInteraction | PlanCreated | TaskResult]:
     if instructions is not None:
         instructions = [instructions] if isinstance(instructions, str) else instructions
     else:
