@@ -75,6 +75,14 @@ async def update_plan_steps(ctx: RunContext[AgentDeps], old_text: str, new_text:
     This function is typically used to **mark plan steps as completed** or to tweak their wording. It
     replaces all occurrences of `old_text` in the plan.
 
+    **COMPLETION FORMAT:**
+    When marking steps as completed, add a brief one-liner on a new line describing what was accomplished.
+    Format:
+    ```
+    - [X] Step description
+    Brief summary of what was done
+    ```
+
     **TOKEN-EFFICIENT BUT FEWER CALLS:**
     • Prefer bundling several related step updates in one call whenever a single action finishes multiple
     sequential steps. Reducing tool invocations is usually worth the few extra tokens a longer replacement string
@@ -93,23 +101,23 @@ async def update_plan_steps(ctx: RunContext[AgentDeps], old_text: str, new_text:
 
     Examples
     --------
-    Bulk completion of three contiguous steps:
+    Bulk completion of three contiguous steps with one-liners:
 
         update_plan_steps(
             "- [ ] Load customer data\n- [ ] Transform customer data\n- [ ] Validate customer data",
-            "- [X] Load customer data\n- [X] Transform customer data\n- [X] Validate customer data",
+            "- [X] Load customer data\nLoaded 15,000 customer records from database\n- [X] Transform customer data\nApplied standardization and cleaned nulls\n- [X] Validate customer data\nVerified data integrity with 99.8% success rate",
         )
 
     Two similar revenue steps in one go:
 
         update_plan_steps(
             "- [ ] Calculate revenue Q1 2023\n- [ ] Calculate revenue Q2 2023",
-            "- [X] Calculate revenue Q1 2023\n- [X] Calculate revenue Q2 2023",
+            "- [X] Calculate revenue Q1 2023\nGenerated $2.3M total revenue\n- [X] Calculate revenue Q2 2023\nGenerated $2.7M total revenue",
         )
 
     Minimal single-step update:
 
-        update_plan_steps("- [ ] Load customer data", "- [X] Load customer data")
+        update_plan_steps("- [ ] Load customer data", "- [X] Load customer data\nSuccessfully loaded 10,500 records")
     """
 
     current_plan = ctx.deps.plan
@@ -251,7 +259,7 @@ async def task_result(ctx: RunContext[AgentDeps], message: str) -> TaskResult:
             "If every step is clearly marked as done, return AllStepsCompleted.\n"
             "If any step is missing its completion mark, return AllStepsNotCompleted "
             "and include a terse message to the executor such as: 'Step 2 unfinished, "
-            "if you've already done it, mark it; if not, do it now.'\n"
+            "verify thoroughly. If you've already done it, mark it; if not, do it now.'\n"
             "You only see the markdown plan, so you cannot know the actual work status. "
             "Prompt the executor to verify and act.\n"
             "Be direct and specific—no generic advice."
