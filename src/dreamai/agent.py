@@ -341,7 +341,9 @@ def create_agent(
                 "3. Once approved, start executing.\n"
                 "4. Fetch the toolsets needed for each step of the plan as you go.\n"
                 "5. Keep updating the plan after every step.\n"
-                "6. Use task_result to end the process.\n"
+                "6. Use the `task_result` tool to end the task.\n"
+                "7. You cannot consider the task complete until all steps are "
+                "marked complete and you have used the `task_result` tool.\n"
             ),
             *instructions,
             toolset_defs_instructions,
