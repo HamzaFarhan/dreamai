@@ -378,8 +378,9 @@ def create_agent(
                 add_reminder_since_tool_call,
                 tool_name="update_plan_steps",
                 reminder="Remember to load and update the plan steps using `load_plan_steps` and `update_plan_steps` to keep on track.",
+                reminder_interval=10,
             ),
         ],
         retries=retries,
-        model_settings=ModelSettings(parallel_tool_calls=False),
+        model_settings=ModelSettings(temperature=0, parallel_tool_calls=False),
     )
