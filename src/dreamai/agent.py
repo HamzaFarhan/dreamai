@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
-from pydantic_ai import Agent, ModelRetry, RunContext, ToolOutput
+from pydantic_ai import Agent, CallDeferred, DeferredToolRequests, DeferredToolResults, ModelRetry, RunContext
+from pydantic_ai.messages import ToolReturn
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.settings import ModelSettings
@@ -52,20 +53,20 @@ async def create_plan_steps(ctx: RunContext[AgentDeps], plan: str) -> PlanCreate
 
     IMPORTANT: For every step include a bolded "Toolsets" line directly under the step. Format:
       - [ ] Step description
-      **Toolsets**: toolset_id1, toolset_id2
+      **Toolsets**: toolset_name1, toolset_name2
 
     Make sure to clarify any assumptions you have about the task beforehand using `user_interaction`.
 
     Args:
         plan: The sequential steps formatted as markdown checkboxes. Each step must have a "**Toolsets**" line
-              listing the toolset id(s) to use for that step (comma-separated if more than one).
+              listing the toolset name(s) to use for that step (comma-separated if more than one).
 
     Example:
         create_plan_steps(plan="## SEQUENTIAL STEPS\n- [ ] Data preparation: Filter active customers using subscription table\n**Toolsets**: data_toolset\n- [ ] Base calculation: Calculate monthly revenue per customer cohort\n**Toolsets**: analytics_toolset\n- [ ] Final output: Generate cohort analysis table with retention metrics\n**Toolsets**: reporting_toolset")
     """
     ctx.deps.mode = Mode.PLAN
     ctx.deps.update_plan(plan)
-    return PlanCreated()
+    raise CallDeferred
 
 
 async def update_plan_steps(ctx: RunContext[AgentDeps], old_text: str, new_text: str):
@@ -140,7 +141,7 @@ async def add_plan_step(ctx: RunContext[AgentDeps], new_step: str):
 
     IMPORTANT: When adding a step, include a bolded "**Toolsets**" line immediately after the step:
       - [ ] New step description
-      **Toolsets**: toolset_id
+      **Toolsets**: toolset_name
 
     Args:
         new_step: The new step to add to the plan. Should be properly formatted and follow the atomic, sequential pattern using checkbox format
@@ -213,7 +214,7 @@ class UserInteraction(BaseModel):
     message: str
 
 
-def user_interaction(message: str) -> UserInteraction:
+def user_interaction(message: str) -> UserInteraction:  # noqa: ARG001
     """
     Interacts with the user. Could be:
     - A question
@@ -225,7 +226,7 @@ def user_interaction(message: str) -> UserInteraction:
     Args:
         message: The message to display to the user.
     """
-    return UserInteraction(message=message)
+    raise CallDeferred
 
 
 class AllStepsMarkedCompleted(BaseModel):
@@ -277,6 +278,8 @@ async def task_result(ctx: RunContext[AgentDeps], message: str) -> TaskResult:
     raise ModelRetry(res.output.message)
 
 
+constant_toolset = FunctionToolset([create_plan_steps, user_interaction], id="constant_toolset")
+
 post_plan_toolset = FunctionToolset([execute_plan_steps], id="post_plan_toolset").filtered(
     lambda ctx, _: ctx.deps.plan is not None and ctx.deps.mode == Mode.PLAN
 )
@@ -298,10 +301,7 @@ def step_toolset(ctx: RunContext[AgentDeps]) -> AbstractToolset[Any] | None:
 async def prepare_output_tools(
     ctx: RunContext[AgentDeps], tool_defs: list[ToolDefinition]
 ) -> list[ToolDefinition] | None:
-    output_types = ["create_plan_steps", "user_interaction"]
-    if ctx.deps.mode == Mode.ACT:
-        output_types.append("task_result")
-    return [tool_def for tool_def in tool_defs if tool_def.name in output_types]
+    return [tool_def for tool_def in tool_defs if "task_result" in tool_def.name and ctx.deps.mode == Mode.ACT]
 
 
 truncate_tool_return = ToolEdit(
@@ -334,7 +334,7 @@ truncate_update_call = ToolEdit(
 
 def create_agent(
     retries: int = 3, instructions: list[str] | str | None = None
-) -> Agent[AgentDeps, UserInteraction | PlanCreated | TaskResult]:
+) -> Agent[AgentDeps, DeferredToolRequests | TaskResult]:
     if instructions is not None:
         instructions = [instructions] if isinstance(instructions, str) else instructions
     else:
@@ -357,21 +357,14 @@ def create_agent(
             toolset_defs_instructions,
         ],
         toolsets=[post_plan_toolset, act_toolset, step_toolset],
-        output_type=[
-            ToolOutput(create_plan_steps, name="create_plan_steps"),
-            ToolOutput(user_interaction, name="user_interaction"),
-            ToolOutput(task_result, name="task_result"),
-        ],
+        output_type=[DeferredToolRequests, task_result],
         prepare_output_tools=prepare_output_tools,
         history_processors=[
             partial(
                 edit_used_tools,
                 tools_to_edit_funcs={
-                    "describe_df": truncate_tool_return,
                     "load_plan_steps": truncate_tool_return,
                     "update_plan_steps": truncate_update_call,
-                    "get_spreadsheet_metadata": truncate_tool_return,
-                    # "write_data_to_sheet": truncate_data_call,
                 },
             ),
             partial(
@@ -384,3 +377,18 @@ def create_agent(
         retries=retries,
         model_settings=ModelSettings(temperature=0, parallel_tool_calls=False),
     )
+
+
+def handle_deferred_tool_requests(deferred_tool_requests: DeferredToolRequests) -> DeferredToolResults:
+    plan_review_prompt = "Please review the plan. Shall I execute it?"
+    results = DeferredToolResults()
+    for call in deferred_tool_requests.calls:
+        if call.tool_name == "user_interaction":
+            results.calls[call.tool_call_id] = ToolReturn(
+                return_value=None, content=input(f"{call.args_as_dict()['message']}\n> ")
+            )
+        elif call.tool_name == "create_plan_steps":
+            results.calls[call.tool_call_id] = ToolReturn(
+                return_value=plan_review_prompt, content=input(f"{plan_review_prompt}\n> ")
+            )
+    return results
