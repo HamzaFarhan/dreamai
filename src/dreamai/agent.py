@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai import Agent, ModelRetry, RunContext, ToolOutput
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import ToolDefinition
@@ -340,7 +340,7 @@ def create_agent(
     else:
         instructions = []
     return Agent(
-        model=OpenAIModel("anthropic/claude-sonnet-4", provider=OpenRouterProvider()),
+        model=OpenAIChatModel("anthropic/claude-sonnet-4", provider=OpenRouterProvider()),
         deps_type=AgentDeps,
         instructions=[
             (
