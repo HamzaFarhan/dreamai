@@ -22,11 +22,30 @@ from .history_processors import (
 
 
 class Mode(StrEnum):
+    """Enumeration of agent operation modes.
+
+    Attributes:
+        PLAN: Mode for planning and creating execution plans.
+        ACT: Mode for executing planned steps.
+    """
+
     PLAN = "plan"
     ACT = "act"
 
 
 class AgentDeps(BaseModel):
+    """Dependencies and state for the AI agent.
+
+    This class holds the runtime state and configuration for the agent,
+    including available toolsets, current operation mode, and plan management.
+
+    Attributes:
+        toolsets: Dictionary of available toolsets by name.
+        mode: Current operation mode (PLAN or ACT).
+        plan_path: File path where the execution plan is stored.
+        fetched_toolset: Name of the currently fetched toolset, if any.
+    """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     toolsets: dict[str, AbstractToolset[Any]] = Field(default_factory=dict)
@@ -35,14 +54,25 @@ class AgentDeps(BaseModel):
     fetched_toolset: str | None = None
 
     def update_plan(self, new_plan: str):
+        """Update the execution plan with new content.
+
+        Args:
+            new_plan: The new plan content to write to the plan file.
+        """
         self.plan_path.write_text(new_plan.strip())
 
     @property
     def plan(self) -> str | None:
+        """Get the current execution plan content.
+
+        Returns:
+            The plan content as a string, or None if no plan exists.
+        """
         return self.plan_path.read_text().strip() if self.plan_path.exists() else None
 
 
-class PlanCreated(BaseModel): ...
+class PlanCreated(BaseModel):
+    """Marker class indicating that a plan has been successfully created."""
 
 
 async def create_plan_steps(ctx: RunContext[AgentDeps], plan: str) -> PlanCreated:
@@ -174,6 +204,17 @@ async def execute_plan_steps(ctx: RunContext[AgentDeps]):
 
 
 async def toolset_defs_instructions(ctx: RunContext[AgentDeps]) -> str:
+    """Generate instructions describing available toolsets.
+
+    This function creates a formatted description of all available toolsets
+    and their tools for inclusion in the agent's instructions.
+
+    Args:
+        ctx: The run context containing agent dependencies and toolsets.
+
+    Returns:
+        Formatted string describing available toolsets and their tools.
+    """
     return (
         (
             "<available_toolsets>\n"
@@ -211,6 +252,15 @@ def fetch_toolset(ctx: RunContext[AgentDeps], toolset_name: str) -> str:
 
 
 class UserInteraction(BaseModel):
+    """Model for user interaction requests.
+
+    This class represents requests for user input or clarification
+    during agent execution.
+
+    Attributes:
+        message: The message to display to the user requesting interaction.
+    """
+
     message: str
 
 
@@ -230,22 +280,36 @@ def user_interaction(message: str) -> UserInteraction:  # noqa: ARG001
 
 
 class AllStepsMarkedCompleted(BaseModel):
-    """
-    All steps have been marked as completed.
-    """
+    """Marker class indicating all plan steps have been completed.
 
-    ...
+    This class is used to signal that all steps in the execution plan
+    have been marked as completed and the task is finished.
+    """
 
 
 class NotAllStepsMarkedCompleted(BaseModel):
-    """
-    Not all steps have been marked as completed.
+    """Marker class indicating that not all plan steps are completed.
+
+    This class is used when some steps in the execution plan are still
+    pending completion, with a message explaining what needs to be done.
+
+    Attributes:
+        message: Description of which steps are incomplete and what action is needed.
     """
 
     message: str
 
 
 class TaskResult(BaseModel):
+    """Model for final task execution results.
+
+    This class represents the final output message after completing
+    a task execution.
+
+    Attributes:
+        message: The final result message to return to the user.
+    """
+
     message: str
 
 
@@ -291,6 +355,17 @@ act_toolset = FunctionToolset(
 
 
 def step_toolset(ctx: RunContext[AgentDeps]) -> AbstractToolset[Any] | None:
+    """Get the currently active toolset for step execution.
+
+    This function returns the toolset that has been fetched for the current
+    execution step, if the agent is in ACT mode.
+
+    Args:
+        ctx: The run context containing agent dependencies.
+
+    Returns:
+        The currently fetched toolset if in ACT mode, None otherwise.
+    """
     return (
         ctx.deps.toolsets.get(ctx.deps.fetched_toolset)
         if ctx.deps.fetched_toolset is not None and ctx.deps.mode == Mode.ACT
@@ -301,6 +376,18 @@ def step_toolset(ctx: RunContext[AgentDeps]) -> AbstractToolset[Any] | None:
 async def prepare_output_tools(
     ctx: RunContext[AgentDeps], tool_defs: list[ToolDefinition]
 ) -> list[ToolDefinition] | None:
+    """Filter output tools based on agent mode.
+
+    This function filters the available output tools to only include
+    task_result when the agent is in ACT mode.
+
+    Args:
+        ctx: The run context containing agent dependencies.
+        tool_defs: List of available tool definitions.
+
+    Returns:
+        Filtered list of tool definitions, or None if no tools match the criteria.
+    """
     return [tool_def for tool_def in tool_defs if "task_result" in tool_def.name and ctx.deps.mode == Mode.ACT]
 
 
@@ -335,6 +422,19 @@ truncate_update_call = ToolEdit(
 def create_agent(
     retries: int = 3, instructions: list[str] | str | None = None
 ) -> Agent[AgentDeps, DeferredToolRequests | TaskResult]:
+    """Create a configured AI agent for task execution.
+
+    This function creates and configures an AI agent with planning and execution
+    capabilities, including toolsets for managing plans and executing steps.
+
+    Args:
+        retries: Number of retry attempts for failed operations. Defaults to 3.
+        instructions: Additional instructions for the agent. Can be a string or
+            list of strings. Defaults to None.
+
+    Returns:
+        Configured Agent instance ready for task execution.
+    """
     if instructions is not None:
         instructions = [instructions] if isinstance(instructions, str) else instructions
     else:
@@ -380,6 +480,17 @@ def create_agent(
 
 
 def handle_deferred_tool_requests(deferred_tool_requests: DeferredToolRequests) -> DeferredToolResults:
+    """Handle deferred tool requests by collecting user input.
+
+    This function processes deferred tool calls, particularly for user interaction
+    requests, by collecting input from the user and returning the results.
+
+    Args:
+        deferred_tool_requests: The deferred tool requests to process.
+
+    Returns:
+        Processed results for the deferred tool calls.
+    """
     plan_review_prompt = "Please review the plan. Shall I execute it?"
     results = DeferredToolResults()
     for call in deferred_tool_requests.calls:
