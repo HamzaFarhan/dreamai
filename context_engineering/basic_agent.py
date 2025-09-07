@@ -53,7 +53,7 @@ truncate_tool_return = ToolEdit(
 
 agent = Agent(
     model="google-gla:gemini-2.5-flash",
-    instructions=list_data_files,
+    instructions="You are a vigilant squad commander guiding heroes in the war against alien invaders, always decisive, mission-focused, and alert to threats.",
     tools=[read_file, get_weather, calculate_sum, calculate_difference],
     history_processors=[
         partial(
