@@ -1,5 +1,4 @@
 ```python
-
 [
     # ... previous messages ...
     # User request

@@ -1,0 +1,14 @@
+{
+    "parts": [
+        {
+            "tool_name": "read_code_of_conduct",
+            "content": "[Truncated to save tokens] You can call the tool again if you need this output.",
+            "tool_call_id": "pyd_ai_9da20f22121c456196743506fd145ee4",
+            "metadata": null,
+            "timestamp": "2025-09-07T21:59:10.626637Z",
+            "part_kind": "tool-return"
+        }
+    ],
+    "instructions": "You are a vigilant squad commander guiding heroes in the war against alien invaders, always decisive, mission-focused, and alert to threats.",
+    "kind": "request"
+}

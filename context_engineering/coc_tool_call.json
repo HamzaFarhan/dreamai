@@ -1,0 +1,87 @@
+[
+    {
+        "parts": [
+            {
+                "content": "what is point 18 in our code of conduct?",
+                "timestamp": "2025-09-07T21:59:09.205599Z",
+                "part_kind": "user-prompt"
+            }
+        ],
+        "instructions": "You are a vigilant squad commander guiding heroes in the war against alien invaders, always decisive, mission-focused, and alert to threats.",
+        "kind": "request"
+    },
+    {
+        "parts": [
+            {
+                "tool_name": "read_code_of_conduct",
+                "args": {},
+                "tool_call_id": "pyd_ai_9da20f22121c456196743506fd145ee4",
+                "part_kind": "tool-call"
+            }
+        ],
+        "usage": {
+            "input_tokens": 618,
+            "cache_write_tokens": 0,
+            "cache_read_tokens": 0,
+            "output_tokens": 14,
+            "input_audio_tokens": 0,
+            "cache_audio_read_tokens": 0,
+            "output_audio_tokens": 0,
+            "details": {
+                "text_prompt_tokens": 618
+            }
+        },
+        "model_name": "gemini-2.5-flash",
+        "timestamp": "2025-09-07T21:59:10.624485Z",
+        "kind": "response",
+        "provider_name": "google-gla",
+        "provider_details": {
+            "finish_reason": "STOP"
+        },
+        "provider_response_id": "LgC-aNuBIuOznsEPrJz9gAw"
+    },
+    {
+        "parts": [
+            {
+                "tool_name": "read_code_of_conduct",
+                "content": "\n# Hero Squad Code of Conduct\n\n1. Always be battle-ready and arrive at mission briefings on time.  \n2. Respect fellow heroes, allies, and our base of operations.  \n3. Keep comms clear, professional, and mission-focused.  \n4. Complete your assigned quests and report results promptly.  \n5. Wear the appropriate armor or disguise for each mission.  \n6. Guard secret intel with your life—no leaks to alien spies.  \n7. Use squad gadgets and weapons responsibly.  \n8. Report strange signals, anomalies, or alien sightings ASAP.  \n9. Zero tolerance for betrayal, dishonor, or abandoning teammates.  \n10. Recharge only during designated rest cycles.  \n11. Follow all safety protocols in battle and training sims.  \n12. Own your mistakes—heroes take responsibility.  \n13. No disappearing without notifying Command.  \n14. Keep your gear and locker spotless.  \n15. Share intel and tactics in team huddles.  \n16. No holo-scrolling or personal calls mid-battle.  \n17. Secure approval before warp jumps or time off.  \n18. Meet mission deadlines and uphold quality standards.  \n19. Honor truth, courage, and loyalty at all times.  \n20. Breaking the Code may result in exile from the squad.  \n",
+                "tool_call_id": "pyd_ai_9da20f22121c456196743506fd145ee4",
+                "metadata": null,
+                "timestamp": "2025-09-07T21:59:10.626637Z",
+                "part_kind": "tool-return"
+            }
+        ],
+        "instructions": "You are a vigilant squad commander guiding heroes in the war against alien invaders, always decisive, mission-focused, and alert to threats.",
+        "kind": "request"
+    },
+    {
+        "parts": [
+            {
+                "content": "Point 18 in the Code of Conduct states: \"Meet mission deadlines and uphold quality standards.\"",
+                "part_kind": "text"
+            }
+        ],
+        "usage": {
+            "input_tokens": 972,
+            "cache_write_tokens": 0,
+            "cache_read_tokens": 698,
+            "output_tokens": 20,
+            "input_audio_tokens": 0,
+            "cache_audio_read_tokens": 0,
+            "output_audio_tokens": 0,
+            "details": {
+                "cached_content_tokens": 698,
+                "text_prompt_tokens": 972,
+                "text_cache_tokens": 698
+            }
+        },
+        "model_name": "gemini-2.5-flash",
+        "timestamp": "2025-09-07T21:59:11.539797Z",
+        "kind": "response",
+        "provider_name": "google-gla",
+        "provider_details": {
+            "finish_reason": "STOP"
+        },
+        "provider_response_id": "LwC-aPPxG9mC7M8P0NLp6Q4"
+    }
+]
