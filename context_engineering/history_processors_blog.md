@@ -1,6 +1,6 @@
-# Context Engineering Using History Processors in Pydantic AI
+# Smart Context Engineering with Pydantic AI - Part 1: History Processing for Long-Running Tasks
 
-### This is the first blog in series about Context Engineering using Pydantic AI.
+### This is the first blog in series about Context Engineering with Pydantic AI.
 
 As we know by now, an agent is only as good as the context it is given.  
 The first trick every AI Engineer learns is adding a `<current_date></current_date>` tag to the prompt/context because every model has its own knowledge cutoff date.  
@@ -583,7 +583,7 @@ We have 12 plasma rifles left.
 > q
 ```
 
-Notice how our `input_tokens` went down significantly.
+Notice how our `input_tokens` went down significantly. Imagine if we had loaded an entire PDF with thousands of tokens, completely irrelevant to the current task.
 
 ### Message History JSON
 
