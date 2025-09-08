@@ -137,20 +137,21 @@ agent = Agent(
     retries=3,
 )
 
-res = None
-message_history_path = MODULE_DIR.joinpath("message_history.json")
-user_prompt = input("> ")
+if __name__ == "__main__":
+    res = None
+    message_history_path = MODULE_DIR.joinpath("message_history.json")
+    user_prompt = input("> ")
 
-while True:
-    res = agent.run_sync(
-        user_prompt=user_prompt,
-        output_type=str,
-        message_history=ModelMessagesTypeAdapter.validate_json(message_history_path.read_bytes())
-        if message_history_path.exists()
-        else None,
-    )
-    message_history_path.write_bytes(res.all_messages_json())
-    print(f"\n============\n{res.usage()}\n============\n")
-    user_prompt = input(f"{res.output}\n> ")
-    if user_prompt.lower() in ["exit", "quit", "q"]:
-        break
+    while True:
+        res = agent.run_sync(
+            user_prompt=user_prompt,
+            output_type=str,
+            message_history=ModelMessagesTypeAdapter.validate_json(message_history_path.read_bytes())
+            if message_history_path.exists()
+            else None,
+        )
+        message_history_path.write_bytes(res.all_messages_json())
+        print(f"\n============\n{res.usage()}\n============\n")
+        user_prompt = input(f"{res.output}\n> ")
+        if user_prompt.lower() in ["exit", "quit", "q"]:
+            break
